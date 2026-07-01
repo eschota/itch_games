@@ -20,6 +20,8 @@ const MAX_MESSAGE_CHARS = 4000;
 const MAX_ROLE_CHARS = 80;
 const MAX_TASK_TEXT_CHARS = 2000;
 let deployRunning = false;
+let unsoccerChild = null;
+let shuttingDown = false;
 
 const TASK_ROLES = [
   "Orchestrator",
@@ -966,10 +968,77 @@ function argValue(name, fallback) {
   return fallback;
 }
 
+function spawnUnsoccerServer(port) {
+  const entry = path.join(ROOT, "unsoccer", "server", "dist", "index.js");
+  if (!fs.existsSync(entry)) {
+    console.warn(`unsoccer autostart skipped: missing ${entry}`);
+    return;
+  }
+  unsoccerChild = childProcess.spawn(process.execPath, [entry], {
+    cwd: ROOT,
+    env: {
+      ...process.env,
+      NODE_ENV: process.env.NODE_ENV || "production",
+      UNSOCCER_PORT: String(port)
+    },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  unsoccerChild.stdout.on("data", (chunk) => process.stdout.write(`[unsoccer] ${chunk}`));
+  unsoccerChild.stderr.on("data", (chunk) => process.stderr.write(`[unsoccer] ${chunk}`));
+  unsoccerChild.on("exit", (code, signal) => {
+    console.error(`unsoccer server exited code=${code} signal=${signal || ""}`);
+    unsoccerChild = null;
+    if (!shuttingDown) {
+      const timer = setTimeout(startUnsoccerServer, 3000);
+      timer.unref();
+    }
+  });
+}
+
+function startUnsoccerServer() {
+  if (process.env.UNSOCCER_AUTOSTART === "0") return;
+  if (unsoccerChild && unsoccerChild.exitCode === null && !unsoccerChild.killed) return;
+  const port = Number(process.env.UNSOCCER_PORT || 8787);
+  let settled = false;
+  const spawnIfNeeded = () => {
+    if (settled) return;
+    settled = true;
+    spawnUnsoccerServer(port);
+  };
+  const request = http.get({ hostname: "127.0.0.1", port, path: "/api/health", timeout: 1000 }, (response) => {
+    response.resume();
+    if (response.statusCode === 200) {
+      settled = true;
+      console.log(`unsoccer server already listening on 127.0.0.1:${port}`);
+      return;
+    }
+    spawnIfNeeded();
+  });
+  request.on("error", spawnIfNeeded);
+  request.on("timeout", () => {
+    request.destroy();
+    spawnIfNeeded();
+  });
+}
+
+function installShutdownHandlers() {
+  for (const signal of ["SIGINT", "SIGTERM"]) {
+    process.once(signal, () => {
+      shuttingDown = true;
+      if (unsoccerChild && unsoccerChild.exitCode === null && !unsoccerChild.killed) {
+        unsoccerChild.kill(signal);
+      }
+      process.exit(0);
+    });
+  }
+}
+
 function main() {
   const host = argValue("--host", process.env.AI_CHAT_HOST || "127.0.0.1");
   const port = Number(argValue("--port", process.env.AI_CHAT_PORT || "8765"));
   ensureDataDir();
+  installShutdownHandlers();
+  startUnsoccerServer();
   console.log(`telegram bridge ${telegramConfig().enabled ? "enabled" : "disabled"}`);
   http.createServer(handleRequest).listen(port, host, () => {
     console.log(`ai_chat node server listening on http://${host}:${port}`);

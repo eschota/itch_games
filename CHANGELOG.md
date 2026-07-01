@@ -1,5 +1,11 @@
 # Changelog
 
+## unsoccer v0.0.007
+
+- Bump release metadata after the production deploy/version drift report.
+- Synchronize package metadata, visible client badge, server health version,
+  acceptance check, and autodeploy artifact check on `v0.0.007`.
+
 ## unsoccer v0.0.003
 
 - Add server-authoritative snow weather, puddles, slush, and snowbank hazards.

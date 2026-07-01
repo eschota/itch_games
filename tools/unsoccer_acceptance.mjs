@@ -104,7 +104,7 @@ async function main() {
   try {
     const health = await waitForHealth(baseUrl, () => exitCode, stderrLines);
     assert.equal(health.ok, true);
-    assert.equal(health.version, "v0.0.006");
+    assert.equal(health.version, "v0.0.007");
 
     let state = (await api("POST", "/api/test/players", { count: 5 })).state;
     assert.equal(state.players.filter((player) => player.role === "player").length, 4);

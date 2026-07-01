@@ -1,4 +1,4 @@
-export const GAME_VERSION = "v0.0.006";
+export const GAME_VERSION = "v0.0.007";
 export const ROOM_ID = "unsoccer-default-room";
 export const MAX_ACTIVE_PLAYERS = 4;
 export const MAX_ROOM_CLIENTS = 32;
@@ -28,6 +28,8 @@ export type PlayerRole = "player" | "spectator";
 export type KickKind = "left" | "right" | "head" | "body";
 export type WeatherKind = "snow";
 export type HazardType = "puddle" | "slush" | "snowbank";
+export type AudioEventKind = "roster" | "kick" | "goal" | "countdown";
+export type RosterAudioChange = "join" | "leave" | "spectator";
 
 export interface Vec3 {
   x: number;
@@ -86,6 +88,39 @@ export interface ScoreState {
   orange: number;
 }
 
+export interface ServerAudioEventBase {
+  id: number;
+  serverTime: number;
+  tick: number;
+}
+
+export interface RosterAudioEvent extends ServerAudioEventBase {
+  kind: "roster";
+  change: RosterAudioChange;
+  playerId: string;
+  role: PlayerRole;
+}
+
+export interface KickAudioEvent extends ServerAudioEventBase {
+  kind: "kick";
+  kick: KickKind;
+  playerId: string;
+  position: Vec3;
+  speed: number;
+}
+
+export interface GoalAudioEvent extends ServerAudioEventBase {
+  kind: "goal";
+  team: TeamId;
+}
+
+export interface CountdownAudioEvent extends ServerAudioEventBase {
+  kind: "countdown";
+  remainingSeconds: number;
+}
+
+export type ServerAudioEvent = RosterAudioEvent | KickAudioEvent | GoalAudioEvent | CountdownAudioEvent;
+
 export interface JoinRequest {
   name?: string;
 }
@@ -111,6 +146,7 @@ export interface ServerState {
   message: string;
   countdown: number;
   weather: WeatherSnapshot;
+  audioEvents: ServerAudioEvent[];
 }
 
 export interface ClientInputMessage {

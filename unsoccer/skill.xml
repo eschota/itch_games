@@ -4,7 +4,7 @@
   <parent path="../itch_games.skill.md" />
   <entry file="unsoccer.skill.md" />
   <runtime url="https://io-games.mecharulez.com/unsoccer/" />
-  <version current="v0.0.006" />
+  <version current="v0.0.007" />
   <publicSurface owner="UI Designer" localUrl="http://127.0.0.1:8000/unsoccer/" itchEntry="dist/index.html">
     <rule>unsoccer/index.html is the public static page for the local server and production route until the built client is deployed there.</rule>
     <rule>UI Designer owns public page hierarchy, prototype status copy, catalog continuity, and itch.io presentation fit.</rule>
@@ -22,7 +22,7 @@
     <rule>Client bundles must not import server-only code.</rule>
     <rule>v0.0.002 keeps Russian player-facing text, HDR-style environment lighting, a visible sun, a 120-second realtime day cycle, an inertial perspective follow camera, and distinct server-authoritative body/left-foot/right-foot contacts.</rule>
     <rule>v0.0.003 keeps weather and hazards server-authoritative; any puddle, slush, or snowbank that changes movement or ball physics must also be visible in the client.</rule>
-    <rule>v0.0.006 aligns public client/server version and keeps production transport dependency-free: built-in Node WebSocket JSON plus HTTP polling fallback.</rule>
+    <rule>v0.0.007 aligns public client/server version and keeps production transport dependency-free: built-in Node WebSocket JSON plus HTTP polling fallback.</rule>
     <rule>Server-confirmed left-foot, right-foot, head, and body contacts must stay visually distinguishable and expose data-last-action-kind, data-last-action-player, and data-last-action-at for QA.</rule>
     <rule>Server owns physics, score, teams, and room assignment.</rule>
     <rule>Production transport is plain WebSocket JSON under /unsoccer/socket/ with HTTP polling fallback, implemented with built-in Node http/net/crypto primitives; do not require geckos.io, ws, or native node-datachannel on the Qwertystock host.</rule>

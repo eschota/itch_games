@@ -194,8 +194,8 @@ Use this root skill when changing, packaging, validating, or publishing the
 
 ## Current Behavior
 
-- Current game release: `v0.0.006`.
-- `unsoccer` current prototype release: `v0.0.006`.
+- Current game release: `v0.0.007`.
+- `unsoccer` current prototype release: `v0.0.007`.
 - `unsoccer` uses a headless authoritative Node server with Rapier3D physics,
   plain WebSocket transport, and HTTP polling fallback; the itch package is
   static client-only and needs the live game server for multiplayer.
@@ -218,7 +218,7 @@ Use this root skill when changing, packaging, validating, or publishing the
 - `unsoccer` v0.0.003 audio must expose debug counters for played and blocked
   Web Audio events and hydrate connection/local role cues after the first
   successful trusted browser unlock.
-- `unsoccer` v0.0.006 aligns the public client/server version and uses the
+- `unsoccer` v0.0.007 aligns the public client/server version and uses the
   built-in Node WebSocket JSON transport with HTTP polling fallback so
   production does not require geckos.io, `ws`, or native `node-datachannel`.
 - `v0.0.006` adds procedural Web Audio feedback and exposes

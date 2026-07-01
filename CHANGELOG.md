@@ -21,6 +21,8 @@
 - Fix the settings tab QA selector collision by keeping the active-tab debug
   state on `data-settings-active-tab` while controls use
   `button[data-settings-tab]`.
+- Stabilize the network HUD widget with fixed numeric columns and tabular
+  numerals so ping/snapshot updates do not resize the panel.
 - Add repo-side Ragdoll Soccer II itch/publication copy, checklist, storefront
   assets, and ledger references as prepared publication material while external
   itch.io URL proof remains separate.

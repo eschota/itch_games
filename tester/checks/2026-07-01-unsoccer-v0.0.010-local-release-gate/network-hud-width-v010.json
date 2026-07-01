@@ -1,0 +1,126 @@
+{
+  "checkedAt": "2026-07-01T15:34:28.015Z",
+  "target": "http://127.0.0.1:5181/",
+  "result": {
+    "ok": true,
+    "title": "UnSoccer v0.0.010 | Ragdoll Soccer II",
+    "versionBadge": "v0.0.010 / 0.61 MB",
+    "gameVersion": "v0.0.010",
+    "weight": "0.61 MB",
+    "stablePanelWidth": true,
+    "stableCellWidths": true,
+    "noOverflow": true,
+    "measurements": [
+      {
+        "value": {
+          "transport": "websocket",
+          "ping": "9 ms",
+          "snapshot": "8 ms"
+        },
+        "panelWidth": 264,
+        "widths": [
+          78,
+          64,
+          84
+        ],
+        "lefts": [
+          1173,
+          1259,
+          1331
+        ],
+        "overflow": false,
+        "grid": "78px 64px 84px",
+        "pingJustify": "flex-end",
+        "fontVariant": "tabular-nums"
+      },
+      {
+        "value": {
+          "transport": "websocket",
+          "ping": "41 ms",
+          "snapshot": "40 ms"
+        },
+        "panelWidth": 264,
+        "widths": [
+          78,
+          64,
+          84
+        ],
+        "lefts": [
+          1173,
+          1259,
+          1331
+        ],
+        "overflow": false,
+        "grid": "78px 64px 84px",
+        "pingJustify": "flex-end",
+        "fontVariant": "tabular-nums"
+      },
+      {
+        "value": {
+          "transport": "websocket",
+          "ping": "100 ms",
+          "snapshot": "999 ms"
+        },
+        "panelWidth": 264,
+        "widths": [
+          78,
+          64,
+          84
+        ],
+        "lefts": [
+          1173,
+          1259,
+          1331
+        ],
+        "overflow": false,
+        "grid": "78px 64px 84px",
+        "pingJustify": "flex-end",
+        "fontVariant": "tabular-nums"
+      },
+      {
+        "value": {
+          "transport": "websocket",
+          "ping": "9999 ms",
+          "snapshot": "9999 ms"
+        },
+        "panelWidth": 264,
+        "widths": [
+          78,
+          64,
+          84
+        ],
+        "lefts": [
+          1173,
+          1259,
+          1331
+        ],
+        "overflow": false,
+        "grid": "78px 64px 84px",
+        "pingJustify": "flex-end",
+        "fontVariant": "tabular-nums"
+      },
+      {
+        "value": {
+          "transport": "offline",
+          "ping": "-- ms",
+          "snapshot": "snapshot --"
+        },
+        "panelWidth": 264,
+        "widths": [
+          78,
+          64,
+          84
+        ],
+        "lefts": [
+          1173,
+          1259,
+          1331
+        ],
+        "overflow": false,
+        "grid": "78px 64px 84px",
+        "pingJustify": "flex-end",
+        "fontVariant": "tabular-nums"
+      }
+    ]
+  }
+}

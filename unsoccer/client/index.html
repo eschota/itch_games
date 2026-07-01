@@ -10,7 +10,32 @@
     />
     <link rel="icon" href="data:," />
     <style>
+      html .network-panel {
+        grid-template-columns: 78px 64px 84px;
+      }
+
+      html .network-panel span {
+        min-width: 0;
+        justify-content: center;
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: "tnum" 1;
+      }
+
+      html .network-panel #transport-status {
+        justify-content: flex-start;
+      }
+
+      html .network-panel #ping-status,
+      html .network-panel #snapshot-age {
+        justify-content: flex-end;
+        font-family: "Roboto Mono", "SFMono-Regular", Consolas, monospace;
+      }
+
       @media (max-width: 840px) {
+        html .network-panel {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
         html .toggle-grid label {
           grid-template-columns: 20px minmax(0, 1fr);
         }

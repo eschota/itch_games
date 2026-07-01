@@ -264,7 +264,9 @@ Use this root skill when changing, packaging, validating, or publishing the
   before publication, with final UI evidence under
   `ui_designer/public_pages/unsoccer-ui-final-local-gate-v0.0.010-rerun.*` and
   Tester evidence under
-  `tester/checks/2026-07-01-unsoccer-v0.0.010-local-release-gate/`.
+  `tester/checks/2026-07-01-unsoccer-v0.0.010-local-release-gate/`. The
+  network HUD uses fixed numeric columns and tabular numerals so live ping/
+  snapshot counters do not resize the panel.
 - `v0.0.006` adds procedural Web Audio feedback and exposes
   `window.orbitalCourierAudio` plus `orbital-courier:audio-event` so future
   network code can replicate semantic sound events instead of audio files.

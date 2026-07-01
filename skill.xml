@@ -22,6 +22,7 @@
     <child path="ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.json" role="unsoccer-ui-v0.0.009-runtime-smoke-json" />
     <child path="ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.png" role="unsoccer-ui-v0.0.009-runtime-smoke-screenshot" />
     <child path="ui_designer/public_pages/unsoccer-ui-final-local-gate-v0.0.010-rerun.json" role="unsoccer-ui-v0.0.010-final-local-gate-json" />
+    <child path="ui_designer/public_pages/unsoccer-ui-network-hud-stability-v0.0.010.md" role="unsoccer-ui-v0.0.010-network-hud-stability-note" />
     <child path="game_designer_skill.md" role="game-designer-root" />
     <child path="game_designer/game_designer.skill.md" role="game-designer-workspace" />
     <child path="game_designer/briefs/unsoccer-v0.0.009-core-loop.md" role="unsoccer-v0.0.009-core-loop-brief" />
@@ -258,7 +259,7 @@
     <rule>v0.0.009 ships the Art Director runtime 3D/animation pass: expanded courtyard models, animated procedural footballer rigs, visible sun/moon/orbit marker, and 120-second lighting datasets.</rule>
     <rule>v0.0.009 fixes team-relative WASD movement, immediate local controlled-player rendering, and removes artificial pitch bounds from player movement.</rule>
     <rule>v0.0.009 ships the UI Designer runtime pass: redesigned HUD, event/status/network panels, toolbar, settings modal tabs, localStorage settings, remappable input, audio/graphics/network/accessibility controls, and QA-readable UI datasets.</rule>
-    <rule>v0.0.010 is the unified 0010 release build with all current runtime workstreams, a camera-framed sun/moon marker, synchronized version surfaces, and repo-side publication evidence.</rule>
+    <rule>v0.0.010 is the unified 0010 release build with all current runtime workstreams, a camera-framed sun/moon marker, synchronized version surfaces, stable network HUD numeric columns, and repo-side publication evidence.</rule>
     <rule>tools/unsoccer_acceptance.mjs derives the expected version from package.json.games.unsoccer.version and checks HTTP fallback join/input/state.</rule>
     <rule>npm run package:unsoccer rebuilds before writing dist/unsoccer-itch.zip so stale dist output cannot become the release package.</rule>
   </game>
@@ -283,6 +284,7 @@
     <surface path="ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.json" role="unsoccer-ui-runtime-smoke-evidence" />
     <surface path="ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.png" role="unsoccer-ui-runtime-smoke-screenshot" />
     <surface path="ui_designer/public_pages/unsoccer-ui-final-local-gate-v0.0.010-rerun.json" role="unsoccer-ui-v0.0.010-final-local-gate" />
+    <surface path="ui_designer/public_pages/unsoccer-ui-network-hud-stability-v0.0.010.md" role="unsoccer-ui-network-hud-stability-note" />
     <rule>Itch upload packages must exclude internal skill, role, agent coordination, server, and source-control docs.</rule>
     <rule>Public game pages, clients, screenshots, and assets are static bundles served directly by nginx from each game public directory; do not add app-server routes for static games or assets unless the Producer explicitly asks for dynamic behavior.</rule>
     <rule>Orbital Courier itch upload must include vendored Three.js and must not require cdn.jsdelivr.net at runtime.</rule>

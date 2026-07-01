@@ -71,9 +71,10 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
   synchronized when changing this surface.
 - `v0.0.010` is the unified 0010 release build. It preserves the v0.0.009
   runtime workstreams, frames the visible sun/moon marker for screenshots,
-  synchronizes the current release version across package, client, server,
-  shared, acceptance, public page, and skill surfaces, and keeps external
-  itch.io publication blocked until the URL/upload evidence is recorded.
+  stabilizes the network HUD numeric columns, synchronizes the current release
+  version across package, client, server, shared, acceptance, public page, and
+  skill surfaces, and keeps external itch.io publication blocked until the
+  URL/upload evidence is recorded.
 - `tools/unsoccer_acceptance.mjs` derives the expected version from
   `package.json.games.unsoccer.version`; keep it that way so version bumps do
   not require multiple acceptance edits.

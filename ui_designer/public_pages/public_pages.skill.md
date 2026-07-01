@@ -40,6 +40,8 @@ Use this file for UI Designer work inside
   minimum widths.
 - `unsoccer-ui-release-gate-v0.0.010.md`: v0.0.010 UI release-gate report and
   publication follow-up notes.
+- `unsoccer-ui-network-hud-stability-v0.0.010.md`: UI Designer note for the
+  v0.0.010 network HUD fixed-column/tabular-numeral stability patch.
 
 ## Rules
 

@@ -4,10 +4,10 @@ Orbital Courier is a tiny browser game built with Three.js for itch.io HTML5 upl
 
 ## Play
 
+- The run starts automatically when the page opens.
 - Move with `A`/`D`, arrow keys, pointer drag, or touch drag.
 - Collect cyan energy cores.
 - Avoid red debris.
-- The run starts automatically when the page opens.
 - Press `Space` or click/tap `Start` after a run ends to restart.
 
 ## Version

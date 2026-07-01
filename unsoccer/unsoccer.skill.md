@@ -14,6 +14,9 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
   local/static host until the built client is promoted there.
 - `client/`: Vite TypeScript browser client for rendering, input, HUD,
   procedural Web Audio, and asset loading.
+- `client/src/environment-props.ts`: Art Director courtyard extension, dense
+  procedural dressing, local Free3D environment GLB roster hydration, and
+  model-count QA datasets.
 - `server/`: Node authoritative game server using the MavonEngine stack shape:
   headless simulation, Rapier3D physics, and WebSocket transport.
 - `shared/`: protocol constants, message types, and gameplay tuning shared by
@@ -22,7 +25,7 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 
 ## Rules
 
-- Current release: `v0.0.014`.
+- Current release: `v0.0.029`.
 - Keep client and server separated; browser bundles must not import server-only
   modules.
 - The server is authoritative for room assignment, teams, player physics, ball
@@ -30,7 +33,7 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 - First 4 connected clients are active players. Additional clients up to 32 are
   spectators/testers so QA can observe without displacing a player.
 - Controls: WASD movement, `Shift` sprint, `Space` jump, left mouse foot kick,
-  right mouse hand hit, mouse wheel head hit.
+  right mouse hand hit, middle mouse button head hit.
 - `v0.0.002` engine pass must preserve the Producer requirements: Russian
   player-facing text, HDR-style environment lighting, visible sun, 120-second
   realtime day cycle, reactive lighting, inertial perspective camera over the
@@ -104,6 +107,113 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
   the different Free3D `6299851/rigged_unity.glb` with WebP albedo/normal/ORM
   maps applied at load time and separate FBX clips for `idle`, `walk`, `run`,
   and `jump`, avoiding the previous single 44s `all_animations` clip autoplay.
+- `v0.0.015` is the character-controller extraction build. Runtime players use
+  `client/src/character-controller.ts` for reusable Free3D GLB/FBX loading,
+  velocity-driven idle/walk/run/jump transitions with hysteresis and time
+  scaling, and procedural bone-IK overlays for foot, hand, head, body, and jump
+  strikes. `client/character-controller-test.html` is the local standalone
+  validation page. The build also extends the authoritative day cycle to 300
+  seconds, shortens true dark hours to 23:00-03:00 with twilight ramps at
+  03:00-05:00 and 21:00-23:00, and adds four night-only floodlight masts with
+  local volumetric beam meshes.
+- `v0.0.016` thins goal posts/crossbars to half the previous radius, uses
+  neutral post material instead of team-yellow/blue paint, scores goals only
+  when the ball crosses the front goal-line plane from the field side, rejects
+  back-net entries, and adds visible center-circle, center-spot, penalty-box,
+  goal-area, and penalty-spot field markings.
+- `v0.0.017` adds the local-player stamina HUD meter with ready/recovering/low/
+  sprint/exhausted states, QA datasets for local stamina, and a longer orange
+  hand-strike visual trail plus hand-action QA datasets.
+- `v0.0.017` character input/strike correction uses middle mouse button for
+  head hits, keeps mouse wheel from triggering attacks, sends foot/hand ball
+  impulses forward along player yaw while preserving the limb-specific contact
+  point, and alternates hand-hit visuals/contact side without adding a new
+  network `KickKind`.
+- `v0.0.018` camera correction keeps the runtime camera anchored to the
+  controlled player, applies smoothed velocity lead for dynamic movement,
+  removes ball-driven camera drift, and renders a large ball arrow plus smaller
+  player arrows when targets are outside the camera view.
+- `v0.0.018` character roster extension keeps `client/src/character-controller.ts`
+  as the reusable loader/controller, expands local runtime characters to 11
+  entries, and makes `client/character-controller-test.html` cycle the roster
+  by arrow keys plus UI. Free3D entries use local 1k `rigged_unity.glb`, WebP
+  albedo/normal/ORM maps, and separate FBX `idle`/`walk`/`run`/`jump` clips;
+  AutoRig task entries may use a local textured `animations.glb` plus local FBX
+  preview clips when full bundle/download endpoints are locked.
+- `v0.0.019` goal-net correction keeps the net local-only but closes the goal
+  cage visually with separate back, roof, left-side, and right-side Verlet
+  panels per goal; `data-goal-net-panels` should be `8` for two goals.
+- `v0.0.020` ball-size correction halves the shared authoritative
+  `BALL_RADIUS` from `0.48` to `0.24`; do not scale only the mesh, because the
+  server collider, scoring heights, contacts, and acceptance fixtures must stay
+  consistent with the visible ball. Browser QA exposes this as
+  `data-ball-radius="0.24"`.
+- `v0.0.021` changes post-goal flow and half-size ball tuning. A scored goal
+  opens a 5-second team celebration phase, blocks normal ball kicks during the
+  reset sequence, then moves the ball back to kickoff over a 1-second
+  server-authored flight before starting the kickoff countdown. `ServerState`
+  exposes `goalReset.phase`, `remainingMs`, and `returnProgress`; browser QA
+  mirrors this through `data-goal-reset-*`. The half-size ball keeps
+  `BALL_RADIUS=0.24` but uses `BALL_DENSITY=3.6` and lower foot/hand/head/body
+  impulses so normal hits no longer launch it like a runaway projectile.
+- `v0.0.022` retargets Free3D character hand-strike IK: alternating hand hits
+  keep logical left/right debug side, compensate the current roster's mirrored
+  arm bones, and drive the punch forward at upper-chest/shoulder height.
+  Runtime fallback hand-hit flash/trail targets must stay raised to match.
+- `v0.0.022` also smooths keyboard movement at the authoritative server level:
+  raw WASD axes are ramped, released axes decay instead of disappearing, the
+  opposite active axis uses a faster takeover rate, and controlled movement
+  velocity accelerates/brakes smoothly. Client prediction mirrors these
+  constants and browser QA exposes `data-movement-smoothing`,
+  `data-local-move-speed`, and `data-local-move-axis`.
+- `v0.0.023` assigns player avatars through a server-side shuffled
+  non-repeating deck sourced from `CHARACTER_ROSTER`. Do not overwrite
+  `player.characterId` during role/team rebalancing; the assignment should stay
+  stable for that runtime player.
+- `v0.0.024` makes the player ground indicator a team marker: the ring and
+  subtle ground halo use the current team color, and local browser QA exposes
+  `data-local-team-marker` plus `data-local-team-marker-color`.
+- `v0.0.024` adds a distinct `jumpRun` controller state for sprint/high-velocity
+  jumps. Until a dedicated run-jump FBX is present in the runtime roster,
+  `jumpRun` clones the normal jump clip and applies a stronger forward-leap IK
+  overlay exposed through `data-player-rig-jump-style=run`.
+- `v0.0.025` camera correction follows a lerped authoritative player offset,
+  not skinned mesh or bone transforms, and derives dynamic lead from smoothed
+  measured anchor velocity. Browser QA exposes
+  `data-camera-anchor-smoothing`, `data-camera-anchor-offset`, and
+  `data-camera-follow-speed`.
+- `v0.0.025` adds server-authored `player.ragdoll`/`ragdollAt` when stamina
+  reaches zero. Sprint exhaustion preserves previous movement inertia;
+  stamina-emptying hits apply heavy knockback/lift; local prediction must not
+  override ragdoll snapshots; browser QA exposes `data-player-rig-ragdoll` and
+  `data-local-player-ragdoll`.
+- `v0.0.026` widens night floodlight coverage: four masts keep local volumetric
+  cone meshes but use a wider SpotLight angle, broader beam radius, per-mast
+  white-temperature variation, and subtle deterministic flicker. Browser QA
+  exposes `data-stadium-light-beam-angle`, `data-stadium-light-beam-radius`,
+  `data-stadium-light-palette`, and `data-stadium-light-flicker`.
+- `v0.0.027` makes player-ball contact height-aware: body bumps require
+  vertical body overlap, foot/hand/head hits require vertical reach, and
+  acceptance guards that jumps can clear the ball while unreachable high balls
+  cannot be played by head input.
+- `v0.0.028` extends the residential courtyard through
+  `client/src/environment-props.ts`: it keeps the playable field bounds
+  unchanged, adds outer roads/sidewalks/garden pockets, places 100+ procedural
+  environment instances, and hydrates 8 local Free3D environment GLB assets
+  from `client/public/assets/environment/free3d/roster.json`. Browser QA
+  exposes `data-environment-model-instances`,
+  `data-procedural-environment-instances`,
+  `data-free3d-environment-instances`,
+  `data-free3d-environment-asset-count`, and
+  `data-free3d-environment-loaded`.
+- `v0.0.029` doubles ordinary foot/hand/head ball-hit power and adds
+  server-authored LMB left-foot charge from 2x tap power to 4x full power over
+  one second. Held charge can fire once on ball contact before release, and
+  browser QA exposes `data-local-kick-charge` plus
+  `data-local-kick-charge-held`.
+- `v0.0.029` also widens gameplay camera framing and adds visible sideline
+  pennant/bench strips so the dense v0.0.028 courtyard dressing is visible in
+  normal play while the playable pitch remains clear.
 - `tools/unsoccer_acceptance.mjs` derives the expected version from
   `package.json.games.unsoccer.version`; keep it that way so version bumps do
   not require multiple acceptance edits.
@@ -142,3 +252,10 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
   `assets/models/characters/roster.json`,
   `assets/licenses/free3d-provenance.json`, and
   `client/public/assets/characters/free3d/roster.json`.
+- Character roster entries must stay synchronized with
+  `shared/src/index.ts::CHARACTER_ROSTER`; do not add a character id there until
+  the public roster entry, local textures, and local FBX clips are present.
+- AutoRig task character provenance should record the canonical `/task?id=...`
+  page, `/api/task/...` metadata, `/animations.glb` source, whether
+  `/bundle.zip` or direct animation downloads were locked, and which local FBX
+  preview clips were shipped.

@@ -5,37 +5,37 @@ status. A public page is not complete until the external URL, uploaded zip,
 exact live copy, screenshots, publication date, and version match are recorded
 here and in the per-game checklist.
 
-## Current Production Evidence
+## Current Local Publication Target
 
-Checked on 2026-07-01 at 13:34 UTC. This is a historical production snapshot;
-the UI/settings runtime integration below was verified locally and does not by
-itself prove the external public route or itch.io page is updated.
+Checked from the working copy on 2026-07-02 during the UI Designer copy pass.
+This is repo-local publication preparation, not proof that the external itch.io
+page has been changed.
 
-The public UnSoccer version is currently split. API/server report `v0.0.008`,
-but raw public page HTML/meta and the visible badge still show `v0.0.007`.
-The Git commit below is a deployment/verification snapshot only; partial
-release commits may advance before every player-facing surface catches up.
+| Surface | Evidence | Status |
+| --- | --- | --- |
+| UnSoccer source/build target | `package.json` and `package.json.games.unsoccer.version` record `v0.0.029` | Use `v0.0.029` for the prepared itch.io copy |
+| UnSoccer upload package | `dist/unsoccer-itch.zip` exists locally | Ready for orchestrator upload step; not verified as uploaded to itch.io |
+| UnSoccer v0.0.029 QA | `tester/checks/2026-07-02-unsoccer-v0.0.029-kick-charge/browser-qa.json` records visible badge `v0.0.029 / 83.79 MB`, WebSocket transport, `data-local-kick-charge`, and `data-local-kick-charge-held` | Local browser evidence supports the v0.0.029 copy claims |
+| Static HTML5 contract | Itch upload is a static browser client and uses the live authoritative multiplayer server for real matches | Keep this warning visible on the itch page |
+| External itch.io | Public itch.io URL is not recorded | Do not claim external publication complete |
+
+## Historical Production Evidence
+
+Checked on 2026-07-01 at 13:34 UTC. This older snapshot is retained for audit
+history only and no longer blocks the prepared `v0.0.029` copy by itself.
+
+The public UnSoccer version was split at that time: API/server reported
+`v0.0.008`, while raw public page HTML/meta and the visible badge still showed
+`v0.0.007`. Any external publish still needs a fresh route/package/embed check
+by the orchestrator before it is called live.
 
 | Surface | Evidence | Status |
 | --- | --- | --- |
 | IO Games catalog | `https://io-games.mecharulez.com/` is the local-server catalog | Keep game cards synchronized with the live routes before external publishing |
-| Orbital Courier route | `https://io-games.mecharulez.com/orbital-courier/` shows `v0.0.006` | Live local-server game route is current |
-| UnSoccer route | `https://io-games.mecharulez.com/unsoccer/` serves built client asset `index-DIqAWeep.js`, but raw HTML meta and visible `#version-badge` still show `v0.0.007` | Public page copy/badge is not yet `v0.0.008` |
-| UnSoccer API | `/unsoccer/api/health` returns JSON `version=v0.0.008` with websocket/http transports enabled | Multiplayer server contract is live for `v0.0.008` |
-| AI chat health | `/ai_chat/api/status` reports `project_version=v0.0.008`, `main@fba16d3`, `dirty=false` | Project/deploy metadata is `v0.0.008` |
-| Version split | Public page badge/meta are `v0.0.007`; API/server/project are `v0.0.008` | Do not publish or advertise `v0.0.008` externally until public route HTML/meta, badge, API, package, screenshots, and QA evidence agree |
-
-## Current Local Implementation Evidence
-
-Checked on 2026-07-01 at 15:08 UTC.
-
-| Surface | Evidence | Status |
-| --- | --- | --- |
-| UnSoccer source/build target | `package.json`, `unsoccer/shared/src/index.ts`, and client HTML target `v0.0.010` | Local runtime target is `v0.0.010` |
-| UnSoccer UI release gate | `unsoccer-ui-final-local-gate-v0.0.010-rerun.json` and matching viewport PNGs show no HUD overflow, no toolbar/version/control-hint overlap, all settings tabs usable, selected tab count `1`, and visible badge `v0.0.010 / 0.61 MB` on desktop/mobile/minimum widths | UI layout and visible version pass locally |
-| UnSoccer Tester release gate | `tester/checks/2026-07-01-unsoccer-v0.0.010-local-release-gate/browser-retry-v010.json` verifies desktop/mobile browser, WebSocket, settings/input, day-cycle/art datasets, and audio datasets | Local browser QA passed |
-| UnSoccer Art release gate | `art_director/checks/2026-07-01-unsoccer-v0.0.010-final-local-art-gate-retry.md` verifies courtyard readability, animated rig visibility, `sunFramed=true`, day-cycle datasets, and mobile framing | Local Art Director visual gate passed |
-| External itch.io | Public itch.io URL is not recorded | Do not claim external publication complete |
+| Orbital Courier route | `https://io-games.mecharulez.com/orbital-courier/` showed `v0.0.006` | Historical live local-server game route evidence |
+| UnSoccer route | `https://io-games.mecharulez.com/unsoccer/` served built client asset `index-DIqAWeep.js`, but raw HTML meta and visible `#version-badge` still showed `v0.0.007` | Historical split evidence only |
+| UnSoccer API | `/unsoccer/api/health` returned JSON `version=v0.0.008` with websocket/http transports enabled | Historical multiplayer server evidence only |
+| AI chat health | `/ai_chat/api/status` reported `project_version=v0.0.008`, `main@fba16d3`, `dirty=false` | Historical deploy metadata only |
 
 ## Game Publication Records
 
@@ -63,12 +63,9 @@ Required final evidence:
 ### Ragdoll Soccer II
 
 - Local production URL: `https://io-games.mecharulez.com/unsoccer/`.
-- Current recorded production version: split between page `v0.0.007` and
-  API/server `v0.0.008` in the 13:34 UTC snapshot.
-- Current local source/build target: `v0.0.010`.
-- Pending publication target: `v0.0.010` only after public route HTML/meta,
-  visible badge, API health, uploaded package, screenshots, and QA evidence all
-  agree.
+- Current repo-local publication target: `v0.0.029`.
+- Current external itch.io publication status: not published/verified in this
+  ledger.
 - Upload package: `dist/unsoccer-itch.zip`.
 - Page copy: `unsoccer-itch-page-copy.md`.
 - Publish checklist: `unsoccer-itch-publishing-checklist.md`.
@@ -77,28 +74,22 @@ Required final evidence:
 - UI/settings runtime evidence:
   `unsoccer-ui-final-local-gate-v0.0.010-rerun.json` and matching viewport
   screenshots.
-- Tester release evidence:
-  `tester/checks/2026-07-01-unsoccer-v0.0.010-local-release-gate/browser-retry-v010.json`.
-- Art release evidence:
-  `art_director/checks/2026-07-01-unsoccer-v0.0.010-final-local-art-gate-retry.md`.
+- Current Tester release evidence:
+  `tester/checks/2026-07-02-unsoccer-v0.0.029-kick-charge/browser-qa.json`.
 - External itch.io project URL: not recorded.
-- Publication status: draft copy/assets/checklist exist; external itch.io
-  publication is blocked until the selected version is synchronized across
-  code, package, production route, screenshots, and server URL strategy. The
-  UI/settings redesign and local browser gates are carried into `v0.0.010`, but
-  this is not an external itch.io publication until the ledger records live
-  upload evidence.
+- Publication status: draft copy/checklist are prepared for `v0.0.029`;
+  external itch.io publication is still unverified until the ledger records the
+  external URL, uploaded zip, exact live copy, screenshots, embed smoke, and
+  multiplayer server URL strategy.
 
 Required final evidence:
 
 - Public itch.io URL.
-- Decided published version: hold external publishing until the recorded
-  production split is resolved, then publish only the synchronized public game
-  version, currently targeted as `v0.0.010`.
+- Decided published version: `v0.0.029`.
 - Uploaded zip filename and version.
 - Multiplayer server URL strategy: embedded production endpoint, documented
   `?server=` tester flow, or explicitly static-only prototype status.
-- Visible runtime badge and `data-game-version` must show `v0.0.010` after the
+- Visible runtime badge and `data-game-version` must show `v0.0.029` after the
   client module loads.
 - Exact live page copy or a dated note that it matches
   `unsoccer-itch-page-copy.md`.

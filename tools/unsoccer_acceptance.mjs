@@ -11,13 +11,33 @@ const EXPECTED_GAME_VERSION = String(PACKAGE.games?.unsoccer?.version || PACKAGE
 const FIELD_WIDTH = 48;
 const FIELD_LENGTH = 72;
 const GOAL_WIDTH = 12;
-const GOAL_POST_RADIUS = 0.38;
-const BALL_RADIUS = 0.48;
+const GOAL_DEPTH = 3.2;
+const GOAL_POST_RADIUS = 0.19;
+const BALL_RADIUS = 0.24;
+const BALL_DENSITY = 3.6;
 const BALL_RESTITUTION = 1.05;
 const PLAYER_HEIGHT = 1.75;
+const DAY_CYCLE_SECONDS = 300;
 const DAY_START_SECONDS = 6 * 60 * 60;
+const POST_GOAL_CELEBRATION_MS = 5000;
+const POST_GOAL_BALL_RETURN_MS = 1000;
 const WEATHER_CHANGE_MIN_MS = 60_000;
 const WEATHER_CHANGE_MAX_MS = 120_000;
+const KICK_SPEED_MAX = 55;
+const CHARACTER_ROSTER = [
+  "6299851",
+  "6243756",
+  "6270571",
+  "6324128",
+  "6244727",
+  "6288738",
+  "6304269",
+  "6298522",
+  "6255142",
+  "6294728",
+  "666dc6f4-0cc4-4714-a7cf-39cfb6655fe8"
+];
+const CHARACTER_ROSTER_SET = new Set(CHARACTER_ROSTER);
 
 async function freePort() {
   return new Promise((resolve, reject) => {
@@ -66,6 +86,10 @@ function speed3(velocity) {
   return Math.hypot(velocity.x, velocity.y, velocity.z);
 }
 
+function speed2(velocity) {
+  return Math.hypot(velocity.x, velocity.z);
+}
+
 function inputState(patch = {}) {
   return {
     up: false,
@@ -73,6 +97,8 @@ function inputState(patch = {}) {
     left: false,
     right: false,
     kickLeft: 0,
+    kickLeftHeld: false,
+    kickLeftCharge: 0,
     kickRight: 0,
     head: 0,
     jump: 0,
@@ -183,7 +209,7 @@ async function assertHttpFallback(api) {
     input: inputState({ up: true })
   });
 
-  state = (await api("POST", "/api/test/tick", { frames: 6 })).state;
+  state = (await api("POST", "/api/test/tick", { frames: 12 })).state;
   assert.ok(playerAt(state, join.joined.index).position.z > 0.5, "http fallback input should move blue player toward +Z");
 
   state = (await api("GET", `/api/state?clientId=${encodeURIComponent(join.joined.id)}`)).state;
@@ -265,6 +291,15 @@ async function main() {
     assert.equal(state.players.filter((player) => player.role === "player").length, 4);
     assert.equal(state.players.filter((player) => player.role === "spectator").length, 1);
     assert.equal(playerAt(state, 4).team, null);
+    const assignedCharacters = state.players.map((player) => player.characterId);
+    assert.ok(
+      assignedCharacters.every((characterId) => CHARACTER_ROSTER_SET.has(characterId)),
+      "all players should receive a character from the ready runtime roster"
+    );
+    assert.ok(
+      new Set(assignedCharacters).size >= Math.min(assignedCharacters.length, CHARACTER_ROSTER.length),
+      "new players should draw non-repeating random characters from the ready roster deck"
+    );
     assert.ok(Array.isArray(state.audioEvents), "state should expose server audioEvents");
     assert.ok(
       state.audioEvents.some((event) => event.kind === "roster" && event.change === "spectator" && event.playerId === playerAt(state, 4).id),
@@ -279,7 +314,10 @@ async function main() {
 
     await assertKick(api, "left", { x: -0.34, y: BALL_RADIUS + 0.04, z: 1.0 }, { kickLeft: 1 });
     await assertKick(api, "hand", { x: 0.34, y: BALL_RADIUS + 0.04, z: 1.0 }, { kickRight: 1 });
-    await assertKick(api, "head", { x: 0, y: BALL_RADIUS + 0.04, z: 0.95 }, { head: 1 });
+    await assertKick(api, "head", { x: 0, y: PLAYER_HEIGHT - BALL_RADIUS * 0.1, z: 0.95 }, { head: 1 });
+    await assertLeftKickCharge(api);
+    await assertJumpClearsGroundBall(api);
+    await assertHeadRequiresReachableHeight(api);
 
     state = await prepareSinglePlayer(api);
     const bodyPlayerId = playerAt(state, 0).id;
@@ -293,9 +331,11 @@ async function main() {
       velocity: { x: 0, y: 0, z: 0 }
     });
     const beforeBodyAudioId = maxAudioEventId(state);
-    state = (await api("POST", "/api/test/tick", { frames: 3 })).state;
+    state = (await api("POST", "/api/test/tick", { frames: 12 })).state;
     assert.equal(playerAt(state, 0).lastAction, "body");
-    assert.ok(speed3(state.ball.velocity) > 0.5, "body contact should move the ball");
+    const bodyBallSpeed = speed3(state.ball.velocity);
+    assert.ok(bodyBallSpeed > 0.5, "body contact should move the ball");
+    assert.ok(bodyBallSpeed < KICK_SPEED_MAX, "body contact should not launch the half-size ball too hard");
     assertAudioEvent(
       state,
       beforeBodyAudioId,
@@ -303,25 +343,93 @@ async function main() {
       "body contact"
     );
 
-    await api("POST", "/api/test/players", { count: 2 });
+    await api("POST", "/api/test/players", { count: 4 });
     state = (await api("POST", "/api/test/reset", {})).state;
     const beforeGoalVariant = state.ball.variant;
     state = (await api("POST", "/api/test/ball", {
-      position: { x: 0, y: BALL_RADIUS + 0.04, z: FIELD_LENGTH / 2 + 0.2 },
-      velocity: { x: 0, y: 0, z: 1 }
+      position: { x: 0, y: BALL_RADIUS + 0.04, z: FIELD_LENGTH / 2 - 0.12 },
+      velocity: { x: 0, y: 0, z: 5 }
     })).state;
     const beforeGoalAudioId = maxAudioEventId(state);
-    state = (await api("POST", "/api/test/tick", { frames: 1 })).state;
+    state = (await api("POST", "/api/test/tick", { frames: 4 })).state;
     assert.equal(state.score.blue, 1);
     assert.equal(state.score.orange, 0);
+    const scoredBallDistance = Math.hypot(state.ball.position.x, state.ball.position.z);
+    assert.ok(scoredBallDistance > FIELD_LENGTH / 2 - 2, "ball should stay near the scored goal during celebration");
+    assert.equal(state.goalReset.phase, "celebration", "goal reset should start with a celebration phase");
+    assert.equal(state.goalReset.scoringTeam, 0, "goal reset should expose the scoring team");
+    assert.ok(state.goalReset.remainingMs > POST_GOAL_CELEBRATION_MS - 500, "celebration phase should keep the ball in play briefly");
+    assert.equal(state.ball.variant, beforeGoalVariant, "ball variant should not rotate before the kickoff return completes");
+    assert.equal(state.countdown, 0, "kickoff countdown should wait until the ball returns to center");
+    assertAudioEvent(state, beforeGoalAudioId, (event) => event.kind === "goal" && event.team === 0, "blue goal");
+    assert.ok(
+      playerAt(state, 0).celebrationAvailableUntil > state.serverTime,
+      "scoring team player should receive a post-goal celebration input window"
+    );
+    assert.ok(
+      playerAt(state, 2).celebrationAvailableUntil > state.serverTime,
+      "all scoring team players should receive a post-goal celebration input window"
+    );
+    assert.ok(
+      playerAt(state, 1).celebrationAvailableUntil <= state.serverTime,
+      "opposing team player should not receive the scoring team's celebration window"
+    );
+    assert.ok(
+      playerAt(state, 3).celebrationAvailableUntil <= state.serverTime,
+      "second opposing team player should not receive the scoring team's celebration window"
+    );
+    const celebrationInputs = [
+      [0, "celebrate1", { kickLeft: 1 }],
+      [2, "celebrate2", { kickRight: 1 }],
+      [0, "celebrate3", { head: 1 }]
+    ];
+    for (const [playerIndex, celebration, input] of celebrationInputs) {
+      const celebratorId = playerAt(state, playerIndex).id;
+      const beforeCelebrationAudioId = maxAudioEventId(state);
+      await api("POST", `/api/test/player/${playerIndex}`, { input: inputState(input) });
+      state = (await api("POST", "/api/test/tick", { frames: 2 })).state;
+      assert.equal(playerAt(state, playerIndex).celebration, celebration, `${celebration} should be selected by scoring team input`);
+      assert.ok(playerAt(state, playerIndex).celebrationAt > 0, `${celebration} should expose celebrationAt`);
+      assertAudioEvent(
+        state,
+        beforeCelebrationAudioId,
+        (event) => event.kind === "celebration" && event.celebration === celebration && event.playerId === celebratorId,
+        `${celebration} celebration`
+      );
+    }
+
+    state = (await api("POST", "/api/test/tick", {
+      frames: Math.ceil((POST_GOAL_CELEBRATION_MS + POST_GOAL_BALL_RETURN_MS * 0.5) / (1000 / 60))
+    })).state;
+    assert.equal(state.goalReset.phase, "returning", "ball should enter a one-second return flight after celebration");
+    assert.ok(state.goalReset.returnProgress > 0.1 && state.goalReset.returnProgress < 0.95, "return flight should expose smooth progress");
+    assert.ok(
+      Math.hypot(state.ball.position.x, state.ball.position.z) < scoredBallDistance,
+      "returning ball should move toward kickoff instead of teleporting"
+    );
+
+    state = (await api("POST", "/api/test/tick", {
+      frames: Math.ceil((POST_GOAL_CELEBRATION_MS + POST_GOAL_BALL_RETURN_MS + 600) / (1000 / 60))
+    })).state;
     assert.ok(Math.abs(state.ball.position.x) < 0.01);
     assert.ok(Math.abs(state.ball.position.z) < 0.01);
-    assert.notEqual(state.ball.variant, beforeGoalVariant, "goal reset should rotate the active ball variant");
-    assert.ok(state.countdown > 0, "goal reset should start countdown");
-    assertAudioEvent(state, beforeGoalAudioId, (event) => event.kind === "goal" && event.team === 0, "blue goal");
+    assert.notEqual(state.ball.variant, beforeGoalVariant, "goal reset should rotate the active ball variant after return");
+    assert.ok(state.countdown > 0, "goal reset should start countdown after ball return");
+    assert.equal(state.goalReset.phase, "kickoff", "goal reset should enter kickoff countdown after ball return");
     assertAudioEvent(state, beforeGoalAudioId, (event) => event.kind === "countdown" && event.remainingSeconds > 0, "goal countdown");
     assert.ok(playerAt(state, 0).position.z < 0, "blue-side player should respawn on own half");
     assert.ok(playerAt(state, 1).position.z > 0, "orange-side player should respawn on own half");
+    assert.ok(playerAt(state, 2).position.z < 0, "second blue-side player should respawn on own half");
+    assert.ok(playerAt(state, 3).position.z > 0, "second orange-side player should respawn on own half");
+
+    state = (await api("POST", "/api/test/reset", {})).state;
+    state = (await api("POST", "/api/test/ball", {
+      position: { x: 0, y: BALL_RADIUS + 0.04, z: FIELD_LENGTH / 2 + GOAL_DEPTH - 0.35 },
+      velocity: { x: 0, y: 0, z: -1.5 }
+    })).state;
+    state = (await api("POST", "/api/test/tick", { frames: 4 })).state;
+    assert.equal(state.score.blue, 0, "ball entering the goal volume from behind must not score");
+    assert.equal(state.score.orange, 0, "back-net entry should not affect either score");
 
     console.log(JSON.stringify({
       ok: true,
@@ -333,19 +441,26 @@ async function main() {
         "websocket join audioEvents",
         "http fallback join/input/state",
         "5-client role assignment",
+        "random non-repeating ready character assignment",
         "team-relative WASD movement",
+        "smoothed keyboard axes and acceleration",
         "player movement beyond pitch bounds",
         "authoritative day start and weather controls",
-        "sprint stamina and jump",
-        "player hit stamina damage",
-        "thick post rebound and bouncier ball",
+        "sprint stamina, jump, and ragdoll exhaustion",
+        "player hit stamina damage and ragdoll knockout",
+        "thin post rebound and bouncier ball",
+        "balanced half-size ball impulses",
         "left kick",
         "hand hit",
         "head hit",
+        "left kick charge scalar",
+        "airborne body clearance",
+        "head height gate",
         "body contact",
-        "goal score/reset/countdown/ball variant",
+        "delayed goal celebration and smooth ball return",
+        "post-goal scoring team celebrations",
         "server audioEvents roster",
-        "server audioEvents kicks/body/goal/countdown"
+        "server audioEvents kicks/body/goal/countdown/celebration"
       ]
     }, null, 2));
   } finally {
@@ -370,15 +485,53 @@ async function assertMovementControls(api) {
     position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
     input: inputState({ up: true })
   });
-  let state = (await api("POST", "/api/test/tick", { frames: 6 })).state;
+  let state = (await api("POST", "/api/test/tick", { frames: 12 })).state;
   assert.ok(playerAt(state, 0).position.z > 0.5, "blue player W should move toward +Z/opponent goal");
 
   await api("POST", "/api/test/player/1", {
     position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
     input: inputState({ up: true, yaw: Math.PI })
   });
-  state = (await api("POST", "/api/test/tick", { frames: 6 })).state;
+  state = (await api("POST", "/api/test/tick", { frames: 12 })).state;
   assert.ok(playerAt(state, 1).position.z < -0.5, "orange player W should move toward -Z/opponent goal");
+
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    velocity: { x: 0, y: 0, z: 0 },
+    input: inputState({ right: true })
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 1 })).state;
+  const firstRightSpeed = speed2(playerAt(state, 0).velocity);
+  state = (await api("POST", "/api/test/tick", { frames: 24 })).state;
+  const acceleratedRight = playerAt(state, 0);
+  assert.ok(speed2(acceleratedRight.velocity) > firstRightSpeed + 2.5, "keyboard movement should ramp up instead of starting at full speed");
+
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    velocity: { x: 0, y: 0, z: 0 },
+    input: inputState({ up: true, right: true })
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 24 })).state;
+  const diagonalBeforeRelease = playerAt(state, 0).velocity;
+  assert.ok(diagonalBeforeRelease.x > 2 && diagonalBeforeRelease.z > 2, "diagonal movement should build both axes");
+  await api("POST", "/api/test/player/0", { input: inputState({ up: true }) });
+  state = (await api("POST", "/api/test/tick", { frames: 2 })).state;
+  const releaseTail = playerAt(state, 0).velocity;
+  assert.ok(releaseTail.x > 0.45, "released side axis should fade out instead of instantly dropping from movement");
+  assert.ok(releaseTail.z > 2, "held forward axis should stay active while the side axis fades");
+  state = (await api("POST", "/api/test/tick", { frames: 28 })).state;
+  assert.ok(Math.abs(playerAt(state, 0).velocity.x) < releaseTail.x * 0.55, "released side axis should continue decaying after the short tail");
+
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    velocity: { x: 0, y: 0, z: 0 },
+    input: inputState({ right: true })
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 24 })).state;
+  assert.ok(playerAt(state, 0).velocity.x > 2, "right movement should build before opposite-axis test");
+  await api("POST", "/api/test/player/0", { input: inputState({ left: true }) });
+  state = (await api("POST", "/api/test/tick", { frames: 12 })).state;
+  assert.ok(playerAt(state, 0).velocity.x < -0.5, "opposite active axis should quickly overpower the old direction");
 }
 
 async function assertPlayerCanLeavePitch(api) {
@@ -408,6 +561,14 @@ async function assertDayAndWeather(api) {
     state.dayTimeSeconds >= DAY_START_SECONDS && state.dayTimeSeconds < DAY_START_SECONDS + 10 * 60,
     "server day time should start near 06:00 sunrise"
   );
+  state = (await api("POST", "/api/test/day", { dayTimeSeconds: 23 * 60 * 60 + 30 * 60 })).state;
+  assert.equal(state.dayTimeSeconds, 23 * 60 * 60 + 30 * 60, "test day override should expose short-night QA time");
+  state = (await api("POST", "/api/test/day", { clear: true })).state;
+  assert.ok(
+    state.dayTimeSeconds >= DAY_START_SECONDS && state.dayTimeSeconds < DAY_START_SECONDS + 10 * 60,
+    "clearing test day override should restore 06:00-start 300-second cycle"
+  );
+  assert.equal(DAY_CYCLE_SECONDS, 300, "day cycle should be 5 minutes");
   assert.ok(
     state.weather.nextChangeInMs <= WEATHER_CHANGE_MAX_MS && state.weather.nextChangeInMs > WEATHER_CHANGE_MIN_MS - 1_000,
     "weather should expose randomized 60-120s next-change timer"
@@ -465,6 +626,20 @@ async function assertSprintAndJump(api) {
   assert.equal(jumper.airborne, true, "jumping player should be airborne in snapshot");
   assert.ok(jumper.stamina < 100, "jump should spend stamina");
   assertAudioEvent(state, beforeJumpAudioId, (event) => event.kind === "kick" && event.kick === "jump", "jump");
+
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    velocity: { x: 0, y: 0, z: 4.2 },
+    stamina: 3,
+    grounded: true,
+    verticalVelocity: 0,
+    input: inputState({ up: true, sprint: true })
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 14 })).state;
+  const collapsedSprinter = playerAt(state, 0);
+  assert.equal(collapsedSprinter.ragdoll, true, "sprint exhaustion should activate ragdoll");
+  assert.ok(collapsedSprinter.ragdollAt > 0, "ragdoll snapshot should expose activation time");
+  assert.ok(collapsedSprinter.position.z > 0.45, "ragdoll should preserve previous forward inertia");
 }
 
 async function assertPlayerHitStamina(api) {
@@ -492,6 +667,10 @@ async function assertPlayerHitStamina(api) {
   assert.equal(playerAt(state, 0).lastAction, "hand");
   assert.ok(target.stamina < 16, "hand hit should drain target stamina");
   assert.equal(target.exhausted, true, "target should become exhausted at zero stamina");
+  assert.equal(target.ragdoll, true, "target should ragdoll when a hit empties stamina");
+  assert.ok(target.ragdollAt > 0, "hit ragdoll should expose activation time");
+  assert.ok(target.velocity.z > 7.5, `hit ragdoll should get a heavy forward knockback, got z=${target.velocity.z}`);
+  assert.ok(target.velocity.y > 2.2, `hit ragdoll should lift the target, got y=${target.velocity.y}`);
 }
 
 async function assertGoalPostAndBouncePhysics(api) {
@@ -509,8 +688,11 @@ async function assertGoalPostAndBouncePhysics(api) {
     velocity: { x: -2.2, y: 0, z: 0 }
   })).state;
   state = (await api("POST", "/api/test/tick", { frames: 1 })).state;
-  assert.ok(state.ball.velocity.x > 1.2, "ball should rebound sideways from the thicker goal post collider");
-  assert.ok(state.ball.velocity.y >= 0.5, "goal post rebound should add a small lift");
+  assert.ok(state.ball.velocity.x > 1.2, "ball should rebound sideways from the goal post collider");
+  assert.ok(
+    state.ball.velocity.y >= 0.35,
+    `goal post rebound should add a small lift, got y=${state.ball.velocity.y}`
+  );
 
   state = (await api("POST", "/api/test/ball", {
     position: { x: 0, y: BALL_RADIUS + 0.015, z: 0 },
@@ -519,6 +701,7 @@ async function assertGoalPostAndBouncePhysics(api) {
   state = (await api("POST", "/api/test/tick", { frames: 1 })).state;
   assert.ok(state.ball.velocity.y > 2.6, "ball should be bouncy enough for head play");
   assert.ok(BALL_RESTITUTION > 1, "acceptance constants should track the bouncier server tuning");
+  assert.equal(BALL_DENSITY, 3.6, "half-size ball should keep the old effective mass through higher density");
 }
 
 async function assertKick(api, kind, ballPosition, input) {
@@ -538,12 +721,165 @@ async function assertKick(api, kind, ballPosition, input) {
   const beforeAudioId = maxAudioEventId(state);
   state = (await api("POST", "/api/test/tick", { frames: 3 })).state;
   assert.equal(playerAt(state, 0).lastAction, kind);
-  assert.ok(speed3(state.ball.velocity) > 0.5, `${kind} should move the ball`);
+  const ballSpeed = speed3(state.ball.velocity);
+  assert.ok(ballSpeed > 0.5, `${kind} should move the ball`);
+  assert.ok(ballSpeed < KICK_SPEED_MAX, `${kind} should not turn the half-size ball into a runaway projectile`);
   assertAudioEvent(
     state,
     beforeAudioId,
     (event) => event.kind === "kick" && event.kick === kind && event.playerId === playerId && event.speed > 0,
     `${kind} kick`
+  );
+  return ballSpeed;
+}
+
+async function measureLeftKickSpeed(api, setupInput, releaseInput, holdFrames = 0) {
+  let state = await prepareSinglePlayer(api);
+  const kickBallPosition = { x: -0.34, y: BALL_RADIUS + 0.04, z: 1.0 };
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    yaw: 0,
+    input: inputState()
+  });
+  await api("POST", "/api/test/ball", {
+    position: holdFrames > 0 ? { x: 0, y: BALL_RADIUS + 0.04, z: 8 } : kickBallPosition,
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  if (setupInput) {
+    await api("POST", "/api/test/player/0", { input: inputState(setupInput) });
+    if (holdFrames > 0) state = (await api("POST", "/api/test/tick", { frames: holdFrames })).state;
+  }
+  if (holdFrames > 0) {
+    await api("POST", "/api/test/ball", {
+      position: kickBallPosition,
+      velocity: { x: 0, y: 0, z: 0 }
+    });
+  }
+  await api("POST", "/api/test/player/0", { input: inputState(releaseInput) });
+  state = (await api("POST", "/api/test/tick", { frames: 3 })).state;
+  assert.equal(playerAt(state, 0).lastAction, "left");
+  return speed3(state.ball.velocity);
+}
+
+async function assertLeftKickCharge(api) {
+  const tapSpeed = await measureLeftKickSpeed(api, null, { kickLeft: 1 });
+  assert.ok(tapSpeed > 5.2, `tap left kick should use the stronger v0.0.028 impulse, got ${tapSpeed}`);
+  const chargedSpeed = await measureLeftKickSpeed(
+    api,
+    { kickLeftHeld: true },
+    { kickLeft: 1, kickLeftHeld: false },
+    66
+  );
+  assert.ok(
+    chargedSpeed > tapSpeed * 1.6,
+    `1s charged left kick should be substantially stronger than tap; tap=${tapSpeed}, charged=${chargedSpeed}`
+  );
+  assert.ok(chargedSpeed < KICK_SPEED_MAX, `charged left kick should stay under runaway threshold, got ${chargedSpeed}`);
+
+  const cappedSpeed = await measureLeftKickSpeed(
+    api,
+    { kickLeftHeld: true },
+    { kickLeft: 1, kickLeftHeld: false },
+    132
+  );
+  assert.ok(
+    cappedSpeed <= chargedSpeed * 1.18,
+    `left kick charge should cap after 1s; charged=${chargedSpeed}, capped=${cappedSpeed}`
+  );
+
+  const heldContactSpeed = await measureHeldContactLeftKickSpeed(api);
+  assert.ok(
+    heldContactSpeed > tapSpeed * 1.6,
+    `held charged left kick should fire on ball contact before release; tap=${tapSpeed}, heldContact=${heldContactSpeed}`
+  );
+  assert.ok(heldContactSpeed < KICK_SPEED_MAX, `held charged left kick should stay under runaway threshold, got ${heldContactSpeed}`);
+}
+
+async function measureHeldContactLeftKickSpeed(api) {
+  let state = await prepareSinglePlayer(api);
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    yaw: 0,
+    input: inputState()
+  });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 8 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  await api("POST", "/api/test/player/0", { input: inputState({ kickLeftHeld: true }) });
+  state = (await api("POST", "/api/test/tick", { frames: 66 })).state;
+  assert.notEqual(playerAt(state, 0).lastAction, "left", "held left kick should wait for ball contact while charging");
+  await api("POST", "/api/test/ball", {
+    position: { x: -0.34, y: BALL_RADIUS + 0.04, z: 1.0 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 3 })).state;
+  assert.equal(playerAt(state, 0).lastAction, "left");
+  return speed3(state.ball.velocity);
+}
+
+async function assertJumpClearsGroundBall(api) {
+  let state = await prepareSinglePlayer(api);
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2 + 1.05, z: 0 },
+    velocity: { x: 0, y: 0, z: 7 },
+    grounded: false,
+    verticalVelocity: 0,
+    yaw: 0,
+    input: inputState({ up: true })
+  });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 0.95 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 12 })).state;
+  assert.notEqual(
+    playerAt(state, 0).lastAction,
+    "body",
+    "airborne player should clear a ground ball instead of body-bumping it by horizontal radius"
+  );
+  assert.ok(
+    speed2(state.ball.velocity) < 0.2,
+    `airborne body clearance should not push the ground ball horizontally, got ${speed2(state.ball.velocity)}`
+  );
+}
+
+async function assertHeadRequiresReachableHeight(api) {
+  await assertHeadMissesBallAtHeight(
+    api,
+    BALL_RADIUS + 0.04,
+    "head input should not reach a ground ball below the player's head"
+  );
+  await assertHeadMissesBallAtHeight(
+    api,
+    PLAYER_HEIGHT + BALL_RADIUS + 0.85,
+    "head input should not reach a ball that is clearly above the player's head"
+  );
+}
+
+async function assertHeadMissesBallAtHeight(api, ballY, message) {
+  let state = await prepareSinglePlayer(api);
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    yaw: 0,
+    input: inputState()
+  });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: ballY, z: 0.95 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  await api("POST", "/api/test/player/0", {
+    input: inputState({ head: 1 })
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 3 })).state;
+  assert.notEqual(
+    playerAt(state, 0).lastAction,
+    "head",
+    message
+  );
+  assert.ok(
+    speed2(state.ball.velocity) < 0.2,
+    `unreachable head attempt should not push the ball horizontally, got ${speed2(state.ball.velocity)}`
   );
 }
 

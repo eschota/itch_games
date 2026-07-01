@@ -1,0 +1,80 @@
+{
+  "version": "v0.0.028",
+  "mode": "free3d-worker-storage-1k-glb-local-clones",
+  "source": "https://free3d.online/api-embeddings/",
+  "note": "Environment GLBs were resolved from public Free3D worker paths.json inventories and shipped locally; runtime does not fetch remote Free3D URLs.",
+  "assets": [
+    {
+      "guid": "6053007",
+      "kind": "bench-rustic",
+      "title": "Rustic Wood Bench Model Pack with Natural Tree Trunk Legs",
+      "src": "assets/environment/free3d/6053007-bench-rustic.glb",
+      "source": "https://free3d.online/model/6053007",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6053007_Rustic%20Wood%20Bench%20Model%20Pack%20with%20Natural%20Tree%20Trunk%20Legs/paths.json",
+      "bytes": 1074172
+    },
+    {
+      "guid": "6239925",
+      "kind": "bench-modern",
+      "title": "Modern Minimalist Bench Model Pack",
+      "src": "assets/environment/free3d/6239925-bench-modern.glb",
+      "source": "https://free3d.online/model/6239925",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6239925_Modern%20Minimalist%20Bench%20Model%20Pack/paths.json",
+      "bytes": 408444
+    },
+    {
+      "guid": "6239337",
+      "kind": "trash-bin",
+      "title": "Outdoor Trash Bin Model Pack with Detailed LODs",
+      "src": "assets/environment/free3d/6239337-trash-bin.glb",
+      "source": "https://free3d.online/model/6239337",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6239337_Outdoor%20Trash%20Bin%20Model%20Pack%20with%20Detailed%20LODs/paths.json",
+      "bytes": 4219376
+    },
+    {
+      "guid": "6388689",
+      "kind": "trash-bin-modern",
+      "title": "Modern Trash Bin Model Pack with Detailed Geometry",
+      "src": "assets/environment/free3d/6388689-trash-bin-modern.glb",
+      "source": "https://free3d.online/model/6388689",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6388689_Modern%20Trash%20Bin%20Model%20Pack%20with%20Detailed%20Geometry/paths.json",
+      "bytes": 578964
+    },
+    {
+      "guid": "6335647",
+      "kind": "trash-bin-ribbed",
+      "title": "Modern Trash Bin Model Pack with Ribbed Design",
+      "src": "assets/environment/free3d/6335647-trash-bin-ribbed.glb",
+      "source": "https://free3d.online/model/6335647",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6335647_Modern%20Trash%20Bin%20Model%20Pack%20with%20Ribbed%20Design/paths.json",
+      "bytes": 412948
+    },
+    {
+      "guid": "6225707",
+      "kind": "traffic-cone",
+      "title": "Traffic Cone Model Pack HighDetail Surface",
+      "src": "assets/environment/free3d/6225707-traffic-cone.glb",
+      "source": "https://free3d.online/model/6225707",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6225707_Traffic%20Cone%20Model%20Pack%20HighDetail%20Surface/paths.json",
+      "bytes": 3632280
+    },
+    {
+      "guid": "6225737",
+      "kind": "traffic-cone-game",
+      "title": "Traffic Cone Model Pack for D Rendering and Game Development",
+      "src": "assets/environment/free3d/6225737-traffic-cone-game.glb",
+      "source": "https://free3d.online/model/6225737",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6225737_Traffic%20Cone%20Model%20Pack%20for%20D%20Rendering%20and%20Game%20Development/paths.json",
+      "bytes": 377956
+    },
+    {
+      "guid": "6110276",
+      "kind": "urban-ruins",
+      "title": "Urban Ruins Building model pack Destructed Cityscape Collection",
+      "src": "assets/environment/free3d/6110276-urban-ruins.glb",
+      "source": "https://free3d.online/model/6110276",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6110276_Urban%20Ruins%20Building%20model%20pack%20Destructed%20Cityscape%20Collection/paths.json",
+      "bytes": 5067208
+    }
+  ]
+}

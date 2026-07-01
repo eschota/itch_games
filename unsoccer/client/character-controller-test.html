@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UnSoccer Character Controller Test</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #08110f;
+        color: #eaf7ef;
+        font-family: Inter, "Segoe UI", Arial, sans-serif;
+      }
+
+      #character-test-canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+        outline: none;
+      }
+
+      .hud {
+        position: fixed;
+        left: 16px;
+        top: 16px;
+        display: grid;
+        gap: 8px;
+        width: min(520px, calc(100vw - 32px));
+        min-width: 260px;
+        pointer-events: none;
+        z-index: 2;
+      }
+
+      .panel {
+        border: 1px solid rgba(207, 244, 221, 0.22);
+        background: rgba(5, 13, 11, 0.72);
+        border-radius: 8px;
+        padding: 10px 12px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+        backdrop-filter: blur(10px);
+        box-sizing: border-box;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px 12px;
+        font-size: 12px;
+        color: rgba(234, 247, 239, 0.76);
+      }
+
+      .metrics strong {
+        display: block;
+        color: #ffffff;
+        font-size: 15px;
+        font-variant-numeric: tabular-nums;
+        overflow-wrap: anywhere;
+      }
+
+      .character-row {
+        display: grid;
+        grid-template-columns: 40px minmax(0, 1fr) 40px;
+        gap: 8px;
+        align-items: center;
+        margin-top: 10px;
+        pointer-events: auto;
+      }
+
+      .character-title {
+        margin-top: 8px;
+        color: rgba(234, 247, 239, 0.86);
+        font-size: 12px;
+        line-height: 1.35;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+      }
+
+      select {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid rgba(207, 244, 221, 0.24);
+        border-radius: 8px;
+        background: rgba(17, 38, 31, 0.94);
+        color: #f4fff8;
+        padding: 9px 10px;
+        font: inherit;
+      }
+
+      .buttons {
+        position: fixed;
+        left: 16px;
+        bottom: 16px;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        z-index: 2;
+      }
+
+      button {
+        min-width: 64px;
+        border: 1px solid rgba(207, 244, 221, 0.24);
+        border-radius: 8px;
+        background: rgba(17, 38, 31, 0.9);
+        color: #f4fff8;
+        padding: 10px 12px;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: rgba(41, 76, 62, 0.96);
+      }
+
+      .icon-button {
+        min-width: 40px;
+        width: 40px;
+        padding: 9px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="character-test-canvas" tabindex="0"></canvas>
+    <section class="hud">
+      <div class="panel">
+        <div class="metrics">
+          <span>Asset<strong id="asset">loading</strong></span>
+          <span>Mode<strong id="mode">controller</strong></span>
+          <span>Action<strong id="action">idle</strong></span>
+          <span>Speed<strong id="speed">0.00</strong></span>
+          <span>Strike<strong id="strike">none</strong></span>
+          <span>Stamina<strong id="stamina">100</strong></span>
+          <span>Roster<strong id="roster-position">0/0</strong></span>
+          <span>Clips<strong id="clip-count">0</strong></span>
+          <span>Textures<strong id="texture-count">0</strong></span>
+        </div>
+        <div class="character-row">
+          <button class="icon-button" id="btn-prev-character" type="button" aria-label="Previous character">&lt;</button>
+          <select id="character-select" aria-label="Character"></select>
+          <button class="icon-button" id="btn-next-character" type="button" aria-label="Next character">&gt;</button>
+        </div>
+        <div class="character-title" id="character-title">loading</div>
+      </div>
+    </section>
+    <div class="buttons">
+      <button id="btn-foot" type="button">Foot</button>
+      <button id="btn-hand" type="button">Hand</button>
+      <button id="btn-head" type="button">Head</button>
+      <button id="btn-jump" type="button">Jump</button>
+      <button id="btn-sprint-jump" type="button">Sprint Jump</button>
+      <button id="btn-ragdoll" type="button">Ragdoll</button>
+      <button id="btn-celebrate-1" type="button">Celebrate 1</button>
+      <button id="btn-celebrate-2" type="button">Celebrate 2</button>
+      <button id="btn-celebrate-3" type="button">Celebrate 3</button>
+    </div>
+    <script type="module" src="/src/character-controller-test.ts"></script>
+  </body>
+</html>

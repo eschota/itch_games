@@ -1,16 +1,23 @@
 {
-  "version": "v0.0.014",
-  "runtimeMode": "free3d-1k-skinned-glb-webp-textures-fbx-clips-with-procedural-fallback",
-  "assignment": "playerIndex maps deterministically to roster order",
+  "version": "v0.0.018",
+  "runtimeMode": "mixed-free3d-autorig-local-skinned-textured-fbx-clips-11-character-controller-ik",
+  "assignment": "playerIndex maps deterministically to roster order; character-controller-test can cycle all runtime characters with arrow keys and UI controls",
   "candidates": [
+    {
+      "id": "6535605",
+      "name": "Charming Panda Character model pack",
+      "source": "https://free3d.online/model/6535605-charming-panda-character-model-pack",
+      "status": "blocked-no-free3d-auth-or-local-runtime-file",
+      "targetRuntimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6535605/rigged_panda.glb",
+      "requiredPipeline": "Download authenticated mesh from Free3D, submit mesh to AutoRig, download prepared GLB plus separate idle/walk/run/jump clips, then add runtime roster entry."
+    },
     {
       "id": "6299851",
       "name": "Male Soccer Player Character Rigged and Animated",
       "source": "https://free3d.online/model/6299851-male-soccer-player-character-rigged-and-animated",
       "status": "downloaded-optimized-runtime",
       "inventoryUrl": "https://worker-0001.free3d.online/storage/6299851_Male Soccer Player Character Rigged and Animated/paths.json",
-      "relativePath": "uploads_files_6299851_1k/Male Soccer Player Character Rigged and Animated_preview_edc53270-2cfb-4b67-8b25-968ad4417256_rigged_unity.glb",
-      "rawLocalPath": "unsoccer/assets/models/characters/free3d/raw/6299851-textured-rig/rigged_unity.glb",
+      "rosterIndex": 0,
       "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6299851/rigged_unity.glb",
       "runtimeTexturePaths": [
         "unsoccer/client/public/assets/characters/free3d/6299851/albedo.webp",
@@ -25,28 +32,201 @@
       ]
     },
     {
-      "id": "6300420",
-      "name": "Young Male Soccer Player Rigged and Animated D Character Model",
-      "source": "https://free3d.online/model/6300420-young-male-soccer-player-rigged-and-animated-d-character-model",
-      "status": "superseded-by-6299851"
+      "id": "6243756",
+      "name": "Wise Owl Character Model Rigged and Animated with Textured Details",
+      "source": "https://free3d.online/model/6243756",
+      "status": "downloaded-optimized-runtime",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6243756_Wise%20Owl%20Character%20Model%20Rigged%20and%20Animated%20with%20Textured%20Detai/paths.json",
+      "rosterIndex": 1,
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6243756/rigged_unity.glb",
+      "runtimeTexturePaths": [
+        "unsoccer/client/public/assets/characters/free3d/6243756/albedo.webp",
+        "unsoccer/client/public/assets/characters/free3d/6243756/normal.webp",
+        "unsoccer/client/public/assets/characters/free3d/6243756/orm.webp"
+      ],
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/free3d/6243756/idle.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6243756/walking.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6243756/running.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6243756/jumping.fbx"
+      ]
     },
     {
-      "id": "6270753",
-      "name": "Animated Fox Soccer Character Model Rigged and Animated",
-      "source": "https://free3d.online/model/6270753-animated-fox-soccer-character-model-rigged-and-animated",
-      "status": "candidate-not-downloaded"
+      "id": "6270571",
+      "name": "Sherlock Lion Rigged and Animated D Character Model",
+      "source": "https://free3d.online/model/6270571",
+      "status": "downloaded-optimized-runtime",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6270571_Sherlock%20Lion%20Rigged%20and%20Animated%20D%20Character%20Model/paths.json",
+      "rosterIndex": 2,
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6270571/rigged_unity.glb",
+      "runtimeTexturePaths": [
+        "unsoccer/client/public/assets/characters/free3d/6270571/albedo.webp",
+        "unsoccer/client/public/assets/characters/free3d/6270571/normal.webp",
+        "unsoccer/client/public/assets/characters/free3d/6270571/orm.webp"
+      ],
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/free3d/6270571/idle.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6270571/walking.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6270571/running.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6270571/jumping.fbx"
+      ]
     },
     {
-      "id": "6298507",
-      "name": "Rugby Player D Character Model Rigged and Animated",
-      "source": "https://free3d.online/model/6298507-rugby-player-d-character-model-rigged-and-animated",
-      "status": "candidate-not-downloaded"
+      "id": "6324128",
+      "name": "Animated Cute Panda Character Model Rigged and Animated",
+      "source": "https://free3d.online/model/6324128",
+      "status": "downloaded-optimized-runtime",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6324128_Animated%20Cute%20Panda%20Character%20Model%20Rigged%20and%20Animated/paths.json",
+      "rosterIndex": 3,
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6324128/rigged_unity.glb",
+      "runtimeTexturePaths": [
+        "unsoccer/client/public/assets/characters/free3d/6324128/albedo.webp",
+        "unsoccer/client/public/assets/characters/free3d/6324128/normal.webp",
+        "unsoccer/client/public/assets/characters/free3d/6324128/orm.webp"
+      ],
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/free3d/6324128/idle.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6324128/walking.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6324128/running.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6324128/jumping.fbx"
+      ]
     },
     {
-      "id": "6300462",
-      "name": "Ice Hockey Player Character Rigged and Animated",
-      "source": "https://free3d.online/model/6300462-ice-hockey-player-character-rigged-and-animated",
-      "status": "candidate-not-downloaded"
+      "id": "6244727",
+      "name": "Stealthy Cyber Ninja Character Model  Rigged and Animated",
+      "source": "https://free3d.online/model/6244727",
+      "status": "downloaded-optimized-runtime",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6244727_Stealthy%20Cyber%20Ninja%20Character%20Model%20Rigged%20and%20Animated/paths.json",
+      "rosterIndex": 4,
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6244727/rigged_unity.glb",
+      "runtimeTexturePaths": [
+        "unsoccer/client/public/assets/characters/free3d/6244727/albedo.webp",
+        "unsoccer/client/public/assets/characters/free3d/6244727/normal.webp",
+        "unsoccer/client/public/assets/characters/free3d/6244727/orm.webp"
+      ],
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/free3d/6244727/idle.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6244727/walking.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6244727/running.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6244727/jumping.fbx"
+      ]
+    },
+    {
+      "id": "6288738",
+      "name": "Chibi Character Rigged and Animated with Colorful Jacket and Boots",
+      "source": "https://free3d.online/model/6288738",
+      "status": "downloaded-optimized-runtime",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6288738_Chibi%20Character%20Rigged%20and%20Animated%20with%20Colorful%20Jacket%20and%20Boo/paths.json",
+      "rosterIndex": 5,
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6288738/rigged_unity.glb",
+      "runtimeTexturePaths": [
+        "unsoccer/client/public/assets/characters/free3d/6288738/albedo.webp",
+        "unsoccer/client/public/assets/characters/free3d/6288738/normal.webp",
+        "unsoccer/client/public/assets/characters/free3d/6288738/orm.webp"
+      ],
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/free3d/6288738/idle.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6288738/walking.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6288738/running.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6288738/jumping.fbx"
+      ]
+    },
+    {
+      "id": "6304269",
+      "name": "Warrior Character Rigged and Animated with Armor and Mohawk",
+      "source": "https://free3d.online/model/6304269",
+      "status": "downloaded-optimized-runtime",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6304269_Warrior%20Character%20Rigged%20and%20Animated%20with%20Armor%20and%20Mohawk/paths.json",
+      "rosterIndex": 6,
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6304269/rigged_unity.glb",
+      "runtimeTexturePaths": [
+        "unsoccer/client/public/assets/characters/free3d/6304269/albedo.webp",
+        "unsoccer/client/public/assets/characters/free3d/6304269/normal.webp",
+        "unsoccer/client/public/assets/characters/free3d/6304269/orm.webp"
+      ],
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/free3d/6304269/idle.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6304269/walking.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6304269/running.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6304269/jumping.fbx"
+      ]
+    },
+    {
+      "id": "6298522",
+      "name": "Ski Enthusiast Character Rigged and Animated for Games",
+      "source": "https://free3d.online/model/6298522",
+      "status": "downloaded-optimized-runtime",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6298522_Ski%20Enthusiast%20Character%20Rigged%20and%20Animated%20for%20Games/paths.json",
+      "rosterIndex": 7,
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6298522/rigged_unity.glb",
+      "runtimeTexturePaths": [
+        "unsoccer/client/public/assets/characters/free3d/6298522/albedo.webp",
+        "unsoccer/client/public/assets/characters/free3d/6298522/normal.webp",
+        "unsoccer/client/public/assets/characters/free3d/6298522/orm.webp"
+      ],
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/free3d/6298522/idle.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6298522/walking.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6298522/running.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6298522/jumping.fbx"
+      ]
+    },
+    {
+      "id": "6255142",
+      "name": "Animated Pop Star Character Model Rigged and Animated",
+      "source": "https://free3d.online/model/6255142",
+      "status": "downloaded-optimized-runtime",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6255142_Animated%20Pop%20Star%20Character%20Model%20Rigged%20and%20Animated/paths.json",
+      "rosterIndex": 8,
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6255142/rigged_unity.glb",
+      "runtimeTexturePaths": [
+        "unsoccer/client/public/assets/characters/free3d/6255142/albedo.webp",
+        "unsoccer/client/public/assets/characters/free3d/6255142/normal.webp",
+        "unsoccer/client/public/assets/characters/free3d/6255142/orm.webp"
+      ],
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/free3d/6255142/idle.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6255142/walking.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6255142/running.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6255142/jumping.fbx"
+      ]
+    },
+    {
+      "id": "6294728",
+      "name": "Colorful Clown Character Rigged and Animated for Games",
+      "source": "https://free3d.online/model/6294728",
+      "status": "downloaded-optimized-runtime",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6294728_Colorful%20Clown%20Character%20Rigged%20and%20Animated%20for%20Games/paths.json",
+      "rosterIndex": 9,
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6294728/rigged_unity.glb",
+      "runtimeTexturePaths": [
+        "unsoccer/client/public/assets/characters/free3d/6294728/albedo.webp",
+        "unsoccer/client/public/assets/characters/free3d/6294728/normal.webp",
+        "unsoccer/client/public/assets/characters/free3d/6294728/orm.webp"
+      ],
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/free3d/6294728/idle.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6294728/walking.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6294728/running.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6294728/jumping.fbx"
+      ]
+    },
+    {
+      "id": "666dc6f4-0cc4-4714-a7cf-39cfb6655fe8",
+      "name": "Pomni Censored Rigged Character",
+      "source": "https://autorig.online/task?id=666dc6f4-0cc4-4714-a7cf-39cfb6655fe8",
+      "status": "downloaded-runtime-autorig-task",
+      "sourceTaskGuid": "e99a5a3a-fbc5-423b-a682-53a869a00ae3",
+      "sourcePreparedGlbReady": true,
+      "sourceContentRating": "safe",
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/autorig/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/animations.glb",
+      "runtimeTextureMode": "embedded-glb-textures-44",
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/autorig/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/idle.fbx",
+        "unsoccer/client/public/assets/characters/autorig/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/walking.fbx",
+        "unsoccer/client/public/assets/characters/autorig/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/running.fbx",
+        "unsoccer/client/public/assets/characters/autorig/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/jumping.fbx"
+      ]
     }
   ]
 }

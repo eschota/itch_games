@@ -61,6 +61,12 @@ Use this file for work inside `/itch_games/sound_designer`.
 - `checks/2026-07-01-unsoccer-v0.0.010-final-audio-gate.md`: final local
   v0.0.010 audio gate evidence tied to deterministic acceptance and browser
   smoke.
+- `sources/unsoccer-sample-sfx-v0.0.023.md`: current free sample-SFX source
+  list, license decision, runtime selection, and WebAudio integration notes for
+  replacing MIDI-like procedural football/fight/celebration feedback.
+- `checks/2026-07-02-unsoccer-v0.0.024-sample-sfx-pass.md`: current sample
+  SFX implementation validation, package asset count/signature check, and
+  acceptance evidence for the WebAudio sample pass.
 
 ## Rules
 

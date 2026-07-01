@@ -4,7 +4,7 @@
   <parent path="../itch_games.skill.md" />
   <entry file="unsoccer.skill.md" />
   <runtime url="https://io-games.mecharulez.com/unsoccer/" />
-  <version current="v0.0.014" />
+  <version current="v0.0.029" />
   <publicSurface owner="UI Designer" localUrl="http://127.0.0.1:8000/unsoccer/" itchEntry="dist/index.html">
     <rule>unsoccer/index.html is the public static page for the local server and production route until the built client is deployed there.</rule>
     <rule>UI Designer owns public page hierarchy, prototype status copy, catalog continuity, and itch.io presentation fit.</rule>
@@ -14,7 +14,11 @@
     <file path="index.html" role="public-page prototype-status" />
     <folder path="client" role="browser-client" />
     <file path="client/index.html" role="client-entry hud-settings-dom" />
+    <file path="client/character-controller-test.html" role="local-character-controller-test-page" />
     <file path="client/src/main.ts" role="three-runtime hud-settings-network-input" />
+    <file path="client/src/environment-props.ts" role="art-director-courtyard-free3d-environment-loader" />
+    <file path="client/src/character-controller.ts" role="free3d-character-loader-animation-controller-ik" />
+    <file path="client/src/character-controller-test.ts" role="standalone-character-controller-test-runtime" />
     <file path="client/src/styles.css" role="hud-settings-responsive-css" />
     <file path="client/src/settings.ts" role="ui-settings-persistence-validation" />
     <file path="client/src/input-map.ts" role="input-remap-movement-resolution" />
@@ -23,6 +27,8 @@
     <folder path="server" role="authoritative-server" />
     <folder path="shared" role="shared-protocol" />
     <folder path="assets" role="runtime-assets-and-provenance" />
+    <file path="client/public/assets/environment/free3d/roster.json" role="local-free3d-environment-runtime-roster" />
+    <file path="assets/models/environment/free3d/provenance.json" role="local-free3d-environment-source-provenance" />
   </files>
   <rules>
     <rule>Client bundles must not import server-only code.</rule>
@@ -39,11 +45,33 @@
     <rule>v0.0.012 keeps the current scene size, fixes server-driven day cycle under qaTime=0, makes 04:00-20:00 bright daytime and 20:00-04:00 the dark window, hides the old sun-path debug line, prevents clear weather precipitation particles, weights random weather toward clear/dawn, upgrades the goal net to client-only Verlet cloth, shows the active Free3D vertex-color GLB ball on-field while hiding that rack variant, aligns visible goal posts with thicker server colliders, and acceptance-tests post rebounds plus bouncier heading physics.</rule>
     <rule>v0.0.013 replaces the primary primitive player body with a local Free3D Online 6300420 skinned GLB character optimized to 2.09 MB, cloned with SkeletonUtils, animated with per-player AnimationMixer, and keeps procedural primitives only as loading/error fallback.</rule>
     <rule>v0.0.014 replaces the white all-animation character runtime with a different textured Free3D 6299851 split pipeline: rigged_unity.glb, WebP albedo/normal/ORM maps, and separate FBX idle/walk/run/jump clips selected by player state.</rule>
+    <rule>v0.0.015 extracts the skinned character runtime into client/src/character-controller.ts, adds character-controller-test.html, blends idle/walk/run/jump by velocity with hysteresis/time scaling, applies procedural bone-IK strike overlays, extends the authoritative day cycle to 300 seconds, shortens true dark hours to 23:00-03:00, and adds four night-only floodlight masts with local volumetric beam meshes.</rule>
+    <rule>v0.0.016 halves goal post and crossbar radius, switches posts to neutral light metal, scores goals only on front goal-line plane crossing from the field side, rejects back-net entries, and adds clear center-circle, center-spot, penalty-box, goal-area, and penalty-spot markings.</rule>
+    <rule>v0.0.017 adds the local stamina HUD meter with state colors/labels, exposes local stamina datasets, and makes hand hits readable with a longer orange strike trail plus hand-action datasets.</rule>
+    <rule>v0.0.017 character input/strike correction uses middle mouse button for head hits, prevents mouse wheel from triggering attacks, sends foot/hand ball impulses forward along player yaw from the limb-specific contact point, and alternates hand-hit visual/contact side without adding a new network KickKind.</rule>
+    <rule>v0.0.018 keeps the camera anchored to the controlled player with smoothed velocity lead, removes ball-driven camera drift, and adds HUD offscreen arrows for the ball and other players.</rule>
+    <rule>v0.0.018 character roster extension expands the local runtime roster to 11 texture+animation characters and makes character-controller-test cycle them with arrow keys plus UI; Free3D entries require local rigged_unity.glb, WebP albedo/normal/ORM maps, and FBX idle/walk/run/jump clips, while AutoRig task entries may use local textured animations.glb plus local FBX preview clips when full downloads are locked.</rule>
+    <rule>v0.0.019 extends local-only goal nets into closed cages with back, roof, left-side, and right-side Verlet panels per goal while keeping net motion off the network.</rule>
+    <rule>v0.0.020 halves the authoritative shared BALL_RADIUS from 0.48 to 0.24 so the server collider, visible client ball, Free3D ball scale, sideline rack, and acceptance fixtures stay in sync.</rule>
+    <rule>v0.0.021 delays goal reset: 5 seconds of scoring-team celebration, then a 1-second server-authored ball return to kickoff before countdown; never teleport the ball to center immediately after a goal.</rule>
+    <rule>v0.0.021 balances the half-size ball with BALL_DENSITY 3.6 and lower normal hit impulses; acceptance guards against runaway projectile speeds.</rule>
+    <rule>v0.0.022 retargets Free3D character hand-strike IK so alternating hand hits keep logical left/right side, compensate mirrored roster arm bones, and punch forward at upper-chest/shoulder height with matching raised hand flash/trail.</rule>
+    <rule>v0.0.022 smooths authoritative keyboard movement: raw axes ramp, released axes decay, opposite axes take over faster, and controlled velocity accelerates/brakes; client prediction mirrors this and exposes data-movement-smoothing, data-local-move-speed, and data-local-move-axis for QA.</rule>
+    <rule>v0.0.023 assigns newly joined players random ready characters from CHARACTER_ROSTER through a shuffled non-repeating server deck and preserves player.characterId during role/team rebalancing.</rule>
+    <rule>v0.0.024 uses team-colored ground indicator rings and halos under players; browser QA exposes data-local-team-marker and data-local-team-marker-color for the local player.</rule>
+    <rule>v0.0.024 adds jumpRun for sprint/high-velocity jumps; until dedicated run-jump FBX clips are added to the runtime roster, jumpRun clones the normal jump clip and applies a stronger forward-leap IK overlay exposed through data-player-rig-jump-style=run.</rule>
+    <rule>v0.0.025 follows a lerped authoritative player offset for camera position/look target instead of skinned mesh or bone transforms; browser QA exposes data-camera-anchor-smoothing, data-camera-anchor-offset, and data-camera-follow-speed.</rule>
+    <rule>v0.0.025 activates server-authored player.ragdoll/ragdollAt when stamina reaches zero: sprint exhaustion preserves movement inertia, stamina-emptying hits apply heavy knockback/lift, local prediction must not override ragdoll snapshots, and browser QA exposes data-player-rig-ragdoll plus data-local-player-ragdoll.</rule>
+    <rule>v0.0.026 widens night floodlight coverage with broader SpotLight beams, larger volumetric cones, per-mast white-temperature variation, and subtle deterministic flicker exposed through data-stadium-light-beam-angle, data-stadium-light-beam-radius, data-stadium-light-palette, and data-stadium-light-flicker.</rule>
+    <rule>v0.0.027 makes player-ball contact height-aware: body bumps require vertical body overlap, foot/hand/head hits require vertical reach, jumps can clear ground balls, and unreachable high balls cannot be headed.</rule>
+    <rule>v0.0.028 extends the residential courtyard with outer roads, sidewalks, dense procedural props, and 8 local Free3D environment GLB asset sources cloned into 100+ environment instances; browser QA exposes data-environment-model-instances, data-procedural-environment-instances, data-free3d-environment-instances, data-free3d-environment-asset-count, and data-free3d-environment-loaded.</rule>
+    <rule>v0.0.029 doubles ordinary foot/hand/head ball-hit power and adds server-authored LMB left-foot charge from 2x tap power to 4x full power over one second; held charge may fire once on ball contact before release and browser QA exposes data-local-kick-charge.</rule>
+    <rule>v0.0.029 widens gameplay camera framing and adds close sideline pennant/bench strips so the dense v0.0.028 courtyard dressing is visible in normal play while the pitch remains clear.</rule>
     <rule>Server-confirmed left-foot, hand, head, jump, and body contacts must stay visually distinguishable and expose data-last-action-kind, data-last-action-player, and data-last-action-at for QA.</rule>
     <rule>Server owns physics, score, teams, and room assignment.</rule>
     <rule>Production transport is plain WebSocket JSON under /unsoccer/socket/ with HTTP polling fallback, implemented with built-in Node http/net/crypto primitives; do not require geckos.io, ws, or native node-datachannel on the Qwertystock host.</rule>
     <rule>UNSOCCER_TEST_MODE enables /api/test/* only for isolated local acceptance and must not be exposed in production.</rule>
-    <rule>npm run test:unsoccer:acceptance is the deterministic gate for spectator roles, team-relative WASD movement, HTTP fallback join/input/state, pitch-bound freedom, foot/hand/head kicks, jump, sprint/stamina, weather, goal reset, and server audioEvents.</rule>
+    <rule>npm run test:unsoccer:acceptance is the deterministic gate for spectator roles, team-relative WASD movement, smoothed keyboard axes/acceleration, HTTP fallback join/input/state, pitch-bound freedom, foot/hand/head kicks, jump, sprint/stamina, weather, goal reset, and server audioEvents.</rule>
     <rule>Acceptance derives the expected version from package.json.games.unsoccer.version and must not hard-code a release string.</rule>
     <rule>npm run package:unsoccer rebuilds before creating dist/unsoccer-itch.zip so stale dist output is not published.</rule>
     <rule>Client audio is procedural Web Audio driven by authoritative ServerState audioEvents and weather state, not local input prediction.</rule>
@@ -51,5 +79,7 @@
     <rule>First 4 clients are players; clients 5-32 are spectators/testers.</rule>
     <rule>Itch package contains static built client only.</rule>
     <rule>Free3D runtime assets require local GLB files and provenance; tokenless LowPoly 1k assets must be selected only from exact public worker inventory paths.json entries.</rule>
+    <rule>Character ids in shared/src/index.ts CHARACTER_ROSTER must exist in client/public/assets/characters/free3d/roster.json with local textures and clips before they can be assigned by the server.</rule>
+    <rule>AutoRig task character provenance must record the task page, task API metadata, animations.glb source, locked bundle/download status, and shipped local FBX preview clips.</rule>
   </rules>
 </folderSkill>

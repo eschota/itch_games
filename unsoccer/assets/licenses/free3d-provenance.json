@@ -1,13 +1,27 @@
 {
-  "version": "v0.0.014",
-  "generatedAt": "2026-07-01T16:21:19.655Z",
+  "version": "v0.0.018",
+  "generatedAt": "2026-07-01T19:58:08.789Z",
   "source": {
     "apiDocsUrl": "https://free3d.online/api-docs",
     "skillUrl": "https://free3d.online/skill.md",
-    "searchUrl": "https://free3d.online/api-embeddings/?q=soccer%20ball&topK=80",
-    "note": "Runtime UnSoccer v0.0.014 uses lightweight vertex-color Free3D ball variants and a local Free3D skinned character runtime with WebP texture maps plus separate FBX animation clips. Assets are local; runtime does not load remote Free3D URLs."
+    "searchUrl": "https://free3d.online/api-embeddings/?q=rigged%20animated%20character%20textured%20fbx%20idle%20walking%20running%20jumping&topK=120",
+    "note": "Runtime UnSoccer v0.0.018 keeps an 11-character local roster: 10 Free3D 1k characters plus one AutoRig task character. Each runtime character has local model files, local texture coverage, and separate local idle/walk/run/jump clips; runtime does not load remote character URLs."
   },
   "characterAssets": [
+    {
+      "guid": "6535605",
+      "title": "Charming Panda Character model pack",
+      "category": "Character",
+      "modelPageUrl": "https://free3d.online/model/6535605-charming-panda-character-model-pack",
+      "searchUrl": "https://free3d.online/api-embeddings/?q=charming%20panda%20character%20model%20pack&limit=5",
+      "format": "glb+fbx target",
+      "lod": "1k target",
+      "status": "blocked-no-free3d-auth-or-local-runtime-file",
+      "blocker": "FREE3D_API_TOKEN/F3D_API_TOKEN is missing; legacy lowpoly download links redirect to login; AutoRig job cannot be submitted until a local panda mesh or reachable authenticated URL is available.",
+      "autorigTarget": "https://autorig.online/api/task/create with source=upload, pipeline=rig, type=t_pose after panda mesh is available",
+      "runtimeLocalPath": null,
+      "downloadedAt": null
+    },
     {
       "guid": "6299851",
       "title": "Male Soccer Player Character Rigged and Animated",
@@ -51,6 +65,460 @@
         "jumpingFbx": 465868
       },
       "downloadedAt": "2026-07-01T18:10:00Z"
+    },
+    {
+      "guid": "6243756",
+      "title": "Wise Owl Character Model Rigged and Animated with Textured Details",
+      "category": "Character",
+      "modelPageUrl": "https://free3d.online/model/6243756",
+      "searchUrl": "https://free3d.online/api-embeddings/?q=rigged%20animated%20character%20textured%20fbx%20idle%20walking%20running%20jumping&topK=120",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6243756_Wise%20Owl%20Character%20Model%20Rigged%20and%20Animated%20with%20Textured%20Detai/paths.json",
+      "format": "glb+fbx+webp",
+      "lod": "1k",
+      "runtimeMode": "skinned GLB body, WebP albedo/normal/ORM textures, separate FBX idle/walk/run/jump clips",
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6243756/rigged_unity.glb",
+      "runtimeTexturePaths": [
+        "unsoccer/client/public/assets/characters/free3d/6243756/albedo.webp",
+        "unsoccer/client/public/assets/characters/free3d/6243756/normal.webp",
+        "unsoccer/client/public/assets/characters/free3d/6243756/orm.webp"
+      ],
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/free3d/6243756/idle.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6243756/walking.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6243756/running.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6243756/jumping.fbx"
+      ],
+      "rawLocalPaths": [
+        "unsoccer/assets/models/characters/free3d/raw/6243756-textured-rig/rigged_unity.glb",
+        "unsoccer/assets/models/characters/free3d/raw/6243756-textured-rig/albedo.png",
+        "unsoccer/assets/models/characters/free3d/raw/6243756-textured-rig/normal.png",
+        "unsoccer/assets/models/characters/free3d/raw/6243756-textured-rig/orm.png",
+        "unsoccer/assets/models/characters/free3d/raw/6243756-textured-rig/idle.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6243756-textured-rig/walking.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6243756-textured-rig/running.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6243756-textured-rig/jumping.fbx"
+      ],
+      "runtimeBytes": {
+        "riggedGlb": 121432,
+        "albedoWebp": 310678,
+        "normalWebp": 268986,
+        "ormWebp": 242916,
+        "idleFbx": 491804,
+        "walkingFbx": 444460,
+        "runningFbx": 428604,
+        "jumpingFbx": 490028
+      },
+      "downloadedAt": "2026-07-01T19:40:00.881Z"
+    },
+    {
+      "guid": "6270571",
+      "title": "Sherlock Lion Rigged and Animated D Character Model",
+      "category": "Character",
+      "modelPageUrl": "https://free3d.online/model/6270571",
+      "searchUrl": "https://free3d.online/api-embeddings/?q=rigged%20animated%20character%20textured%20fbx%20idle%20walking%20running%20jumping&topK=120",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6270571_Sherlock%20Lion%20Rigged%20and%20Animated%20D%20Character%20Model/paths.json",
+      "format": "glb+fbx+webp",
+      "lod": "1k",
+      "runtimeMode": "skinned GLB body, WebP albedo/normal/ORM textures, separate FBX idle/walk/run/jump clips",
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6270571/rigged_unity.glb",
+      "runtimeTexturePaths": [
+        "unsoccer/client/public/assets/characters/free3d/6270571/albedo.webp",
+        "unsoccer/client/public/assets/characters/free3d/6270571/normal.webp",
+        "unsoccer/client/public/assets/characters/free3d/6270571/orm.webp"
+      ],
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/free3d/6270571/idle.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6270571/walking.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6270571/running.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6270571/jumping.fbx"
+      ],
+      "rawLocalPaths": [
+        "unsoccer/assets/models/characters/free3d/raw/6270571-textured-rig/rigged_unity.glb",
+        "unsoccer/assets/models/characters/free3d/raw/6270571-textured-rig/albedo.png",
+        "unsoccer/assets/models/characters/free3d/raw/6270571-textured-rig/normal.png",
+        "unsoccer/assets/models/characters/free3d/raw/6270571-textured-rig/orm.png",
+        "unsoccer/assets/models/characters/free3d/raw/6270571-textured-rig/idle.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6270571-textured-rig/walking.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6270571-textured-rig/running.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6270571-textured-rig/jumping.fbx"
+      ],
+      "runtimeBytes": {
+        "riggedGlb": 94912,
+        "albedoWebp": 248136,
+        "normalWebp": 170896,
+        "ormWebp": 139740,
+        "idleFbx": 465116,
+        "walkingFbx": 422700,
+        "runningFbx": 402540,
+        "jumpingFbx": 463404
+      },
+      "downloadedAt": "2026-07-01T19:40:00.881Z"
+    },
+    {
+      "guid": "6324128",
+      "title": "Animated Cute Panda Character Model Rigged and Animated",
+      "category": "Character",
+      "modelPageUrl": "https://free3d.online/model/6324128",
+      "searchUrl": "https://free3d.online/api-embeddings/?q=rigged%20animated%20character%20textured%20fbx%20idle%20walking%20running%20jumping&topK=120",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6324128_Animated%20Cute%20Panda%20Character%20Model%20Rigged%20and%20Animated/paths.json",
+      "format": "glb+fbx+webp",
+      "lod": "1k",
+      "runtimeMode": "skinned GLB body, WebP albedo/normal/ORM textures, separate FBX idle/walk/run/jump clips",
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6324128/rigged_unity.glb",
+      "runtimeTexturePaths": [
+        "unsoccer/client/public/assets/characters/free3d/6324128/albedo.webp",
+        "unsoccer/client/public/assets/characters/free3d/6324128/normal.webp",
+        "unsoccer/client/public/assets/characters/free3d/6324128/orm.webp"
+      ],
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/free3d/6324128/idle.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6324128/walking.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6324128/running.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6324128/jumping.fbx"
+      ],
+      "rawLocalPaths": [
+        "unsoccer/assets/models/characters/free3d/raw/6324128-textured-rig/rigged_unity.glb",
+        "unsoccer/assets/models/characters/free3d/raw/6324128-textured-rig/albedo.png",
+        "unsoccer/assets/models/characters/free3d/raw/6324128-textured-rig/normal.png",
+        "unsoccer/assets/models/characters/free3d/raw/6324128-textured-rig/orm.png",
+        "unsoccer/assets/models/characters/free3d/raw/6324128-textured-rig/idle.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6324128-textured-rig/walking.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6324128-textured-rig/running.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6324128-textured-rig/jumping.fbx"
+      ],
+      "runtimeBytes": {
+        "riggedGlb": 94552,
+        "albedoWebp": 113416,
+        "normalWebp": 131750,
+        "ormWebp": 112704,
+        "idleFbx": 471404,
+        "walkingFbx": 428412,
+        "runningFbx": 407532,
+        "jumpingFbx": 471020
+      },
+      "downloadedAt": "2026-07-01T19:40:00.881Z"
+    },
+    {
+      "guid": "6244727",
+      "title": "Stealthy Cyber Ninja Character Model  Rigged and Animated",
+      "category": "Character",
+      "modelPageUrl": "https://free3d.online/model/6244727",
+      "searchUrl": "https://free3d.online/api-embeddings/?q=rigged%20animated%20character%20textured%20fbx%20idle%20walking%20running%20jumping&topK=120",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6244727_Stealthy%20Cyber%20Ninja%20Character%20Model%20Rigged%20and%20Animated/paths.json",
+      "format": "glb+fbx+webp",
+      "lod": "1k",
+      "runtimeMode": "skinned GLB body, WebP albedo/normal/ORM textures, separate FBX idle/walk/run/jump clips",
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6244727/rigged_unity.glb",
+      "runtimeTexturePaths": [
+        "unsoccer/client/public/assets/characters/free3d/6244727/albedo.webp",
+        "unsoccer/client/public/assets/characters/free3d/6244727/normal.webp",
+        "unsoccer/client/public/assets/characters/free3d/6244727/orm.webp"
+      ],
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/free3d/6244727/idle.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6244727/walking.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6244727/running.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6244727/jumping.fbx"
+      ],
+      "rawLocalPaths": [
+        "unsoccer/assets/models/characters/free3d/raw/6244727-textured-rig/rigged_unity.glb",
+        "unsoccer/assets/models/characters/free3d/raw/6244727-textured-rig/albedo.png",
+        "unsoccer/assets/models/characters/free3d/raw/6244727-textured-rig/normal.png",
+        "unsoccer/assets/models/characters/free3d/raw/6244727-textured-rig/orm.png",
+        "unsoccer/assets/models/characters/free3d/raw/6244727-textured-rig/idle.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6244727-textured-rig/walking.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6244727-textured-rig/running.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6244727-textured-rig/jumping.fbx"
+      ],
+      "runtimeBytes": {
+        "riggedGlb": 101092,
+        "albedoWebp": 195448,
+        "normalWebp": 219278,
+        "ormWebp": 186138,
+        "idleFbx": 475004,
+        "walkingFbx": 428492,
+        "runningFbx": 411308,
+        "jumpingFbx": 473916
+      },
+      "downloadedAt": "2026-07-01T19:40:00.881Z"
+    },
+    {
+      "guid": "6288738",
+      "title": "Chibi Character Rigged and Animated with Colorful Jacket and Boots",
+      "category": "Character",
+      "modelPageUrl": "https://free3d.online/model/6288738",
+      "searchUrl": "https://free3d.online/api-embeddings/?q=rigged%20animated%20character%20textured%20fbx%20idle%20walking%20running%20jumping&topK=120",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6288738_Chibi%20Character%20Rigged%20and%20Animated%20with%20Colorful%20Jacket%20and%20Boo/paths.json",
+      "format": "glb+fbx+webp",
+      "lod": "1k",
+      "runtimeMode": "skinned GLB body, WebP albedo/normal/ORM textures, separate FBX idle/walk/run/jump clips",
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6288738/rigged_unity.glb",
+      "runtimeTexturePaths": [
+        "unsoccer/client/public/assets/characters/free3d/6288738/albedo.webp",
+        "unsoccer/client/public/assets/characters/free3d/6288738/normal.webp",
+        "unsoccer/client/public/assets/characters/free3d/6288738/orm.webp"
+      ],
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/free3d/6288738/idle.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6288738/walking.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6288738/running.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6288738/jumping.fbx"
+      ],
+      "rawLocalPaths": [
+        "unsoccer/assets/models/characters/free3d/raw/6288738-textured-rig/rigged_unity.glb",
+        "unsoccer/assets/models/characters/free3d/raw/6288738-textured-rig/albedo.png",
+        "unsoccer/assets/models/characters/free3d/raw/6288738-textured-rig/normal.png",
+        "unsoccer/assets/models/characters/free3d/raw/6288738-textured-rig/orm.png",
+        "unsoccer/assets/models/characters/free3d/raw/6288738-textured-rig/idle.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6288738-textured-rig/walking.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6288738-textured-rig/running.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6288738-textured-rig/jumping.fbx"
+      ],
+      "runtimeBytes": {
+        "riggedGlb": 102064,
+        "albedoWebp": 203148,
+        "normalWebp": 173136,
+        "ormWebp": 137576,
+        "idleFbx": 471772,
+        "walkingFbx": 429612,
+        "runningFbx": 410492,
+        "jumpingFbx": 471788
+      },
+      "downloadedAt": "2026-07-01T19:40:00.881Z"
+    },
+    {
+      "guid": "6304269",
+      "title": "Warrior Character Rigged and Animated with Armor and Mohawk",
+      "category": "Character",
+      "modelPageUrl": "https://free3d.online/model/6304269",
+      "searchUrl": "https://free3d.online/api-embeddings/?q=rigged%20animated%20character%20textured%20fbx%20idle%20walking%20running%20jumping&topK=120",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6304269_Warrior%20Character%20Rigged%20and%20Animated%20with%20Armor%20and%20Mohawk/paths.json",
+      "format": "glb+fbx+webp",
+      "lod": "1k",
+      "runtimeMode": "skinned GLB body, WebP albedo/normal/ORM textures, separate FBX idle/walk/run/jump clips",
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6304269/rigged_unity.glb",
+      "runtimeTexturePaths": [
+        "unsoccer/client/public/assets/characters/free3d/6304269/albedo.webp",
+        "unsoccer/client/public/assets/characters/free3d/6304269/normal.webp",
+        "unsoccer/client/public/assets/characters/free3d/6304269/orm.webp"
+      ],
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/free3d/6304269/idle.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6304269/walking.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6304269/running.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6304269/jumping.fbx"
+      ],
+      "rawLocalPaths": [
+        "unsoccer/assets/models/characters/free3d/raw/6304269-textured-rig/rigged_unity.glb",
+        "unsoccer/assets/models/characters/free3d/raw/6304269-textured-rig/albedo.png",
+        "unsoccer/assets/models/characters/free3d/raw/6304269-textured-rig/normal.png",
+        "unsoccer/assets/models/characters/free3d/raw/6304269-textured-rig/orm.png",
+        "unsoccer/assets/models/characters/free3d/raw/6304269-textured-rig/idle.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6304269-textured-rig/walking.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6304269-textured-rig/running.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6304269-textured-rig/jumping.fbx"
+      ],
+      "runtimeBytes": {
+        "riggedGlb": 99556,
+        "albedoWebp": 270574,
+        "normalWebp": 288368,
+        "ormWebp": 222522,
+        "idleFbx": 470796,
+        "walkingFbx": 427292,
+        "runningFbx": 406700,
+        "jumpingFbx": 468844
+      },
+      "downloadedAt": "2026-07-01T19:40:00.881Z"
+    },
+    {
+      "guid": "6298522",
+      "title": "Ski Enthusiast Character Rigged and Animated for Games",
+      "category": "Character",
+      "modelPageUrl": "https://free3d.online/model/6298522",
+      "searchUrl": "https://free3d.online/api-embeddings/?q=rigged%20animated%20character%20textured%20fbx%20idle%20walking%20running%20jumping&topK=120",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6298522_Ski%20Enthusiast%20Character%20Rigged%20and%20Animated%20for%20Games/paths.json",
+      "format": "glb+fbx+webp",
+      "lod": "1k",
+      "runtimeMode": "skinned GLB body, WebP albedo/normal/ORM textures, separate FBX idle/walk/run/jump clips",
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6298522/rigged_unity.glb",
+      "runtimeTexturePaths": [
+        "unsoccer/client/public/assets/characters/free3d/6298522/albedo.webp",
+        "unsoccer/client/public/assets/characters/free3d/6298522/normal.webp",
+        "unsoccer/client/public/assets/characters/free3d/6298522/orm.webp"
+      ],
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/free3d/6298522/idle.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6298522/walking.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6298522/running.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6298522/jumping.fbx"
+      ],
+      "rawLocalPaths": [
+        "unsoccer/assets/models/characters/free3d/raw/6298522-textured-rig/rigged_unity.glb",
+        "unsoccer/assets/models/characters/free3d/raw/6298522-textured-rig/albedo.png",
+        "unsoccer/assets/models/characters/free3d/raw/6298522-textured-rig/normal.png",
+        "unsoccer/assets/models/characters/free3d/raw/6298522-textured-rig/orm.png",
+        "unsoccer/assets/models/characters/free3d/raw/6298522-textured-rig/idle.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6298522-textured-rig/walking.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6298522-textured-rig/running.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6298522-textured-rig/jumping.fbx"
+      ],
+      "runtimeBytes": {
+        "riggedGlb": 107304,
+        "albedoWebp": 251662,
+        "normalWebp": 284568,
+        "ormWebp": 179672,
+        "idleFbx": 476540,
+        "walkingFbx": 433660,
+        "runningFbx": 413260,
+        "jumpingFbx": 476844
+      },
+      "downloadedAt": "2026-07-01T19:40:00.881Z"
+    },
+    {
+      "guid": "6255142",
+      "title": "Animated Pop Star Character Model Rigged and Animated",
+      "category": "Character",
+      "modelPageUrl": "https://free3d.online/model/6255142",
+      "searchUrl": "https://free3d.online/api-embeddings/?q=rigged%20animated%20character%20textured%20fbx%20idle%20walking%20running%20jumping&topK=120",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6255142_Animated%20Pop%20Star%20Character%20Model%20Rigged%20and%20Animated/paths.json",
+      "format": "glb+fbx+webp",
+      "lod": "1k",
+      "runtimeMode": "skinned GLB body, WebP albedo/normal/ORM textures, separate FBX idle/walk/run/jump clips",
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6255142/rigged_unity.glb",
+      "runtimeTexturePaths": [
+        "unsoccer/client/public/assets/characters/free3d/6255142/albedo.webp",
+        "unsoccer/client/public/assets/characters/free3d/6255142/normal.webp",
+        "unsoccer/client/public/assets/characters/free3d/6255142/orm.webp"
+      ],
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/free3d/6255142/idle.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6255142/walking.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6255142/running.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6255142/jumping.fbx"
+      ],
+      "rawLocalPaths": [
+        "unsoccer/assets/models/characters/free3d/raw/6255142-textured-rig/rigged_unity.glb",
+        "unsoccer/assets/models/characters/free3d/raw/6255142-textured-rig/albedo.png",
+        "unsoccer/assets/models/characters/free3d/raw/6255142-textured-rig/normal.png",
+        "unsoccer/assets/models/characters/free3d/raw/6255142-textured-rig/orm.png",
+        "unsoccer/assets/models/characters/free3d/raw/6255142-textured-rig/idle.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6255142-textured-rig/walking.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6255142-textured-rig/running.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6255142-textured-rig/jumping.fbx"
+      ],
+      "runtimeBytes": {
+        "riggedGlb": 117336,
+        "albedoWebp": 267508,
+        "normalWebp": 274136,
+        "ormWebp": 192696,
+        "idleFbx": 714892,
+        "walkingFbx": 649644,
+        "runningFbx": 623996,
+        "jumpingFbx": 711036
+      },
+      "downloadedAt": "2026-07-01T19:40:00.881Z"
+    },
+    {
+      "guid": "6294728",
+      "title": "Colorful Clown Character Rigged and Animated for Games",
+      "category": "Character",
+      "modelPageUrl": "https://free3d.online/model/6294728",
+      "searchUrl": "https://free3d.online/api-embeddings/?q=rigged%20animated%20character%20textured%20fbx%20idle%20walking%20running%20jumping&topK=120",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6294728_Colorful%20Clown%20Character%20Rigged%20and%20Animated%20for%20Games/paths.json",
+      "format": "glb+fbx+webp",
+      "lod": "1k",
+      "runtimeMode": "skinned GLB body, WebP albedo/normal/ORM textures, separate FBX idle/walk/run/jump clips",
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6294728/rigged_unity.glb",
+      "runtimeTexturePaths": [
+        "unsoccer/client/public/assets/characters/free3d/6294728/albedo.webp",
+        "unsoccer/client/public/assets/characters/free3d/6294728/normal.webp",
+        "unsoccer/client/public/assets/characters/free3d/6294728/orm.webp"
+      ],
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/free3d/6294728/idle.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6294728/walking.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6294728/running.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6294728/jumping.fbx"
+      ],
+      "rawLocalPaths": [
+        "unsoccer/assets/models/characters/free3d/raw/6294728-textured-rig/rigged_unity.glb",
+        "unsoccer/assets/models/characters/free3d/raw/6294728-textured-rig/albedo.png",
+        "unsoccer/assets/models/characters/free3d/raw/6294728-textured-rig/normal.png",
+        "unsoccer/assets/models/characters/free3d/raw/6294728-textured-rig/orm.png",
+        "unsoccer/assets/models/characters/free3d/raw/6294728-textured-rig/idle.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6294728-textured-rig/walking.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6294728-textured-rig/running.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6294728-textured-rig/jumping.fbx"
+      ],
+      "runtimeBytes": {
+        "riggedGlb": 103688,
+        "albedoWebp": 289678,
+        "normalWebp": 252576,
+        "ormWebp": 241224,
+        "idleFbx": 469324,
+        "walkingFbx": 424684,
+        "runningFbx": 404988,
+        "jumpingFbx": 467500
+      },
+      "downloadedAt": "2026-07-01T19:40:00.881Z"
+    },
+    {
+      "guid": "666dc6f4-0cc4-4714-a7cf-39cfb6655fe8",
+      "title": "Pomni Censored Rigged Character",
+      "category": "Character",
+      "provider": "AutoRig.online",
+      "modelPageUrl": "https://autorig.online/task?id=666dc6f4-0cc4-4714-a7cf-39cfb6655fe8",
+      "taskApiUrl": "https://autorig.online/api/task/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8",
+      "animationCatalogUrl": "https://autorig.online/api/task/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/animations/catalog",
+      "sourceGuid": "e99a5a3a-fbc5-423b-a682-53a869a00ae3",
+      "format": "glb+fbx",
+      "lod": "autorig-runtime",
+      "runtimeMode": "AutoRig animations.glb with embedded GLB textures plus public preview FBX idle/walk/run/jump clips",
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/autorig/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/animations.glb",
+      "runtimeTextureMode": "embedded GLB images/textures",
+      "runtimeTextureCount": 44,
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/autorig/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/idle.fbx",
+        "unsoccer/client/public/assets/characters/autorig/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/walking.fbx",
+        "unsoccer/client/public/assets/characters/autorig/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/running.fbx",
+        "unsoccer/client/public/assets/characters/autorig/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/jumping.fbx"
+      ],
+      "rawLocalPaths": [
+        "unsoccer/assets/models/characters/autorig/raw/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/animations.glb",
+        "unsoccer/assets/models/characters/autorig/raw/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/idle.fbx",
+        "unsoccer/assets/models/characters/autorig/raw/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/walking.fbx",
+        "unsoccer/assets/models/characters/autorig/raw/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/running.fbx",
+        "unsoccer/assets/models/characters/autorig/raw/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/jumping.fbx",
+        "unsoccer/assets/models/characters/autorig/raw/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/task.json",
+        "unsoccer/assets/models/characters/autorig/raw/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/cached-files.json",
+        "unsoccer/assets/models/characters/autorig/raw/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/animations-catalog.json"
+      ],
+      "sourceAccess": {
+        "animationsGlb": {
+          "url": "https://autorig.online/api/task/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/animations.glb",
+          "status": 200
+        },
+        "preparedGlb": {
+          "url": "https://autorig.online/api/task/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/prepared.glb",
+          "status": 200
+        },
+        "bundleZip": {
+          "url": "https://autorig.online/api/task/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/bundle.zip",
+          "status": 401
+        },
+        "fbxDownloads": {
+          "status": 401,
+          "note": "Direct animation downloads require task unlock; public preview FBX endpoints were used for idle/walk/run/jump runtime clips."
+        }
+      },
+      "runtimeBytes": {
+        "animationsGlb": 32682496,
+        "idleFbx": 1573708,
+        "walkingFbx": 705596,
+        "runningFbx": 662748,
+        "jumpingFbx": 833356
+      },
+      "downloadedAt": "2026-07-01T19:58:08.816Z"
     }
   ],
   "assets": [
@@ -247,9 +715,9 @@
   ],
   "rules": [
     "Use FREE3D_API_TOKEN or F3D_API_TOKEN from the environment only for authenticated direct routes.",
-    "For tokenless work, use only public LowPoly 1k worker inventory assets with exact paths.json relativePath entries.",
+    "For tokenless character work, use only public LowPoly 1k worker inventory assets with exact paths.json relativePath entries.",
     "Record source guid, source URL, inventory URL, direct worker URL, format, lod, relativePath, bytes, and timestamp before shipping or deriving a GLB.",
     "Do not ship remote runtime dependencies in the itch.io zip.",
-    "Do not include texture files in the UnSoccer runtime; derive optimized vertex-color/material variants instead."
+    "Character runtime assets may include local optimized WebP textures and separate local FBX animation clips when character readability depends on textures and animation."
   ]
 }

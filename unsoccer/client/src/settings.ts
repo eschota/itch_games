@@ -72,7 +72,7 @@ export const DEFAULT_BINDINGS: KeyBindings = {
   moveRight: ["KeyD", "ArrowRight"],
   leftKick: ["Mouse0", "KeyJ"],
   rightKick: ["Mouse2", "KeyK"],
-  headHit: ["Wheel", "KeyL"],
+  headHit: ["Mouse1", "KeyL"],
   jump: ["Space"],
   sprint: ["ShiftLeft", "ShiftRight"],
   settings: ["Escape"],
@@ -226,7 +226,12 @@ function normalizeBindings(value: Partial<KeyBindings> | undefined): KeyBindings
   if (!value) return next;
   for (const action of Object.keys(next) as InputAction[]) {
     const codes = value[action];
-    if (Array.isArray(codes) && codes.length > 0) next[action] = Array.from(new Set(codes.filter(Boolean)));
+    if (Array.isArray(codes) && codes.length > 0) {
+      const normalizedCodes = codes
+        .filter(Boolean)
+        .map((code) => action === "headHit" && code === "Wheel" ? "Mouse1" : code);
+      next[action] = Array.from(new Set(normalizedCodes));
+    }
   }
   return next;
 }

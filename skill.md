@@ -211,8 +211,8 @@ Use this root skill when changing, packaging, validating, or publishing the
 
 ## Current Behavior
 
-- Current game release: `v0.0.014`.
-- `unsoccer` current prototype release: `v0.0.014`.
+- Current game release: `v0.0.029`.
+- `unsoccer` current prototype release: `v0.0.029`.
 - `unsoccer` uses a headless authoritative Node server with Rapier3D physics,
   plain WebSocket transport, and HTTP polling fallback; the itch package is
   static client-only and needs the live game server for multiplayer.
@@ -294,6 +294,94 @@ Use this root skill when changing, packaging, validating, or publishing the
   a different textured Free3D `6299851` split pipeline: `rigged_unity.glb`,
   WebP albedo/normal/ORM maps, and separate FBX `idle`, `walk`, `run`, and
   `jump` clips selected by player speed/airborne state.
+- `unsoccer` v0.0.015 extracts the skinned character runtime into
+  `client/src/character-controller.ts`, adds `character-controller-test.html`
+  for local controller validation without the multiplayer server, blends
+  idle/walk/run/jump by velocity with hysteresis/time scaling, applies
+  procedural bone-IK overlays for foot/hand/head/body/jump strikes instead of
+  baked attack clips, extends the server-authoritative day cycle to 300 seconds,
+  shortens true dark hours to 23:00-03:00, and adds night-only floodlight masts
+  with local volumetric beam meshes around the field.
+- `unsoccer` v0.0.016 halves goal post/crossbar radius, switches posts to
+  neutral material, makes goal scoring depend on front goal-line plane crossing
+  from the field side, rejects back-net entries, and improves field graphics
+  with center-circle, center-spot, penalty-box, goal-area, and penalty-spot
+  markings.
+- `unsoccer` v0.0.017 adds the local stamina HUD meter and state labels, exposes
+  stamina QA datasets, and makes hand hits visibly read through a longer orange
+  strike trail plus hand-action datasets.
+- `unsoccer` v0.0.018 makes the camera player-anchored with smoothed velocity
+  lead, removes ball-driven camera drift, and adds HUD offscreen arrows for the
+  ball and other players with QA datasets.
+- `unsoccer` v0.0.018 character roster extension adds a local 11-character
+  runtime roster: 10 Free3D characters with WebP textures and one AutoRig task
+  character with embedded GLB textures; every entry has separate local FBX
+  idle/walk/run/jump clips and standalone controller-test switching by arrow
+  keys plus UI.
+- `unsoccer` v0.0.019 extends the local-only Verlet goal net from the rear
+  sheet into closed goals with back, roof, left-side, and right-side panels,
+  while keeping net motion visual-only and off the network.
+- `unsoccer` v0.0.020 halves the authoritative shared `BALL_RADIUS` from
+  `0.48` to `0.24`; keep physics, client procedural/Free3D ball scale,
+  sideline ball placement, and acceptance fixtures on the shared radius.
+- `unsoccer` v0.0.021 keeps goals in a 5-second team celebration phase,
+  blocks normal ball kicks during the reset sequence, returns the ball to
+  kickoff over a 1-second server-authored flight, and only then starts the
+  kickoff countdown. Never teleport the ball to center immediately after a
+  goal. `ServerState.goalReset` and browser `data-goal-reset-*` datasets are
+  the QA surface. v0.0.021 also keeps the half-size ball from becoming a
+  runaway projectile through `BALL_DENSITY=3.6` and reduced normal hit
+  impulses.
+- `unsoccer` v0.0.022 retargets Free3D character hand-strike IK so alternating
+  hand hits keep logical left/right side while compensating the current
+  roster's mirrored arm bones, and the punch/flash target reads forward at
+  upper-chest/shoulder height.
+- `unsoccer` v0.0.022 also smooths keyboard movement: server-authoritative WASD
+  axes ramp and decay, opposite axes take over faster than release decay, and
+  controlled player velocity accelerates/brakes instead of snapping. Client
+  prediction mirrors this and exposes `data-movement-smoothing`,
+  `data-local-move-speed`, and `data-local-move-axis` for QA.
+- `unsoccer` v0.0.023 assigns newly joined players random ready characters from
+  `CHARACTER_ROSTER` through a shuffled non-repeating server deck and preserves
+  `player.characterId` across room role/team rebalancing.
+- `unsoccer` v0.0.024 uses team-colored ground marker rings/halos under players
+  and exposes `data-local-team-marker` plus `data-local-team-marker-color` for
+  browser QA.
+- `unsoccer` v0.0.024 adds a distinct `jumpRun` controller state for
+  sprint/high-velocity jumps. Until a dedicated run-jump FBX is present in the
+  runtime roster, `jumpRun` clones the normal jump clip and applies a stronger
+  forward-leap IK overlay exposed through `data-player-rig-jump-style=run`.
+- `unsoccer` v0.0.025 makes the camera follow a lerped authoritative player
+  offset instead of any animated character/bone transform, smooths measured
+  camera velocity before lead, and exposes `data-camera-anchor-smoothing`,
+  `data-camera-anchor-offset`, and `data-camera-follow-speed` for browser QA.
+- `unsoccer` v0.0.025 adds server-authored `player.ragdoll`/`ragdollAt` when
+  stamina reaches zero. Sprint exhaustion must preserve previous movement
+  inertia; stamina-emptying hits must apply heavy knockback/lift; local
+  prediction must not override ragdoll snapshots; browser QA exposes
+  `data-player-rig-ragdoll` and `data-local-player-ragdoll`.
+- `unsoccer` v0.0.026 widens night floodlight SpotLight beams and volumetric
+  cone meshes, gives each mast a slightly different white temperature, and adds
+  subtle deterministic flicker exposed through `data-stadium-light-flicker`,
+  `data-stadium-light-beam-angle`, `data-stadium-light-beam-radius`, and
+  `data-stadium-light-palette`.
+- `unsoccer` v0.0.027 makes player-ball contact height-aware: body bumps only
+  happen when the ball overlaps the player's vertical body span, and foot/hand/
+  head hits must be within their vertical reach so jumps can clear the ball and
+  head inputs cannot hit balls clearly above the player.
+- `unsoccer` v0.0.028 extends the residential courtyard with local Free3D
+  environment GLB props plus dense procedural dressing. Browser QA must confirm
+  `data-environment-model-instances` is at least `100`,
+  `data-free3d-environment-asset-count="8"`, and
+  `data-free3d-environment-loaded="true"`.
+- `unsoccer` v0.0.029 doubles ordinary foot/hand/head ball-hit power and adds
+  server-authored LMB left-foot charge from 2x tap power to 4x full power over
+  one second. A held charge can fire once on ball contact before release, and
+  browser QA exposes `data-local-kick-charge` plus
+  `data-local-kick-charge-held`.
+- `unsoccer` v0.0.029 also widens gameplay camera framing and adds visible
+  sideline pennant/bench strips so the dense v0.0.028 courtyard remains visible
+  during ordinary play without placing props on the pitch.
 - `v0.0.006` adds procedural Web Audio feedback and exposes
   `window.orbitalCourierAudio` plus `orbital-courier:audio-event` so future
   network code can replicate semantic sound events instead of audio files.

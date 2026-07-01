@@ -1,5 +1,140 @@
 # Changelog
 
+## unsoccer v0.0.029
+
+- Double normal foot/hand/head ball-hit impulse power so ordinary contacts no
+  longer feel underpowered after the recent ball/contact tuning.
+- Add server-authored left-foot charge: holding LMB starts a one-second charge
+  window, interpolating left-foot ball power from 2x tap strength to 4x full
+  strength, and a held charge can fire on ball contact before release.
+- Expose local charge QA data through `data-local-kick-charge` and slightly
+  expand the local player marker ring while charging.
+- Widen the gameplay camera framing and add close sideline pennant/bench strips
+  so the v0.0.028 courtyard dressing is visible during normal play, not only in
+  far-edge views.
+
+## unsoccer v0.0.028
+
+- Extend the residential courtyard into a denser outer block with roads,
+  sidewalks, garden pockets, lamps, planters, bicycles, utility props, tables,
+  crates, puddles, and ground decals while preserving pitch readability.
+- Add a local Free3D environment roster with 8 shipped GLB prop sources and
+  clone them around the courtyard as benches, bins, cones, and background ruins.
+- Expose `data-environment-model-instances`,
+  `data-procedural-environment-instances`, `data-free3d-environment-instances`,
+  and `data-free3d-environment-asset-count` for browser QA of the 100+ model
+  requirement.
+- Keep spectator benches and pennant frames just outside the pitch lines so the
+  enriched courtyard reads in the player camera while the field stays clear.
+
+## unsoccer v0.0.027
+
+- Make player-ball body contact height-aware so a sufficiently airborne player
+  can jump over a ground ball instead of pushing it by horizontal radius alone.
+- Gate foot/hand/head ball hits by vertical contact reach, with head hits only
+  applying when the ball is near the player's actual head height.
+- Add acceptance regressions for airborne ball clearance and unreachable
+  high-ball head attempts.
+
+## unsoccer v0.0.026
+
+- Widen night floodlight beams and volumetric cones so the masts cover the
+  field instead of only the center circle.
+- Give each mast a slightly different white temperature and a subtle
+  deterministic flicker, with QA datasets for beam angle, beam radius, palette,
+  and flicker strength.
+
+## unsoccer v0.0.025
+
+- Make the runtime camera follow a lerped authoritative player offset instead
+  of any animated character/bone transform, removing movement bobble from the
+  camera target.
+- Smooth measured camera velocity from that anchor before calculating dynamic
+  lead, and expose QA datasets for anchor smoothing, offset, and follow speed.
+- Add a server-authored `ragdoll` state when stamina reaches zero: sprint
+  exhaustion preserves movement inertia, stamina-emptying hits launch the target
+  with heavy knockback/lift, and skinned characters switch to limp ragdoll IK.
+
+## unsoccer v0.0.024
+
+- Add team-colored indicator circles under players: each player now has a
+  colored ground glow plus brighter ring using the current team color.
+- Expose `data-local-team-marker` and `data-local-team-marker-color` for browser
+  QA of the local player's marker color.
+- Add a distinct `jumpRun` controller state for sprint/high-velocity jumps, with
+  stronger forward-leap IK, faster playback, and QA datasets for jump style.
+
+## unsoccer v0.0.023
+
+- Assign each newly joined player a random ready character from the shared
+  runtime roster instead of always starting from the first footballer.
+- Use a shuffled non-repeating server deck so the roster is distributed across
+  players before any character can repeat.
+- Preserve the assigned `characterId` across role/team rebalancing so reconnects
+  and spectator promotion do not silently remap the avatar.
+## unsoccer v0.0.022
+
+- Add authoritative keyboard movement smoothing: direction axes now ramp, a
+  released side axis fades instead of disappearing instantly, opposite input
+  wins faster, and controlled player velocity accelerates/brakes smoothly.
+- Mirror the same smoothing model in local client prediction and expose
+  `data-movement-smoothing`, `data-local-move-speed`, and
+  `data-local-move-axis` for browser QA.
+- Retarget Free3D character hand-strike IK so alternating left/right hand hits
+  drive the punch forward at upper-chest/shoulder height instead of low across
+  the torso.
+- Raise the runtime hand-strike flash/trail target to match the corrected
+  punch height.
+
+## unsoccer v0.0.021
+
+- Keep goals in a post-goal celebration phase for 5 seconds, then return the
+  ball to kickoff over a 1-second server-authored flight instead of teleporting
+  it to center immediately.
+- Expose `goalReset` phase/progress snapshots and browser QA datasets for
+  `celebration`, `returning`, and `kickoff`.
+- Rebalance the half-size ball by raising its density to preserve useful mass
+  and reducing foot/hand/head/body impulses so normal hits no longer launch it
+  like a runaway projectile.
+
+## unsoccer v0.0.020
+
+- Halve the authoritative ball radius from `0.48` to `0.24` so the visual ball,
+  Rapier collider, Free3D ball scale, sideline balls, and acceptance fixtures
+  all use the smaller match ball.
+
+## unsoccer v0.0.019
+
+- Extend local-only Verlet goal nets from a rear sheet into closed netted
+  goals with back, roof, left-side, and right-side cloth panels.
+- Expose goal-net QA datasets for panel count and coverage while keeping net
+  motion visual-only and off the network.
+
+## unsoccer v0.0.018
+
+- Make the gameplay camera stay anchored to the controlled player with
+  smoothed velocity lead instead of blending toward the ball.
+- Add a large HUD direction arrow for the ball when it leaves the camera view.
+- Add compact offscreen direction arrows for other players outside the camera
+  view, with QA-readable camera/offscreen datasets.
+
+## unsoccer v0.0.017
+
+- Add a local-player stamina HUD meter with numeric percent, state label, and
+  ready/recovering/low/sprint/exhausted colors.
+- Expose local stamina QA datasets for browser verification.
+- Make right-hand hits visibly read with a longer orange strike trail and
+  hand-action QA datasets.
+
+## unsoccer v0.0.016
+
+- Thin the goal posts and crossbar to half radius and switch them to neutral
+  light metal instead of team-colored/yellow posts.
+- Score only when the ball crosses the front goal-line plane from the field
+  side; balls entering the net volume from the back no longer count.
+- Add visible halfway/center-circle/center-spot, penalty-box, goal-area, and
+  penalty-spot field markings.
+
 ## unsoccer v0.0.011
 
 - Expand the authoritative pitch and courtyard footprint to 2x width/length and

@@ -59,6 +59,13 @@ Use this file for work inside `/itch_games`.
 - `unsoccer/client/`: Vite TypeScript browser client.
 - `unsoccer/client/src/main.ts`: Three.js scene, gameplay HUD, player action
   telegraphs, QA datasets, input, camera, and network state application.
+- `unsoccer/client/src/character-controller.ts`: reusable Free3D skinned
+  character loader, velocity animation state machine, and procedural bone-IK
+  strike overlays.
+- `unsoccer/client/character-controller-test.html` and
+  `unsoccer/client/src/character-controller-test.ts`: standalone local
+  controller validation page that does not require the multiplayer server and
+  cycles the local 11-character Free3D/AutoRig roster with arrow keys plus UI.
 - `unsoccer/client/src/settings.ts`: UI/settings defaults, validation, local
   persistence, reset, and binding-conflict helpers.
 - `unsoccer/client/src/input-map.ts`: key/mouse binding resolution, movement
@@ -176,8 +183,8 @@ Use this file for work inside `/itch_games`.
 
 ## Versioning
 
-- Current release: `v0.0.014`.
-- `unsoccer` release: `v0.0.014`.
+- Current release: `v0.0.029`.
+- `unsoccer` release: `v0.0.029`.
 - Game releases start at `v0.0.001` and every behavior change increments the
   version.
 - The visible bottom-left badge, `package.json.gameVersion`, README, and skill
@@ -239,3 +246,84 @@ Use this file for work inside `/itch_games`.
     `data-player-rig-mode="free3d-1k-skinned-glb-webp-textures-fbx-clips"`,
     `data-player-rig-textures="3"`, `data-player-rig-clip-count="4"`, and
     `data-player-rig-action` switches among `idle`, `walk`, `run`, and `jump`.
+17. For UnSoccer v0.0.015 character-controller and lighting QA, open
+    `/character-controller-test.html` from the Vite dev server or built client,
+    confirm `data-character-controller-test="ready"`,
+    `data-player-rig="free3d-skinned-character-controller"`,
+    `data-player-rig-ik="procedural-bone-ik-overlay"`, and verify player feel
+    for WASD, Shift sprint, Space jump, LMB foot, RMB hand, and MMB head
+    strike. In the main game, confirm `data-day-cycle-length-seconds="300"`,
+    `data-dark-hours="23:00-03:00"`, `data-stadium-lights="4"`, daytime
+    `data-stadium-lights-on="0"`, and night
+    `data-night-lighting="floodlight-masts-volumetric"` with four visible beam
+    cones.
+18. For UnSoccer v0.0.016 field/goal QA, confirm
+    `data-goal-post-radius="0.19"`,
+    `data-goal-post-material="neutral-white-metal"`, and
+    `data-field-markings` includes `penalty-boxes`, `goal-areas`,
+    `penalty-spots`, and `center-circle`; acceptance must prove that a ball
+    entering the goal volume from behind does not score.
+19. For UnSoccer v0.0.017 stamina/hand-feedback QA, confirm
+    `data-local-stamina` is numeric for the local player,
+    `data-local-stamina-state` changes through `ready`, `sprint`, `low`, or
+    `exhausted`, and RMB/hand hit updates `data-last-hand-action-at` plus a
+    visible orange hand-strike trail.
+20. For UnSoccer v0.0.018 camera/offscreen QA, confirm
+    `data-camera-mode="player-anchored-smooth"`, `data-camera-anchor` resolves
+    to the local player id, `data-ball-offscreen` toggles when the ball leaves
+    the view, and `data-offscreen-players` counts visible player arrows.
+21. For UnSoccer v0.0.018 character roster QA, open
+    `/character-controller-test.html`, cycle all 11 entries by arrow keys or UI,
+    and confirm each entry reports `data-character-controller-test="ready"`,
+    `data-player-rig-textures` greater than zero, `data-player-rig-clip-count="4"`,
+    and `data-player-rig-ik="procedural-bone-ik-overlay"`.
+22. For UnSoccer v0.0.019 goal-net QA, confirm
+    `data-goal-net-mode="local-verlet-closed-goal-cloth-no-network"`,
+    `data-goal-net-panels="8"` for two goals, and `data-goal-net-coverage`
+    includes `back`, `roof`, `left-side`, and `right-side`.
+23. For UnSoccer v0.0.020 ball-size QA, confirm the browser/server version is
+    `v0.0.020`, `data-ball-radius="0.24"`, and the visible runtime ball is
+    half the previous v0.0.019 diameter.
+24. For UnSoccer v0.0.021 goal-reset and ball-balance QA, confirm
+    `data-goal-reset-phase` moves through `celebration`, `returning`, and
+    `kickoff`; after a goal the ball stays near the scored goal for 5 seconds,
+    then flies to center for 1 second instead of teleporting; ordinary
+    foot/hand/head/body hits must keep half-size ball speed below acceptance's
+    runaway threshold.
+25. For UnSoccer v0.0.022 movement QA, confirm
+    `data-movement-smoothing="axis-inertia-accel-decel"` and keep the
+    acceptance coverage for keyboard acceleration, released-axis fade, and
+    faster opposite-axis takeover.
+26. For UnSoccer v0.0.023 character assignment QA, confirm several players get
+    `characterId` values from `CHARACTER_ROSTER` and the first roster deck does
+    not repeat before the ready character pool is exhausted.
+27. For UnSoccer v0.0.024 team marker QA, confirm the ground indicator circle
+    under the local player has `data-local-team-marker` of `blue` or `orange`
+    and `data-local-team-marker-color` matching the team color.
+28. For UnSoccer v0.0.025 camera QA, confirm
+    `data-camera-mode="player-anchored-lerp-anchor"`,
+    `data-camera-anchor-smoothing="lerped-authoritative-player-offset-no-bone-follow"`,
+    and that `data-camera-anchor-offset` remains bounded while the camera
+    follows player movement without animation-driven bobble.
+29. For UnSoccer v0.0.026 floodlight QA, force a night time through the local
+    test API or `qaTime`, then confirm all four stadium lights are on,
+    `data-stadium-light-beam-angle` is wider than 60 degrees,
+    `data-stadium-light-beam-radius` is at least 13, `data-stadium-light-palette`
+    lists four mast colors, and `data-stadium-light-flicker` rises above zero
+    during observation.
+30. For UnSoccer v0.0.027 player-ball contact QA, acceptance must prove an
+    airborne player can clear a ground ball without body-bumping it and a head
+    input cannot move a ball that is clearly above reachable head height.
+31. For UnSoccer v0.0.028 environment QA, confirm the main game reports
+    `data-environment="residential-courtyard-v028-free3d-dense"`,
+    `data-environment-model-instances` of at least `100`,
+    `data-free3d-environment-asset-count="8"`, and
+    `data-free3d-environment-loaded="true"` while the field remains readable.
+32. For UnSoccer v0.0.029 kick-power QA, acceptance must prove ordinary ball
+    hits use the stronger 2x impulse, LMB/left-foot charge reaches a stronger
+    capped 4x result after one second, and `data-local-kick-charge` rises while
+    the local player holds LMB.
+33. For UnSoccer v0.0.029 environment framing QA, take a main-game browser
+    screenshot near a sideline and confirm the courtyard props are visible in
+    the normal player camera while pitch markings and goal readability remain
+    clear.

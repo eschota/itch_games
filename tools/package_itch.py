@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import os
+import json
 import pathlib
+import shutil
 import sys
 import zipfile
 
@@ -51,7 +53,20 @@ def iter_unsoccer_dist(path: pathlib.Path) -> list[pathlib.Path]:
         raise FileNotFoundError(
             f"{path} is missing; run `npm run build:unsoccer` before packaging"
         )
+    prune_unsoccer_unused_character_assets(path)
     return sorted(item for item in path.rglob("*") if item.is_file())
+
+
+def prune_unsoccer_unused_character_assets(dist_root: pathlib.Path) -> None:
+    character_dir = dist_root / "assets" / "characters" / "free3d"
+    roster_path = character_dir / "roster.json"
+    if not roster_path.exists():
+        return
+    roster = json.loads(roster_path.read_text(encoding="utf-8"))
+    keep = {str(asset.get("guid")) for asset in roster.get("assets", [])}
+    for child in character_dir.iterdir():
+        if child.is_dir() and child.name not in keep:
+            shutil.rmtree(child)
 
 
 def write_file(archive: zipfile.ZipFile, source: pathlib.Path, root: pathlib.Path) -> None:

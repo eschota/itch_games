@@ -62,7 +62,7 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
   the service environment is production, delete generated UnSoccer dist folders
   before rebuilding, then verify `unsoccer/client/dist/index.html` against
   `package.json.games.unsoccer.version`, the `BUILD_WEIGHT_LABEL` from
-  `unsoccer/client/src/main.ts` (currently `0.61 MB`), every referenced asset
+  `unsoccer/client/src/main.ts` (currently `1.31 MB`), every referenced asset
   path, at least one built JS asset, the
   `residential-courtyard` client marker inside built assets, and that the server
   bundle does not import geckos.io, `ws`, or `node-datachannel` before nginx

@@ -10,6 +10,8 @@ export type InputAction =
   | "leftKick"
   | "rightKick"
   | "headHit"
+  | "jump"
+  | "sprint"
   | "settings"
   | "cameraReset"
   | "muteAudio";
@@ -71,6 +73,8 @@ export const DEFAULT_BINDINGS: KeyBindings = {
   leftKick: ["Mouse0", "KeyJ"],
   rightKick: ["Mouse2", "KeyK"],
   headHit: ["Wheel", "KeyL"],
+  jump: ["Space"],
+  sprint: ["ShiftLeft", "ShiftRight"],
   settings: ["Escape"],
   cameraReset: ["KeyR"],
   muteAudio: ["KeyM"]

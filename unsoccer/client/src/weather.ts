@@ -52,7 +52,7 @@ export class WeatherVisualLayer {
         blending: THREE.AdditiveBlending
       })
     );
-    this.snow.name = "snowfall";
+    this.snow.name = "weather-particles";
     this.snow.frustumCulled = false;
     this.group.add(this.snow);
   }
@@ -157,15 +157,21 @@ export class WeatherVisualLayer {
     const halfWidth = this.fieldWidth / 2 + 9;
     const halfLength = this.fieldLength / 2 + 12;
     const intensity = THREE.MathUtils.clamp(weather.intensity, 0, 1);
-    this.snow.visible = this.particlesEnabled;
-    (this.snow.material as THREE.PointsMaterial).opacity = (0.18 + intensity * 0.48) * this.opacityScale;
-    (this.snow.material as THREE.PointsMaterial).size = 0.045 + intensity * 0.06;
+    const precipitation = weather.kind === "rain" || weather.kind === "snow";
+    this.snow.visible = this.particlesEnabled && precipitation;
+    if (!precipitation) return;
+    const material = this.snow.material as THREE.PointsMaterial;
+    material.color.setHex(weather.kind === "rain" ? 0x9fd4ff : 0xeaf8ff);
+    material.opacity = (weather.kind === "rain" ? 0.12 + intensity * 0.3 : 0.18 + intensity * 0.48) * this.opacityScale;
+    material.size = weather.kind === "rain" ? 0.035 + intensity * 0.035 : 0.045 + intensity * 0.06;
 
     for (let index = 0; index < SNOW_PARTICLE_COUNT; index += 1) {
       const offset = index * 3;
       const seed = this.snowSeeds[index];
       this.snowPositions[offset] += weather.wind.x * (0.014 + seed * 0.014) + Math.sin(time * 0.8 + seed * 19) * 0.002;
-      this.snowPositions[offset + 1] -= 0.035 + intensity * 0.055 + seed * 0.015;
+      this.snowPositions[offset + 1] -= weather.kind === "rain"
+        ? 0.12 + intensity * 0.16 + seed * 0.03
+        : 0.035 + intensity * 0.055 + seed * 0.015;
       this.snowPositions[offset + 2] += weather.wind.z * (0.014 + seed * 0.014);
 
       if (this.snowPositions[offset + 1] < 0.35) {

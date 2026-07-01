@@ -1,0 +1,29 @@
+{
+  "browserEvidence": {
+    "badge": "v0.0.011 / 1.31 MB",
+    "canvas": {
+      "height": 982,
+      "width": 1492
+    },
+    "dataset": {
+      "activeBallVariant": "0",
+      "artPass": "v0.0.011",
+      "ballRack": "10-free3d-vertex-color-glb",
+      "dayTimeSeconds": "21600.0",
+      "environment": "residential-courtyard-v011",
+      "free3dBallMode": "free3d-1k-glb-vertex-color-optimized",
+      "gameVersion": "v0.0.011",
+      "gameWeightLabel": "1.31 MB",
+      "moonFramed": "false",
+      "movingCars": "6",
+      "sunFramed": "false",
+      "weatherKind": "clear",
+      "weatherNextChangeMs": "63308"
+    },
+    "title": "UnSoccer v0.0.011 | Ragdoll Soccer II",
+    "url": "http://127.0.0.1:5182/?server=http://127.0.0.1:8794&name=codex-v011-browser&qaTime=0&bust=1782923817378",
+    "visibleText": "ИГРОК\nСиние\nScreen\nСиние\n0\n:\n0\nОранжевые\nwebsocket\n1 ms\n0 ms\n\ncodex-v011-browser подключился к полю\n\nВы: Синие #1\n\nWebSocket online\n\ncodex-v011-browser подключился к полю.\nПогода: Ясно • 12% • ветер 0.1 • смена 64с • лужи 0, слякоть 0, сугробы 0\ncodex-v011-browser\nвы\nХод W/A/S/D\nУдар/рука LMB/RMB\nГолова Wheel\nПрыжок/спринт Space/Shift\nМеню Escape\nSET\nAUD\nFS\nCAM\nv0.0.011 / 1.31 MB",
+    "weatherParticlesVisible": null
+  },
+  "logs": []
+}

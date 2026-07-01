@@ -176,8 +176,8 @@ Use this file for work inside `/itch_games`.
 
 ## Versioning
 
-- Current release: `v0.0.010`.
-- `unsoccer` release: `v0.0.010`.
+- Current release: `v0.0.011`.
+- `unsoccer` release: `v0.0.011`.
 - Game releases start at `v0.0.001` and every behavior change increments the
   version.
 - The visible bottom-left badge, `package.json.gameVersion`, README, and skill

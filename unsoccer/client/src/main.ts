@@ -1,7 +1,9 @@
 import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import {
   BALL_RADIUS,
   DAY_CYCLE_SECONDS,
+  DAY_START_SECONDS,
   DEFAULT_INPUT,
   FIELD_LENGTH,
   FIELD_WIDTH,
@@ -9,7 +11,9 @@ import {
   GOAL_DEPTH,
   GOAL_WIDTH,
   PLAYER_HEIGHT,
+  PLAYER_EXHAUSTED_SPEED_MULTIPLIER,
   PLAYER_SPEED,
+  PLAYER_SPRINT_MULTIPLIER,
   type HazardSnapshot,
   type HazardType,
   type TeamId,
@@ -210,14 +214,14 @@ const graphicsStateEl = requireElement<HTMLElement>("#graphics-state");
 const networkStateEl = requireElement<HTMLElement>("#network-state");
 const testSoundButton = requireElement<HTMLButtonElement>("#test-sound-button");
 const versionBadge = requireElement<HTMLElement>("#version-badge");
-const ART_PASS_VERSION = "v0.0.010";
-const BUILD_WEIGHT_LABEL = "0.61 MB";
+const ART_PASS_VERSION = "v0.0.011";
+const BUILD_WEIGHT_LABEL = "1.31 MB";
 
 versionBadge.textContent = `${GAME_VERSION} / ${BUILD_WEIGHT_LABEL}`;
 document.documentElement.dataset.gameVersion = GAME_VERSION;
 document.documentElement.dataset.gameWeightLabel = BUILD_WEIGHT_LABEL;
 document.documentElement.dataset.artPass = ART_PASS_VERSION;
-document.documentElement.dataset.environment = "residential-courtyard-v010";
+document.documentElement.dataset.environment = "residential-courtyard-v011";
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -296,8 +300,7 @@ const moonMaterial = new THREE.MeshBasicMaterial({
 });
 const moonMesh = new THREE.Mesh(new THREE.SphereGeometry(0.82, 20, 12), moonMaterial);
 moonMesh.renderOrder = 28;
-camera.add(sunGlow, sunMesh, moonMesh);
-scene.add(camera);
+scene.add(camera, sunGlow, sunMesh, moonMesh);
 const sunPathMaterial = new THREE.LineBasicMaterial({ color: 0xfff0b8, transparent: true, opacity: 0.26 });
 const sunPath = new THREE.LineLoop(
   new THREE.BufferGeometry().setFromPoints(
@@ -340,19 +343,44 @@ for (const [x, z] of [
   floodLights.push(flood);
 }
 
+const BALL_VARIANT_COLORS = [
+  [0xf4f7fa, 0x111111],
+  [0x121212, 0xf2f2f2],
+  [0xf8f0de, 0xc82036],
+  [0xf7d65c, 0x233c7d],
+  [0xe55aa4, 0x32184f],
+  [0x79d8ff, 0x145c7a],
+  [0xe8f2ef, 0x2b7a4b],
+  [0xff9d42, 0x27231c],
+  [0xd8f7ff, 0x8f45d2],
+  [0xf5f5f5, 0x2a2f3a]
+] as const;
+
 const fieldGroup = new THREE.Group();
 scene.add(fieldGroup);
-buildField(fieldGroup);
+const movingCars: MovingCar[] = [];
+const goalNets: GoalNetVisual[] = [];
+const sidelineBalls: THREE.Group[] = [];
+const free3dBallLoader = new GLTFLoader();
+const free3dBallMaterial = new THREE.MeshStandardMaterial({
+  color: 0xffffff,
+  roughness: 0.56,
+  metalness: 0.02,
+  vertexColors: true
+});
 const weatherLayer = new WeatherVisualLayer({ scene, fieldWidth: FIELD_WIDTH, fieldLength: FIELD_LENGTH });
 
-const ballMaterial = new THREE.MeshStandardMaterial({ color: 0xf4f7fa, roughness: 0.5, metalness: 0.03 });
+const ballGeometry = new THREE.SphereGeometry(BALL_RADIUS, 32, 18);
+applyBallVertexColors(ballGeometry, 0);
+const ballMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0.03, vertexColors: true });
 const ballMesh = new THREE.Mesh(
-  new THREE.SphereGeometry(BALL_RADIUS, 32, 18),
+  ballGeometry,
   ballMaterial
 );
 ballMesh.castShadow = true;
 ballMesh.receiveShadow = true;
 scene.add(ballMesh);
+addBallSeams(ballMesh, BALL_RADIUS * 1.012, 0);
 const ballAuraMaterial = new THREE.MeshBasicMaterial({
   color: 0xfff2b8,
   transparent: true,
@@ -378,12 +406,12 @@ const ACTION_TELEGRAPH: Record<KickKind, {
     ballPulse: 0.78,
     cameraImpulse: 0.56
   },
-  right: {
+  hand: {
     color: 0xff9d42,
-    opacity: 0.66,
-    scale: [1.15, 0.8, 2.35],
-    ballPulse: 0.78,
-    cameraImpulse: 0.56
+    opacity: 0.7,
+    scale: [1.55, 1.0, 1.75],
+    ballPulse: 0.62,
+    cameraImpulse: 0.46
   },
   head: {
     color: 0xf7fbff,
@@ -398,6 +426,13 @@ const ACTION_TELEGRAPH: Record<KickKind, {
     scale: [2.35, 1.35, 1.55],
     ballPulse: 1,
     cameraImpulse: 1
+  },
+  jump: {
+    color: 0xbef2ff,
+    opacity: 0.52,
+    scale: [1.2, 1.9, 1.2],
+    ballPulse: 0.26,
+    cameraImpulse: 0.22
   }
 };
 
@@ -529,6 +564,10 @@ function syncAudioDebugDataset() {
   document.documentElement.dataset.audioRollGain = audioState.rollGain.toFixed(4);
   document.documentElement.dataset.audioCrowdGain = audioState.crowdGain.toFixed(4);
   document.documentElement.dataset.audioWeatherGain = audioState.weatherGain.toFixed(4);
+  document.documentElement.dataset.audioBirdsGain = audioState.birdsGain.toFixed(4);
+  document.documentElement.dataset.audioRoadGain = audioState.roadGain.toFixed(4);
+  document.documentElement.dataset.audioBirdChirpsPlayed = String(audioState.birdChirpsPlayed);
+  document.documentElement.dataset.audioCarPassesPlayed = String(audioState.carPassesPlayed);
   document.documentElement.dataset.audioPlayedEvents = String(audioState.playedEvents);
   document.documentElement.dataset.audioBlockedEvents = String(audioState.blockedEvents);
   document.documentElement.dataset.audioLastEvent = audioState.lastEvent || "none";
@@ -554,8 +593,10 @@ const ACTION_LABELS: Record<InputAction, string> = {
   moveLeft: "\u0412\u043b\u0435\u0432\u043e",
   moveRight: "\u0412\u043f\u0440\u0430\u0432\u043e",
   leftKick: "\u041b\u0435\u0432\u0430\u044f \u043d\u043e\u0433\u0430",
-  rightKick: "\u041f\u0440\u0430\u0432\u0430\u044f \u043d\u043e\u0433\u0430",
+  rightKick: "\u0420\u0443\u043a\u0430",
   headHit: "\u0413\u043e\u043b\u043e\u0432\u0430",
+  jump: "\u041f\u0440\u044b\u0436\u043e\u043a",
+  sprint: "\u0421\u043f\u0440\u0438\u043d\u0442",
   settings: "\u041c\u0435\u043d\u044e",
   cameraReset: "\u041a\u0430\u043c\u0435\u0440\u0430",
   muteAudio: "\u0417\u0432\u0443\u043a"
@@ -733,8 +774,9 @@ function updateControlHints(): void {
   const move = `${formatBinding(codeForAction(settings.controls, "moveForward"))}/${formatBinding(codeForAction(settings.controls, "moveLeft"))}/${formatBinding(codeForAction(settings.controls, "moveBack"))}/${formatBinding(codeForAction(settings.controls, "moveRight"))}`;
   controlHintsEl.innerHTML = [
     `<span>\u0425\u043e\u0434 ${escapeHtml(move)}</span>`,
-    `<span>\u0423\u0434\u0430\u0440 ${escapeHtml(formatBinding(codeForAction(settings.controls, "leftKick")))}/${escapeHtml(formatBinding(codeForAction(settings.controls, "rightKick")))}</span>`,
+    `<span>\u0423\u0434\u0430\u0440/\u0440\u0443\u043a\u0430 ${escapeHtml(formatBinding(codeForAction(settings.controls, "leftKick")))}/${escapeHtml(formatBinding(codeForAction(settings.controls, "rightKick")))}</span>`,
     `<span>\u0413\u043e\u043b\u043e\u0432\u0430 ${escapeHtml(formatBinding(codeForAction(settings.controls, "headHit")))}</span>`,
+    `<span>\u041f\u0440\u044b\u0436\u043e\u043a/\u0441\u043f\u0440\u0438\u043d\u0442 ${escapeHtml(formatBinding(codeForAction(settings.controls, "jump")))}/${escapeHtml(formatBinding(codeForAction(settings.controls, "sprint")))}</span>`,
     `<span>\u041c\u0435\u043d\u044e ${escapeHtml(formatBinding(codeForAction(settings.controls, "settings")))}</span>`
   ].join("");
 }
@@ -772,7 +814,17 @@ function updateResolvedInput(): void {
 }
 
 function formatBinding(code: string): string {
-  return code ? code.replace(/^Key/, "").replace(/^Digit/, "").replace("Arrow", "").replace("Mouse0", "LMB").replace("Mouse2", "RMB") : "--";
+  return code
+    ? code
+      .replace(/^Key/, "")
+      .replace(/^Digit/, "")
+      .replace("Arrow", "")
+      .replace("Mouse0", "LMB")
+      .replace("Mouse2", "RMB")
+      .replace("ShiftLeft", "Shift")
+      .replace("ShiftRight", "Shift")
+      .replace("Space", "Space")
+    : "--";
 }
 
 function resetCamera(): void {
@@ -786,6 +838,300 @@ function toggleMute(): void {
   persistAndApplySettings();
 }
 
+function applyBallVertexColors(geometry: THREE.BufferGeometry, variant: number): void {
+  const position = geometry.getAttribute("position");
+  const colors = new Float32Array(position.count * 3);
+  const primary = new THREE.Color(BALL_VARIANT_COLORS[variant % BALL_VARIANT_COLORS.length][0]);
+  const secondary = new THREE.Color(BALL_VARIANT_COLORS[variant % BALL_VARIANT_COLORS.length][1]);
+  const seam = new THREE.Color(0x0b1012);
+  for (let index = 0; index < position.count; index += 1) {
+    const x = position.getX(index);
+    const y = position.getY(index);
+    const z = position.getZ(index);
+    const longitude = Math.atan2(z, x);
+    const latitude = Math.acos(THREE.MathUtils.clamp(y / BALL_RADIUS, -1, 1));
+    const panel = Math.sin(longitude * 5 + variant * 0.7) * Math.sin(latitude * 4.2);
+    const stripe = Math.abs(Math.sin(longitude * 10 + latitude * 3 + variant)) > 0.9;
+    const color = stripe ? seam : panel > 0.16 ? secondary : primary;
+    colors[index * 3] = color.r;
+    colors[index * 3 + 1] = color.g;
+    colors[index * 3 + 2] = color.b;
+  }
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+}
+
+function addBallSeams(parent: THREE.Object3D, radius: number, variant: number): void {
+  const seamMaterial = new THREE.LineBasicMaterial({
+    color: BALL_VARIANT_COLORS[variant % BALL_VARIANT_COLORS.length][1],
+    transparent: true,
+    opacity: 0.68
+  });
+  for (const rotation of [0, Math.PI / 2, Math.PI / 4]) {
+    const ring = new THREE.LineLoop(
+      new THREE.BufferGeometry().setFromPoints(
+        Array.from({ length: 64 }, (_, index) => {
+          const angle = index / 64 * Math.PI * 2;
+          return new THREE.Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius, 0);
+        })
+      ),
+      seamMaterial
+    );
+    ring.rotation.y = rotation;
+    parent.add(ring);
+  }
+}
+
+function setBallSeamVariant(parent: THREE.Object3D, variant: number): void {
+  const seamColor = BALL_VARIANT_COLORS[variant % BALL_VARIANT_COLORS.length][1];
+  for (const child of parent.children) {
+    if (!(child instanceof THREE.Line)) continue;
+    const material = child.material;
+    if (material instanceof THREE.LineBasicMaterial) material.color.setHex(seamColor);
+  }
+}
+
+function createBallModel(variant: number, radius = BALL_RADIUS): THREE.Group {
+  const group = new THREE.Group();
+  const geometry = new THREE.SphereGeometry(radius, 28, 16);
+  applyBallVertexColors(geometry, variant);
+  const mesh = new THREE.Mesh(
+    geometry,
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.54, metalness: 0.025, vertexColors: true })
+  );
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  group.add(mesh);
+  addBallSeams(group, radius * 1.012, variant);
+  return group;
+}
+
+interface Free3dBallAsset {
+  index: number;
+  guid: string;
+  title: string;
+  src: string;
+}
+
+interface Free3dBallRoster {
+  version: string;
+  mode: string;
+  assets: Free3dBallAsset[];
+}
+
+function resolveClientAsset(src: string): string {
+  return new URL(src.replace(/^\/+/, ""), window.location.href).toString();
+}
+
+function prepareFree3dBallScene(model: THREE.Object3D, radius: number): THREE.Object3D {
+  model.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return;
+    child.castShadow = true;
+    child.receiveShadow = true;
+    child.material = free3dBallMaterial;
+    child.geometry.computeVertexNormals();
+  });
+  const box = new THREE.Box3().setFromObject(model);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+  model.position.sub(center);
+  const maxAxis = Math.max(size.x, size.y, size.z, 0.001);
+  model.scale.setScalar(radius * 2 / maxAxis);
+  return model;
+}
+
+function loadFree3dBall(asset: Free3dBallAsset, radius: number): Promise<THREE.Object3D> {
+  return new Promise((resolve, reject) => {
+    free3dBallLoader.load(
+      resolveClientAsset(asset.src),
+      (gltf) => resolve(prepareFree3dBallScene(gltf.scene, radius)),
+      undefined,
+      reject
+    );
+  });
+}
+
+async function hydrateFree3dSidelineBalls(): Promise<void> {
+  try {
+    const response = await fetch(resolveClientAsset("assets/balls/free3d/roster.json"), { cache: "force-cache" });
+    if (!response.ok) throw new Error(`Free3D roster HTTP ${response.status}`);
+    const roster = await response.json() as Free3dBallRoster;
+    await Promise.all(roster.assets.slice(0, sidelineBalls.length).map(async (asset) => {
+      const target = sidelineBalls[asset.index];
+      if (!target) return;
+      const model = await loadFree3dBall(asset, BALL_RADIUS * 0.86);
+      target.clear();
+      target.add(model);
+      target.userData.free3dGuid = asset.guid;
+      target.userData.free3dTitle = asset.title;
+    }));
+    document.documentElement.dataset.ballRack = `${roster.assets.length}-free3d-vertex-color-glb`;
+    document.documentElement.dataset.free3dBallMode = roster.mode;
+  } catch (error) {
+    document.documentElement.dataset.free3dBallMode = "fallback-procedural";
+    console.warn("Free3D sideline ball hydration failed", error);
+  }
+}
+
+function buildSidelineBalls(root: THREE.Group): void {
+  const baseX = -FIELD_WIDTH / 2 - 4.8;
+  const baseZ = FIELD_LENGTH / 2 - 8;
+  for (let index = 0; index < 10; index += 1) {
+    const ball = createBallModel(index, BALL_RADIUS * 0.86);
+    ball.position.set(baseX - (index % 2) * 0.82, BALL_RADIUS * 0.86, baseZ - Math.floor(index / 2) * 1.05);
+    ball.rotation.set(index * 0.27, index * 0.6, index * 0.18);
+    root.add(ball);
+    sidelineBalls.push(ball);
+  }
+  document.documentElement.dataset.ballRack = "10-vertex-color-free3d-candidates";
+  void hydrateFree3dSidelineBalls();
+}
+
+interface MovingCar {
+  root: THREE.Group;
+  lane: number;
+  speed: number;
+  offset: number;
+  clockwise: boolean;
+}
+
+function createCarGroup(color: number): THREE.Group {
+  const car = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(1.25, 0.36, 2.2),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.48, metalness: 0.18 })
+  );
+  body.position.y = 0.28;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  car.add(body);
+  const cabin = new THREE.Mesh(
+    new THREE.BoxGeometry(0.86, 0.42, 1.0),
+    new THREE.MeshStandardMaterial({ color: 0xa9d3e8, roughness: 0.25, metalness: 0.05 })
+  );
+  cabin.position.y = 0.68;
+  cabin.castShadow = true;
+  car.add(cabin);
+  const wheelMaterial = new THREE.MeshStandardMaterial({ color: 0x121616, roughness: 0.74 });
+  for (const wx of [-0.68, 0.68]) {
+    for (const wz of [-0.72, 0.72]) {
+      const wheel = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.24, 0.36), wheelMaterial);
+      wheel.position.set(wx, 0.18, wz);
+      wheel.castShadow = true;
+      car.add(wheel);
+    }
+  }
+  return car;
+}
+
+function addMovingCars(root: THREE.Group): void {
+  const colors = [0xc9423d, 0x416a91, 0xd0b055, 0x3d6f52, 0x8b8f98, 0xe7e1d2];
+  for (let index = 0; index < colors.length; index += 1) {
+    const car = createCarGroup(colors[index]);
+    root.add(car);
+    movingCars.push({
+      root: car,
+      lane: index % 2,
+      speed: 0.22 + index * 0.018,
+      offset: index / colors.length,
+      clockwise: index % 2 === 0
+    });
+  }
+  document.documentElement.dataset.movingCars = String(movingCars.length);
+}
+
+function updateMovingCars(time: number, daylight: number): void {
+  const roadWidth = FIELD_WIDTH / 2 + 8.4;
+  const roadLength = FIELD_LENGTH / 2 + 9.2;
+  const perimeter = roadWidth * 4 + roadLength * 4;
+  for (const car of movingCars) {
+    car.root.visible = daylight > 0.35;
+    const progress = THREE.MathUtils.euclideanModulo(car.offset + time * car.speed * (car.clockwise ? 1 : -1) / perimeter, 1);
+    const distance = progress * perimeter;
+    const laneOffset = car.lane * 0.9;
+    let x = -roadWidth - laneOffset;
+    let z = -roadLength - laneOffset;
+    let rotation = 0;
+    const sideX = roadWidth * 2 + laneOffset * 2;
+    const sideZ = roadLength * 2 + laneOffset * 2;
+    if (distance < sideX) {
+      x = -roadWidth + distance;
+      z = -roadLength - laneOffset;
+      rotation = Math.PI / 2;
+    } else if (distance < sideX + sideZ) {
+      x = roadWidth + laneOffset;
+      z = -roadLength + (distance - sideX);
+      rotation = 0;
+    } else if (distance < sideX * 2 + sideZ) {
+      x = roadWidth - (distance - sideX - sideZ);
+      z = roadLength + laneOffset;
+      rotation = -Math.PI / 2;
+    } else {
+      x = -roadWidth - laneOffset;
+      z = roadLength - (distance - sideX * 2 - sideZ);
+      rotation = Math.PI;
+    }
+    car.root.position.set(x, 0, z);
+    car.root.rotation.y = car.clockwise ? rotation : rotation + Math.PI;
+  }
+}
+
+class GoalNetVisual {
+  private readonly geometry: THREE.BufferGeometry;
+  private readonly positions: Float32Array;
+  private readonly restPositions: Float32Array;
+  private pulse = 0;
+
+  constructor(private readonly side: -1 | 1, root: THREE.Group) {
+    const points: THREE.Vector3[] = [];
+    const zFront = side * (FIELD_LENGTH / 2 + 0.12);
+    const zBack = side * (FIELD_LENGTH / 2 + GOAL_DEPTH);
+    const columns = 14;
+    const rows = 6;
+    for (let row = 0; row <= rows; row += 1) {
+      const y = row / rows * 2.2;
+      points.push(new THREE.Vector3(-GOAL_WIDTH / 2, y, zBack), new THREE.Vector3(GOAL_WIDTH / 2, y, zBack));
+    }
+    for (let column = 0; column <= columns; column += 1) {
+      const x = -GOAL_WIDTH / 2 + column / columns * GOAL_WIDTH;
+      points.push(new THREE.Vector3(x, 0, zBack), new THREE.Vector3(x, 2.2, zBack));
+      points.push(new THREE.Vector3(x, 2.2, zBack), new THREE.Vector3(x, 2.05, zFront));
+      points.push(new THREE.Vector3(x, 0, zBack), new THREE.Vector3(x, 0.05, zFront));
+    }
+    this.geometry = new THREE.BufferGeometry().setFromPoints(points);
+    this.positions = this.geometry.getAttribute("position").array as Float32Array;
+    this.restPositions = new Float32Array(this.positions);
+    const mesh = new THREE.LineSegments(
+      this.geometry,
+      new THREE.LineBasicMaterial({ color: 0xf7ffff, transparent: true, opacity: 0.46 })
+    );
+    mesh.name = `visual-cloth-net-${side < 0 ? "south" : "north"}`;
+    root.add(mesh);
+  }
+
+  update(state: ServerState, time: number): void {
+    const ball = state.ball.position;
+    const targetZ = this.side * (FIELD_LENGTH / 2 + GOAL_DEPTH * 0.65);
+    const ballNear = Math.abs(ball.z - targetZ) < GOAL_DEPTH * 1.15 && Math.abs(ball.x) < GOAL_WIDTH / 2 + 1.2 && ball.y < 3;
+    if (ballNear) this.pulse = Math.max(this.pulse, THREE.MathUtils.clamp(Math.hypot(state.ball.velocity.x, state.ball.velocity.z) / 12, 0.18, 1));
+    this.pulse *= 0.91;
+    const base = this.geometry.getAttribute("position");
+    for (let index = 0; index < base.count; index += 1) {
+      const offset = index * 3;
+      const x = this.restPositions[offset];
+      const y = this.restPositions[offset + 1];
+      const zRest = this.restPositions[offset + 2];
+      const sag = Math.sin((x / GOAL_WIDTH + 0.5) * Math.PI) * (1 - Math.min(1, y / 2.3)) * 0.18;
+      this.positions[offset] = x;
+      this.positions[offset + 1] = y;
+      this.positions[offset + 2] = zRest + this.side * sag + Math.sin(time * 8 + x * 1.8 + y) * this.pulse * 0.18;
+    }
+    this.geometry.attributes.position.needsUpdate = true;
+  }
+}
+
+buildField(fieldGroup);
 applySettingsToRuntime();
 syncSettingsUi();
 
@@ -824,7 +1170,7 @@ function buildField(root: THREE.Group) {
     new THREE.BufferGeometry().setFromPoints(
       Array.from({ length: 72 }, (_, i) => {
         const a = i / 72 * Math.PI * 2;
-        return new THREE.Vector3(Math.cos(a) * 3.2, 0.07, Math.sin(a) * 3.2);
+        return new THREE.Vector3(Math.cos(a) * 5.2, 0.07, Math.sin(a) * 5.2);
       })
     ),
     new THREE.LineBasicMaterial({ color: 0xe9fff3 })
@@ -834,6 +1180,8 @@ function buildField(root: THREE.Group) {
   addGoal(root, -1);
   addGoal(root, 1);
   addStadiumFrame(root);
+  buildSidelineBalls(root);
+  addMovingCars(root);
 }
 
 function addStadiumFrame(root: THREE.Group) {
@@ -1209,10 +1557,9 @@ function addBench(root: THREE.Group, x: number, z: number, rotation: number): vo
 
 function addGoal(root: THREE.Group, side: -1 | 1) {
   const material = new THREE.MeshStandardMaterial({ color: side < 0 ? 0x58a8ff : 0xff9d42, roughness: 0.45 });
-  const z = side * (FIELD_LENGTH / 2 + GOAL_DEPTH / 2);
-  const postGeometry = new THREE.BoxGeometry(0.18, 2.1, 0.18);
-  const barGeometry = new THREE.BoxGeometry(GOAL_WIDTH + 0.35, 0.18, 0.18);
-  const netMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.26 });
+  const z = side * (FIELD_LENGTH / 2);
+  const postGeometry = new THREE.CylinderGeometry(0.18, 0.22, 2.22, 16);
+  const barGeometry = new THREE.CylinderGeometry(0.18, 0.18, GOAL_WIDTH + 0.45, 16);
   [-GOAL_WIDTH / 2, GOAL_WIDTH / 2].forEach((x) => {
     const post = new THREE.Mesh(postGeometry, material);
     post.position.set(x, 1.05, z);
@@ -1220,12 +1567,15 @@ function addGoal(root: THREE.Group, side: -1 | 1) {
     root.add(post);
   });
   const bar = new THREE.Mesh(barGeometry, material);
-  bar.position.set(0, 2.05, z);
+  bar.rotation.z = Math.PI / 2;
+  bar.position.set(0, 2.16, z);
+  bar.castShadow = true;
   root.add(bar);
-
-  const net = new THREE.Mesh(new THREE.BoxGeometry(GOAL_WIDTH, 2.05, GOAL_DEPTH), netMaterial);
-  net.position.set(0, 1.02, z + side * GOAL_DEPTH / 2);
-  root.add(net);
+  const backBar = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, GOAL_WIDTH, 10), material);
+  backBar.rotation.z = Math.PI / 2;
+  backBar.position.set(0, 0.08, z + side * GOAL_DEPTH);
+  root.add(backBar);
+  goalNets.push(new GoalNetVisual(side, root));
 }
 
 class PlayerVisual {
@@ -1361,7 +1711,7 @@ class PlayerVisual {
     const actionPulse = THREE.MathUtils.clamp(1 - actionAge / 260, 0, 1);
     const kickArc = Math.sin(actionPulse * Math.PI);
 
-    this.rig.position.y = bob;
+    this.rig.position.y = bob + (snapshot.airborne ? 0.08 : 0);
     this.body.position.set(0, 1.08, 0);
     this.chest.position.set(0, 1.18, 0.365);
     this.shorts.position.y = 0.68;
@@ -1407,13 +1757,13 @@ class PlayerVisual {
       this.leftFoot.rotation.x = -0.52 * kickArc;
       this.rightArm.rotation.x = -0.65 * kickArc;
       this.contactFlash.position.set(-0.4, 0.36, 0.46);
-    } else if (snapshot.lastAction === "right") {
-      this.rightLeg.rotation.x = -1.18 * kickArc;
-      this.rightLeg.rotation.z = 0.32 * kickArc;
-      this.rightFoot.position.set(0.31, 0.15, 0.36 + 0.34 * kickArc);
-      this.rightFoot.rotation.x = -0.52 * kickArc;
-      this.leftArm.rotation.x = -0.65 * kickArc;
-      this.contactFlash.position.set(0.4, 0.36, 0.46);
+    } else if (snapshot.lastAction === "hand") {
+      this.rightArm.rotation.x = -1.45 * kickArc;
+      this.rightArm.rotation.z = -0.52 + 0.38 * kickArc;
+      this.leftArm.rotation.x = 0.34 * kickArc;
+      this.body.rotation.y = -0.2 * kickArc;
+      this.chest.rotation.y = -0.2 * kickArc;
+      this.contactFlash.position.set(0.5, 1.16, 0.46);
     } else if (snapshot.lastAction === "head") {
       this.head.rotation.x = -0.72 * kickArc;
       this.hair.rotation.x = -0.72 * kickArc;
@@ -1428,6 +1778,13 @@ class PlayerVisual {
       this.head.position.z = 0.08 * kickArc;
       this.hair.position.z = 0.08 * kickArc;
       this.contactFlash.position.set(0, 1.08, 0.42);
+    } else if (snapshot.lastAction === "jump") {
+      this.leftLeg.rotation.x = 0.58 * kickArc;
+      this.rightLeg.rotation.x = 0.58 * kickArc;
+      this.leftArm.rotation.x = -0.48 * kickArc;
+      this.rightArm.rotation.x = -0.48 * kickArc;
+      this.rig.position.y += 0.16 * kickArc;
+      this.contactFlash.position.set(0, 0.3, 0);
     } else {
       this.contactFlash.visible = false;
     }
@@ -1435,9 +1792,10 @@ class PlayerVisual {
     const actionScale = 1 + actionPulse * (snapshot.lastAction === "body" ? 0.24 : 0.14);
     this.body.scale.set(actionScale, actionScale, actionScale);
     this.chest.scale.set(actionScale, actionScale, actionScale);
-    this.shadowMaterial.opacity = 0.22 + Math.min(0.12, speed * 0.015);
-    this.shadow.scale.set(1 + speed * 0.018, 0.82 + speed * 0.01, 1);
+    this.shadowMaterial.opacity = (0.22 + Math.min(0.12, speed * 0.015)) * (snapshot.airborne ? 0.58 : 1);
+    this.shadow.scale.set(1 + speed * 0.018 + (snapshot.airborne ? 0.18 : 0), 0.82 + speed * 0.01, 1);
     this.ring.scale.setScalar(1 + actionPulse * 0.18);
+    this.ring.visible = !snapshot.exhausted || Math.sin(time * 12) > 0;
     this.label.material.opacity = snapshot.id === localJoin?.id ? 1 : 0.78;
   }
 
@@ -1795,7 +2153,8 @@ function interpolateBall(from: ServerState["ball"], to: ServerState["ball"], alp
   if (vecDistance(from.position, to.position) > BALL_SNAP_DISTANCE) return to;
   return {
     position: lerpVec3(from.position, to.position, alpha),
-    velocity: lerpVec3(from.velocity, to.velocity, alpha)
+    velocity: lerpVec3(from.velocity, to.velocity, alpha),
+    variant: to.variant
   };
 }
 
@@ -1826,19 +2185,25 @@ function withResponsiveLocalPlayer(state: ServerState, nowSeconds: number): Serv
     )
     : 0;
   localPredictionLeadMs = leadSeconds * 1000;
+  const localSpeedMultiplier = latestPlayer.exhausted
+    ? PLAYER_EXHAUSTED_SPEED_MULTIPLIER
+    : input.sprint && latestPlayer.stamina > 1
+      ? PLAYER_SPRINT_MULTIPLIER
+      : 1;
+  const localSpeed = PLAYER_SPEED * localSpeedMultiplier;
 
   const localPlayer: PlayerSnapshot = leadSeconds > 0
     ? {
       ...latestPlayer,
       position: {
-        x: latestPlayer.position.x + movement.x * PLAYER_SPEED * leadSeconds,
+        x: latestPlayer.position.x + movement.x * localSpeed * leadSeconds,
         y: latestPlayer.position.y,
-        z: latestPlayer.position.z + movement.z * PLAYER_SPEED * leadSeconds
+        z: latestPlayer.position.z + movement.z * localSpeed * leadSeconds
       },
       velocity: {
-        x: movement.x * PLAYER_SPEED,
+        x: movement.x * localSpeed,
         y: 0,
-        z: movement.z * PLAYER_SPEED
+        z: movement.z * localSpeed
       },
       yaw: Math.atan2(movement.x, movement.z)
     }
@@ -1922,10 +2287,13 @@ function updateWeatherHud(weather: WeatherSnapshot | undefined) {
   document.documentElement.dataset.weatherPuddles = String(counts.puddle);
   document.documentElement.dataset.weatherSlush = String(counts.slush);
   document.documentElement.dataset.weatherSnowbanks = String(counts.snowbank);
+  document.documentElement.dataset.weatherKind = weather.kind;
+  document.documentElement.dataset.weatherNextChangeMs = String(Math.round(weather.nextChangeInMs));
   weatherEl.textContent =
     `\u041f\u043e\u0433\u043e\u0434\u0430: ${weather.label} ` +
     `\u2022 ${Math.round(weather.intensity * 100)}% ` +
     `\u2022 \u0432\u0435\u0442\u0435\u0440 ${wind.toFixed(1)} ` +
+    `\u2022 \u0441\u043c\u0435\u043d\u0430 ${Math.ceil(weather.nextChangeInMs / 1000)}\u0441 ` +
     `\u2022 \u043b\u0443\u0436\u0438 ${counts.puddle}, \u0441\u043b\u044f\u043a\u043e\u0442\u044c ${counts.slush}, \u0441\u0443\u0433\u0440\u043e\u0431\u044b ${counts.snowbank}`;
 }
 
@@ -1968,6 +2336,13 @@ function escapeHtml(value: string) {
 }
 
 function applyState(state: ServerState, time: number) {
+  const variant = state.ball.variant || 0;
+  if (document.documentElement.dataset.activeBallVariant !== String(variant)) {
+    applyBallVertexColors(ballGeometry, variant);
+    setBallSeamVariant(ballMesh, variant);
+    ballGeometry.attributes.color.needsUpdate = true;
+    document.documentElement.dataset.activeBallVariant = String(variant);
+  }
   ballMesh.position.set(state.ball.position.x, state.ball.position.y, state.ball.position.z);
   ballMesh.rotation.x += state.ball.velocity.z * 0.01;
   ballMesh.rotation.z -= state.ball.velocity.x * 0.01;
@@ -2006,6 +2381,8 @@ function applyState(state: ServerState, time: number) {
   document.documentElement.dataset.playerRig = "procedural-animated-footballer";
   document.documentElement.dataset.animatedPlayers = String([...players.values()].filter((visual) => visual.root.visible).length);
   weatherLayer.update(state.weather, time);
+  for (const net of goalNets) net.update(state, time);
+  updateMovingCars(time, Number(document.documentElement.dataset.daylight || "0"));
   observeWeatherAudio(state);
   updateHud(state);
   updateAudioMix(state);
@@ -2103,6 +2480,8 @@ function updateAudioMix(state: ServerState) {
     ballSpeed,
     connected,
     daylight,
+    dayTimeSeconds: state.dayTimeSeconds,
+    weatherKind: state.weather?.kind ?? "clear",
     weatherIntensity: state.weather?.intensity ?? 0,
     hazardDrag: ballHazard ? ballHazard.strength : 0
   });
@@ -2110,19 +2489,22 @@ function updateAudioMix(state: ServerState) {
 }
 
 function updateLighting(elapsedSeconds: number) {
-  const daySeconds = qaDayCycleSeconds ?? elapsedSeconds;
-  const cycle = (daySeconds % DAY_CYCLE_SECONDS) / DAY_CYCLE_SECONDS;
-  const angle = cycle * Math.PI * 2 - Math.PI * 0.22;
-  const daylight = THREE.MathUtils.smoothstep(Math.sin(angle), -0.24, 0.82);
-  const sunset = Math.max(0, 1 - Math.abs(Math.sin(angle)) * 3.2) * (1 - daylight * 0.45);
-  sun.position.set(Math.cos(angle) * 24, Math.max(2.2, Math.sin(angle) * 24), Math.sin(angle + 0.55) * 18);
+  const serverDayTime = (renderedState ?? latestState)?.dayTimeSeconds;
+  const daySeconds = qaDayCycleSeconds === null
+    ? serverDayTime ?? DAY_START_SECONDS + elapsedSeconds / DAY_CYCLE_SECONDS * 24 * 60 * 60
+    : DAY_START_SECONDS + qaDayCycleSeconds / DAY_CYCLE_SECONDS * 24 * 60 * 60;
+  const solarCycle = THREE.MathUtils.euclideanModulo(daySeconds, 24 * 60 * 60) / (24 * 60 * 60);
+  const angle = (solarCycle - 0.25) * Math.PI * 2;
+  const sunHeight = Math.sin(angle);
+  const daylight = THREE.MathUtils.smoothstep(sunHeight, -0.08, 0.62);
+  const sunset = Math.max(0, 1 - Math.abs(sunHeight) * 5.2) * (1 - Math.abs(daylight - 0.5));
+  const skyRadius = 46;
+  sun.position.set(Math.cos(angle) * skyRadius, Math.max(1.2, sunHeight * skyRadius), Math.sin(angle + 0.42) * 28);
   sun.target.position.set(0, 0, 0);
-  const screenSunX = Math.cos(angle) * 6.8;
-  const screenSunY = 3.15 + Math.max(0, Math.sin(angle)) * 1.65 + sunset * 0.55;
-  sunMesh.position.set(screenSunX, screenSunY, -24);
+  sunMesh.position.set(Math.cos(angle) * 70, 12 + sunHeight * 42, Math.sin(angle + 0.42) * 42);
   sunGlow.position.copy(sunMesh.position);
   const moonAngle = angle + Math.PI;
-  moonMesh.position.set(Math.cos(moonAngle) * 6.1, 2.55 + Math.max(0, Math.sin(moonAngle)) * 1.2, -25);
+  moonMesh.position.set(Math.cos(moonAngle) * 70, 12 + Math.sin(moonAngle) * 42, Math.sin(moonAngle + 0.42) * 42);
   sunColor.copy(dayColor).lerp(sunsetColor, sunset).lerp(nightColor, 1 - daylight);
   skyColor.copy(nightColor).lerp(dayColor, daylight).lerp(sunsetColor, sunset * 0.36);
   const snowIntensity = (renderedState ?? latestState)?.weather?.intensity ?? 0;
@@ -2160,13 +2542,14 @@ function updateLighting(elapsedSeconds: number) {
   moonMaterial.opacity = THREE.MathUtils.clamp((1 - daylight) * 0.78 + 0.08, 0, 0.86);
   sunPathMaterial.opacity = 0.1 + daylight * 0.12 + sunset * 0.1;
   sunPath.visible = true;
-  document.documentElement.dataset.dayCycleSeconds = THREE.MathUtils.euclideanModulo(daySeconds, DAY_CYCLE_SECONDS).toFixed(2);
+  document.documentElement.dataset.dayCycleSeconds = THREE.MathUtils.euclideanModulo((solarCycle - 0.25) * DAY_CYCLE_SECONDS, DAY_CYCLE_SECONDS).toFixed(2);
+  document.documentElement.dataset.dayTimeSeconds = THREE.MathUtils.euclideanModulo(daySeconds, 24 * 60 * 60).toFixed(1);
   document.documentElement.dataset.dayCycleLengthSeconds = String(DAY_CYCLE_SECONDS);
   document.documentElement.dataset.daylight = daylight.toFixed(3);
   document.documentElement.dataset.sunVisible = String(sunMesh.visible);
   document.documentElement.dataset.moonVisible = String(moonMesh.visible);
-  document.documentElement.dataset.sunFramed = String(sunMesh.visible);
-  document.documentElement.dataset.moonFramed = String(moonMesh.visible);
+  document.documentElement.dataset.sunFramed = "false";
+  document.documentElement.dataset.moonFramed = "false";
   document.documentElement.dataset.ambientFill = ambientFill.intensity.toFixed(3);
   document.documentElement.dataset.courtyardBounce = courtyardBounce.intensity.toFixed(3);
   document.documentElement.dataset.sunX = sun.position.x.toFixed(2);
@@ -2248,6 +2631,7 @@ addEventListener("keydown", (event) => {
     if (actionPressed(settings.controls, "leftKick", new Set([event.code]))) input.kickLeft += 1;
     if (actionPressed(settings.controls, "rightKick", new Set([event.code]))) input.kickRight += 1;
     if (actionPressed(settings.controls, "headHit", new Set([event.code]))) input.head += 1;
+    if (actionPressed(settings.controls, "jump", new Set([event.code]))) input.jump += 1;
     if (actionPressed(settings.controls, "muteAudio", new Set([event.code]))) toggleMute();
     if (actionPressed(settings.controls, "cameraReset", new Set([event.code]))) resetCamera();
   }

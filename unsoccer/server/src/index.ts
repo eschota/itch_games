@@ -4,19 +4,28 @@ import type { Duplex } from "node:stream";
 import express, { type Request, type Response } from "express";
 import RAPIER from "@dimforge/rapier3d-compat";
 import {
+  AIRBORNE_HEAD_STAMINA_DAMAGE_BONUS,
   BALL_RADIUS,
+  BALL_RESTITUTION,
   BODY_BUMP_COOLDOWN_MS,
   BODY_BUMP_MIN_SPEED,
   BODY_BUMP_RANGE,
   BODY_BUMP_STRENGTH,
   CHARACTER_ROSTER,
+  DAY_CYCLE_SECONDS,
+  DAY_START_SECONDS,
   DEFAULT_INPUT,
   FIELD_LENGTH,
   FIELD_WIDTH,
+  FOOT_PLAYER_STAMINA_DAMAGE,
   FOOT_KICK_STRENGTH,
   GAME_VERSION,
   GOAL_DEPTH,
   GOAL_WIDTH,
+  HAND_COOLDOWN_MS,
+  HAND_HIT_STRENGTH,
+  HAND_PLAYER_STAMINA_DAMAGE,
+  HEAD_PLAYER_STAMINA_DAMAGE,
   HEAD_KICK_STRENGTH,
   HEAD_COOLDOWN_MS,
   KICK_COOLDOWN_MS,
@@ -26,6 +35,19 @@ import {
   PLAYER_HEIGHT,
   PLAYER_RADIUS,
   PLAYER_SPEED,
+  PLAYER_AIR_CONTROL_MULTIPLIER,
+  PLAYER_EXHAUSTED_RECOVERY_THRESHOLD,
+  PLAYER_EXHAUSTED_SPEED_MULTIPLIER,
+  PLAYER_GRAVITY,
+  PLAYER_JUMP_COOLDOWN_MS,
+  PLAYER_JUMP_STRENGTH,
+  PLAYER_SPRINT_MULTIPLIER,
+  PLAYER_STAMINA_HIT_COST,
+  PLAYER_STAMINA_JUMP_COST,
+  PLAYER_STAMINA_MAX,
+  PLAYER_STAMINA_RECOVERY_DELAY_MS,
+  PLAYER_STAMINA_RECOVERY_PER_SECOND,
+  PLAYER_STAMINA_SPRINT_DRAIN_PER_SECOND,
   SERVER_TICK_RATE,
   SNAPSHOT_RATE,
   type BallSnapshot,
@@ -43,6 +65,7 @@ import {
   type ServerState,
   type TeamId,
   type Vec3,
+  type WeatherKind,
   type WeatherSnapshot,
   clamp,
   sanitizePlayerName
@@ -233,12 +256,21 @@ interface PlayerRuntime {
   lastKickLeft: number;
   lastKickRight: number;
   lastHead: number;
+  lastJump: number;
   lastBodyAt: number;
+  lastJumpAt: number;
   lastAction: KickKind | null;
   lastActionAt: number;
   lastAudioRole: PlayerRole | null;
   yaw: number;
   velocity: Vec3;
+  pushVelocity: Vec3;
+  stamina: number;
+  staminaRecoveryBlockedUntil: number;
+  sprinting: boolean;
+  exhausted: boolean;
+  grounded: boolean;
+  verticalVelocity: number;
   lastSeenAt: number;
 }
 
@@ -247,57 +279,97 @@ const TEST_MODE = process.env.UNSOCCER_TEST_MODE === "1";
 const TEST_TOKEN = process.env.UNSOCCER_TEST_TOKEN || "";
 const AUDIO_EVENT_LIMIT = 80;
 const AUDIO_EVENT_TTL_MS = 5000;
+const WEATHER_CHANGE_MIN_MS = 60000;
+const WEATHER_CHANGE_MAX_MS = 120000;
+const PLAYER_HIT_RECOVERY_DELAY_MS = 600;
+const GOAL_POST_RADIUS = 0.28;
+const GOAL_CROSSBAR_HEIGHT = 2.18;
+const GOAL_CROSSBAR_RADIUS = 0.22;
+const BALL_VARIANT_COUNT = 10;
+
 const WEATHER_HAZARDS: HazardSnapshot[] = [
   {
     id: "puddle-west-box",
     type: "puddle",
-    position: { x: -6.4, y: 0.03, z: -7.2 },
-    radius: 2.45,
+    position: { x: -FIELD_WIDTH * 0.27, y: 0.03, z: -FIELD_LENGTH * 0.19 },
+    radius: 3.4,
     strength: 0.58
   },
   {
     id: "puddle-east-mid",
     type: "puddle",
-    position: { x: 6.2, y: 0.03, z: 3.1 },
-    radius: 2.1,
+    position: { x: FIELD_WIDTH * 0.25, y: 0.03, z: FIELD_LENGTH * 0.11 },
+    radius: 3.1,
     strength: 0.52
   },
   {
     id: "slush-center-left",
     type: "slush",
-    position: { x: -2.7, y: 0.04, z: 6.4 },
-    radius: 2.8,
+    position: { x: -FIELD_WIDTH * 0.12, y: 0.04, z: FIELD_LENGTH * 0.21 },
+    radius: 3.7,
     strength: 0.38
   },
   {
     id: "slush-center-right",
     type: "slush",
-    position: { x: 3.8, y: 0.04, z: -4.8 },
-    radius: 2.6,
+    position: { x: FIELD_WIDTH * 0.16, y: 0.04, z: -FIELD_LENGTH * 0.18 },
+    radius: 3.5,
     strength: 0.34
   },
   {
     id: "snowbank-north",
     type: "snowbank",
-    position: { x: -7.4, y: 0.28, z: 10.5 },
-    radius: 1.25,
+    position: { x: -FIELD_WIDTH * 0.34, y: 0.28, z: FIELD_LENGTH * 0.34 },
+    radius: 1.7,
     strength: 0.92
   },
   {
     id: "snowbank-south",
     type: "snowbank",
-    position: { x: 7.5, y: 0.28, z: -10.2 },
-    radius: 1.3,
+    position: { x: FIELD_WIDTH * 0.33, y: 0.28, z: -FIELD_LENGTH * 0.33 },
+    radius: 1.75,
     strength: 0.92
   }
 ];
-const WEATHER: WeatherSnapshot = {
-  kind: "snow",
-  label: "\u0421\u043d\u0435\u0433, \u043b\u0443\u0436\u0438 \u0438 \u0441\u0443\u0433\u0440\u043e\u0431\u044b",
-  intensity: 0.72,
-  wind: { x: 0.16, y: 0, z: -0.1 },
-  hazards: WEATHER_HAZARDS
-};
+
+interface WeatherPreset {
+  kind: WeatherKind;
+  label: string;
+  intensity: number;
+  wind: Vec3;
+  hazards: HazardSnapshot[];
+}
+
+const WEATHER_PRESETS: WeatherPreset[] = [
+  {
+    kind: "dawn",
+    label: "\u0420\u0430\u0441\u0441\u0432\u0435\u0442, \u0441\u0443\u0445\u043e",
+    intensity: 0.06,
+    wind: { x: 0.04, y: 0, z: -0.02 },
+    hazards: []
+  },
+  {
+    kind: "clear",
+    label: "\u042f\u0441\u043d\u043e",
+    intensity: 0.12,
+    wind: { x: 0.08, y: 0, z: 0.04 },
+    hazards: []
+  },
+  {
+    kind: "rain",
+    label: "\u0414\u043e\u0436\u0434\u044c \u0438 \u043b\u0443\u0436\u0438",
+    intensity: 0.68,
+    wind: { x: 0.18, y: 0, z: -0.08 },
+    hazards: WEATHER_HAZARDS.filter((hazard) => hazard.type !== "snowbank")
+  },
+  {
+    kind: "snow",
+    label: "\u0421\u043d\u0435\u0433, \u043b\u0443\u0436\u0438 \u0438 \u0441\u0443\u0433\u0440\u043e\u0431\u044b",
+    intensity: 0.72,
+    wind: { x: 0.16, y: 0, z: -0.1 },
+    hazards: WEATHER_HAZARDS
+  }
+];
 
 function vec3FromRapier(value: { x: number; y: number; z: number }): Vec3 {
   return { x: value.x, y: value.y, z: value.z };
@@ -320,6 +392,8 @@ function cloneInput(input: InputState): InputState {
     kickLeft: Number(input.kickLeft || 0),
     kickRight: Number(input.kickRight || 0),
     head: Number(input.head || 0),
+    jump: Number(input.jump || 0),
+    sprint: Boolean(input.sprint),
     yaw: Number.isFinite(input.yaw) ? input.yaw : 0
   };
 }
@@ -355,6 +429,10 @@ class UnsoccerServer {
   private nextAudioEventId = 0;
   private lastCountdownAudioSecond: number | null = null;
   private readonly audioEvents: ServerAudioEvent[] = [];
+  private readonly startedAt = Date.now();
+  private currentWeatherIndex = 0;
+  private nextWeatherChangeAt = this.startedAt + this.randomWeatherDelayMs();
+  private activeBallVariant = 0;
 
   async start(): Promise<void> {
     await RAPIER.init();
@@ -513,6 +591,20 @@ class UnsoccerServer {
       response.json({ ok: true, player: this.snapshotPlayer(player), state: this.snapshot() });
     });
 
+    this.app.post("/api/test/weather", (request, response) => {
+      if (!this.allowTestRequest(request, response)) return;
+      const body = this.requestBody(request);
+      const kind = String(body.kind || "");
+      const presetIndex = WEATHER_PRESETS.findIndex((preset) => preset.kind === kind);
+      if (presetIndex < 0) {
+        response.status(400).json({ ok: false, error: "unknown weather kind" });
+        return;
+      }
+      this.currentWeatherIndex = presetIndex;
+      this.nextWeatherChangeAt = Date.now() + this.randomWeatherDelayMs();
+      response.json({ ok: true, state: this.snapshot() });
+    });
+
     this.app.post("/api/test/tick", (request, response) => {
       if (!this.allowTestRequest(request, response)) return;
       const body = this.requestBody(request);
@@ -598,6 +690,46 @@ class UnsoccerServer {
     return Math.hypot(velocity.x, velocity.y, velocity.z);
   }
 
+  private randomWeatherDelayMs(): number {
+    return WEATHER_CHANGE_MIN_MS + Math.floor(Math.random() * (WEATHER_CHANGE_MAX_MS - WEATHER_CHANGE_MIN_MS + 1));
+  }
+
+  private updateWeather(now: number): void {
+    if (now < this.nextWeatherChangeAt) return;
+    const previousIndex = this.currentWeatherIndex;
+    let nextIndex = previousIndex;
+    if (WEATHER_PRESETS.length > 1) {
+      while (nextIndex === previousIndex) nextIndex = Math.floor(Math.random() * WEATHER_PRESETS.length);
+    }
+    this.currentWeatherIndex = nextIndex;
+    this.nextWeatherChangeAt = now + this.randomWeatherDelayMs();
+    this.message = `\u041f\u043e\u0433\u043e\u0434\u0430: ${WEATHER_PRESETS[nextIndex].label}`;
+  }
+
+  private currentWeather(now = Date.now()): WeatherSnapshot {
+    const preset = WEATHER_PRESETS[this.currentWeatherIndex] || WEATHER_PRESETS[0];
+    return {
+      kind: preset.kind,
+      label: preset.label,
+      intensity: preset.intensity,
+      wind: { ...preset.wind },
+      hazards: preset.hazards.map((hazard) => ({
+        id: hazard.id,
+        type: hazard.type,
+        position: { ...hazard.position },
+        radius: hazard.radius,
+        strength: hazard.strength
+      })),
+      nextChangeInMs: Math.max(0, this.nextWeatherChangeAt - now)
+    };
+  }
+
+  private dayTimeSeconds(now: number): number {
+    const elapsedSeconds = Math.max(0, (now - this.startedAt) / 1000);
+    const dayAdvanceSeconds = elapsedSeconds / DAY_CYCLE_SECONDS * 24 * 60 * 60;
+    return (DAY_START_SECONDS + dayAdvanceSeconds) % (24 * 60 * 60);
+  }
+
   private pushRosterAudioEvent(player: PlayerRuntime, change: "join" | "leave" | "spectator", now = Date.now()): void {
     this.pushAudioEvent(now, {
       kind: "roster",
@@ -652,12 +784,21 @@ class UnsoccerServer {
       lastKickLeft: 0,
       lastKickRight: 0,
       lastHead: 0,
+      lastJump: 0,
       lastBodyAt: 0,
+      lastJumpAt: 0,
       lastAction: null,
       lastActionAt: 0,
       lastAudioRole: null,
       yaw: 0,
       velocity: zeroVec(),
+      pushVelocity: zeroVec(),
+      stamina: PLAYER_STAMINA_MAX,
+      staminaRecoveryBlockedUntil: 0,
+      sprinting: false,
+      exhausted: false,
+      grounded: true,
+      verticalVelocity: 0,
       lastSeenAt: Date.now()
     };
   }
@@ -677,11 +818,20 @@ class UnsoccerServer {
       player.lastKickLeft = 0;
       player.lastKickRight = 0;
       player.lastHead = 0;
+      player.lastJump = 0;
       player.lastBodyAt = 0;
+      player.lastJumpAt = 0;
       player.lastAction = null;
       player.lastActionAt = 0;
       player.lastAudioRole = null;
       player.velocity = zeroVec();
+      player.pushVelocity = zeroVec();
+      player.stamina = PLAYER_STAMINA_MAX;
+      player.staminaRecoveryBlockedUntil = 0;
+      player.sprinting = false;
+      player.exhausted = false;
+      player.grounded = true;
+      player.verticalVelocity = 0;
     }
     this.rebalanceRoles();
   }
@@ -694,6 +844,21 @@ class UnsoccerServer {
     }
     if (body.velocity !== undefined) {
       player.velocity = this.vecField(body.velocity, player.velocity);
+    }
+    if (body.pushVelocity !== undefined) {
+      player.pushVelocity = this.vecField(body.pushVelocity, player.pushVelocity);
+    }
+    if (body.stamina !== undefined) {
+      const stamina = Number(body.stamina);
+      if (Number.isFinite(stamina)) player.stamina = clamp(stamina, 0, PLAYER_STAMINA_MAX);
+      player.exhausted = player.stamina <= 0.01 || player.exhausted && player.stamina < PLAYER_EXHAUSTED_RECOVERY_THRESHOLD;
+    }
+    if (body.grounded !== undefined) {
+      player.grounded = Boolean(body.grounded);
+    }
+    if (body.verticalVelocity !== undefined) {
+      const verticalVelocity = Number(body.verticalVelocity);
+      if (Number.isFinite(verticalVelocity)) player.verticalVelocity = verticalVelocity;
     }
     if (body.yaw !== undefined) {
       const yaw = Number(body.yaw);
@@ -724,8 +889,8 @@ class UnsoccerServer {
     );
     this.world.createCollider(
       RAPIER.ColliderDesc.ball(BALL_RADIUS)
-        .setRestitution(0.72)
-        .setFriction(0.95)
+        .setRestitution(BALL_RESTITUTION)
+        .setFriction(0.78)
         .setDensity(0.45),
       this.ballBody
     );
@@ -809,7 +974,8 @@ class UnsoccerServer {
     this.world.createCollider(
       RAPIER.ColliderDesc.capsule((PLAYER_HEIGHT - PLAYER_RADIUS * 2) / 2, PLAYER_RADIUS)
         .setFriction(1.1)
-        .setRestitution(0.05),
+        .setRestitution(0.05)
+        .setSensor(true),
       player.body
     );
   }
@@ -853,6 +1019,7 @@ class UnsoccerServer {
     const dt = 1 / SERVER_TICK_RATE;
     this.tickCount += 1;
     this.cleanupStaleHttpPlayers(now);
+    this.updateWeather(now);
 
     for (const player of this.players.values()) {
       this.updatePlayer(player, dt, now);
@@ -895,20 +1062,55 @@ class UnsoccerServer {
   private updatePlayer(player: PlayerRuntime, dt: number, now: number): void {
     if (!player.body) return;
     const current = player.body.translation();
-    const currentPoint = { x: current.x, y: PLAYER_HEIGHT / 2, z: current.z };
+    const groundY = PLAYER_HEIGHT / 2;
+    const currentPoint = { x: current.x, y: current.y, z: current.z };
     const environment = this.environmentAt(currentPoint);
     const movement = movementDirection(player.input, player.team);
-    const weatherSpeed = PLAYER_SPEED * environment.playerSpeedMultiplier;
+    const moving = movement.magnitude > 0.05;
+    const canSprint = moving && player.input.sprint && !player.exhausted && player.stamina > 0.5;
+    player.sprinting = canSprint;
+
+    if (canSprint) {
+      player.stamina = Math.max(0, player.stamina - PLAYER_STAMINA_SPRINT_DRAIN_PER_SECOND * dt);
+      player.staminaRecoveryBlockedUntil = now + PLAYER_STAMINA_RECOVERY_DELAY_MS;
+      if (player.stamina <= 0.01) player.exhausted = true;
+    } else if (now >= player.staminaRecoveryBlockedUntil) {
+      player.stamina = Math.min(PLAYER_STAMINA_MAX, player.stamina + PLAYER_STAMINA_RECOVERY_PER_SECOND * dt);
+      if (player.exhausted && player.stamina >= PLAYER_EXHAUSTED_RECOVERY_THRESHOLD) player.exhausted = false;
+    }
+
+    if (player.input.jump > player.lastJump) {
+      player.lastJump = player.input.jump;
+      this.tryJump(player, now);
+    }
+
+    if (!player.grounded || player.verticalVelocity > 0) {
+      player.verticalVelocity -= PLAYER_GRAVITY * dt;
+    }
+    let y = current.y + player.verticalVelocity * dt;
+    if (y <= groundY) {
+      y = groundY;
+      player.verticalVelocity = 0;
+      player.grounded = true;
+    } else {
+      player.grounded = false;
+    }
+
+    const staminaSpeed = player.exhausted ? PLAYER_EXHAUSTED_SPEED_MULTIPLIER : canSprint ? PLAYER_SPRINT_MULTIPLIER : 1;
+    const airSpeed = player.grounded ? 1 : PLAYER_AIR_CONTROL_MULTIPLIER;
+    const weatherSpeed = PLAYER_SPEED * staminaSpeed * airSpeed * environment.playerSpeedMultiplier;
+    player.pushVelocity.x *= Math.exp(-dt * 4.2);
+    player.pushVelocity.z *= Math.exp(-dt * 4.2);
     const next = {
-      x: current.x + movement.x * weatherSpeed * dt,
-      y: PLAYER_HEIGHT / 2,
-      z: current.z + movement.z * weatherSpeed * dt
+      x: current.x + (movement.x * weatherSpeed + player.pushVelocity.x) * dt,
+      y,
+      z: current.z + (movement.z * weatherSpeed + player.pushVelocity.z) * dt
     };
     const resolvedNext = this.resolvePlayerHazards(next);
 
     player.velocity = {
       x: (resolvedNext.x - current.x) / dt,
-      y: 0,
+      y: (resolvedNext.y - current.y) / dt,
       z: (resolvedNext.z - current.z) / dt
     };
     if (movement.magnitude > 0.05) player.yaw = Math.atan2(movement.x, movement.z);
@@ -919,10 +1121,30 @@ class UnsoccerServer {
     this.processKick(player, now);
   }
 
+  private tryJump(player: PlayerRuntime, now: number): void {
+    if (!player.body || !player.grounded) return;
+    if (now - player.lastJumpAt < PLAYER_JUMP_COOLDOWN_MS) return;
+    if (player.stamina < PLAYER_STAMINA_JUMP_COST) return;
+    player.lastJumpAt = now;
+    player.stamina = Math.max(0, player.stamina - PLAYER_STAMINA_JUMP_COST);
+    player.staminaRecoveryBlockedUntil = now + PLAYER_STAMINA_RECOVERY_DELAY_MS;
+    player.verticalVelocity = PLAYER_JUMP_STRENGTH;
+    player.grounded = false;
+    player.lastAction = "jump";
+    player.lastActionAt = now;
+    this.pushAudioEvent(now, {
+      kind: "kick",
+      kick: "jump",
+      playerId: player.id,
+      position: this.runtimePosition(player),
+      speed: PLAYER_JUMP_STRENGTH
+    });
+  }
+
   private environmentAt(point: Vec3): { playerSpeedMultiplier: number; ballDrag: number } {
     let playerSpeedMultiplier = 1;
     let ballDrag = 0.997;
-    for (const hazard of WEATHER_HAZARDS) {
+    for (const hazard of this.currentWeather().hazards) {
       if (hazard.type === "snowbank") continue;
       const distance = distance2d(point, hazard.position);
       if (distance > hazard.radius) continue;
@@ -943,7 +1165,7 @@ class UnsoccerServer {
 
   private resolvePlayerHazards(next: Vec3): Vec3 {
     const resolved = { ...next };
-    for (const hazard of WEATHER_HAZARDS) {
+    for (const hazard of this.currentWeather().hazards) {
       if (hazard.type !== "snowbank") continue;
       const dx = resolved.x - hazard.position.x;
       const dz = resolved.z - hazard.position.z;
@@ -976,11 +1198,11 @@ class UnsoccerServer {
     const approachSpeed = player.velocity.x * directionX + player.velocity.z * directionZ;
     if (approachSpeed < BODY_BUMP_MIN_SPEED * 0.62) return;
 
-    const strength = BODY_BUMP_STRENGTH + Math.min(3.2, approachSpeed * 0.28);
+    const strength = BODY_BUMP_STRENGTH + Math.min(1.1, approachSpeed * 0.12);
     this.ballBody.applyImpulse(
       {
         x: directionX * strength + player.velocity.x * 0.08,
-        y: 0.52,
+        y: 0.28,
         z: directionZ * strength + player.velocity.z * 0.08
       },
       true
@@ -1005,7 +1227,7 @@ class UnsoccerServer {
     }
     if (player.input.kickRight > player.lastKickRight) {
       player.lastKickRight = player.input.kickRight;
-      this.tryKick(player, "right", now);
+      this.tryKick(player, "hand", now);
     }
     if (player.input.head > player.lastHead) {
       player.lastHead = player.input.head;
@@ -1015,12 +1237,22 @@ class UnsoccerServer {
 
   private tryKick(player: PlayerRuntime, kind: KickKind, now: number): void {
     if (!player.body) return;
+    if (kind === "jump" || kind === "body") return;
     if (kind === "head") {
       if (now - player.lastHeadAt < HEAD_COOLDOWN_MS) return;
       player.lastHeadAt = now;
+    } else if (kind === "hand") {
+      if (now - player.lastKickAt < HAND_COOLDOWN_MS) return;
+      if (player.stamina < PLAYER_STAMINA_HIT_COST) return;
+      player.lastKickAt = now;
+      player.stamina = Math.max(0, player.stamina - PLAYER_STAMINA_HIT_COST);
+      player.staminaRecoveryBlockedUntil = now + PLAYER_STAMINA_RECOVERY_DELAY_MS;
     } else {
       if (now - player.lastKickAt < KICK_COOLDOWN_MS) return;
+      if (player.stamina < PLAYER_STAMINA_HIT_COST) return;
       player.lastKickAt = now;
+      player.stamina = Math.max(0, player.stamina - PLAYER_STAMINA_HIT_COST);
+      player.staminaRecoveryBlockedUntil = now + PLAYER_STAMINA_RECOVERY_DELAY_MS;
     }
 
     const playerPosition = player.body.translation();
@@ -1029,12 +1261,17 @@ class UnsoccerServer {
     const forwardZ = Math.cos(player.yaw);
     const sideX = Math.cos(player.yaw);
     const sideZ = -Math.sin(player.yaw);
-    const side = kind === "left" ? -1 : kind === "right" ? 1 : 0;
+    const side = kind === "left" ? -1 : kind === "hand" ? 1 : 0;
     const contact = kind === "head"
       ? {
           x: playerPosition.x + forwardX * 0.18,
           z: playerPosition.z + forwardZ * 0.18
         }
+      : kind === "hand"
+        ? {
+            x: playerPosition.x + sideX * 0.36 + forwardX * 0.42,
+            z: playerPosition.z + sideZ * 0.36 + forwardZ * 0.42
+          }
       : {
           x: playerPosition.x + sideX * side * 0.34 + forwardX * 0.28,
           z: playerPosition.z + sideZ * side * 0.34 + forwardZ * 0.28
@@ -1042,39 +1279,91 @@ class UnsoccerServer {
     const dx = ballPosition.x - contact.x;
     const dz = ballPosition.z - contact.z;
     const distance = Math.hypot(dx, dz);
-    if (distance > KICK_RANGE) return;
+    const ballInRange = distance <= (kind === "hand" ? KICK_RANGE * 0.82 : KICK_RANGE);
+    let acted = false;
 
-    const directionX = distance > 0.01 ? dx / distance : forwardX;
-    const directionZ = distance > 0.01 ? dz / distance : forwardZ;
-    const aimX = directionX * 0.72 + forwardX * 0.28;
-    const aimZ = directionZ * 0.72 + forwardZ * 0.28;
-    const aimMagnitude = Math.hypot(aimX, aimZ) || 1;
-    const strength = kind === "head" ? HEAD_KICK_STRENGTH : FOOT_KICK_STRENGTH;
-    const lift = kind === "head" ? 3.5 : 0.75;
-    this.ballBody.applyImpulse(
-      {
-        x: aimX / aimMagnitude * strength + sideX * side * 1.65,
-        y: lift,
-        z: aimZ / aimMagnitude * strength + sideZ * side * 1.65
-      },
-      true
-    );
+    if (ballInRange) {
+      const directionX = distance > 0.01 ? dx / distance : forwardX;
+      const directionZ = distance > 0.01 ? dz / distance : forwardZ;
+      const aimX = directionX * 0.72 + forwardX * 0.28;
+      const aimZ = directionZ * 0.72 + forwardZ * 0.28;
+      const aimMagnitude = Math.hypot(aimX, aimZ) || 1;
+      const airborneHead = kind === "head" && !player.grounded;
+      const strength = kind === "head"
+        ? HEAD_KICK_STRENGTH * (airborneHead ? 1.14 : 1)
+        : kind === "hand"
+          ? HAND_HIT_STRENGTH
+          : FOOT_KICK_STRENGTH;
+      const lift = kind === "head" ? 3.9 : kind === "hand" ? 0.42 : 0.82;
+      this.ballBody.applyImpulse(
+        {
+          x: aimX / aimMagnitude * strength + sideX * side * (kind === "hand" ? 0.72 : 1.65),
+          y: lift,
+          z: aimZ / aimMagnitude * strength + sideZ * side * (kind === "hand" ? 0.72 : 1.65)
+        },
+        true
+      );
+      acted = true;
+    }
+
+    acted = this.applyPlayerHit(player, kind, now, { x: forwardX, z: forwardZ }) || acted;
+    if (!acted) return;
+
     player.lastAction = kind;
     player.lastActionAt = now;
     this.pushAudioEvent(now, {
       kind: "kick",
       kick: kind,
       playerId: player.id,
-      position: vec3FromRapier(this.ballBody.translation()),
-      speed: Math.max(strength, this.ballSpeed())
+      position: this.runtimePosition(player),
+      speed: Math.max(kind === "head" ? HEAD_KICK_STRENGTH : kind === "hand" ? HAND_HIT_STRENGTH : FOOT_KICK_STRENGTH, this.ballSpeed())
     });
-    this.message = `${player.name} ${this.actionLabel(kind)} \u043c\u044f\u0447`;
+    this.message = `${player.name} ${this.actionLabel(kind)}`;
+  }
+
+  private applyPlayerHit(
+    attacker: PlayerRuntime,
+    kind: KickKind,
+    now: number,
+    forward: { x: number; z: number }
+  ): boolean {
+    if (!attacker.body || kind === "body" || kind === "jump") return false;
+    const origin = attacker.body.translation();
+    const range = kind === "left" ? 1.62 : kind === "hand" ? 1.38 : 1.42;
+    const cone = kind === "hand" ? 0.44 : 0.32;
+    let hit = false;
+    for (const target of this.players.values()) {
+      if (target.id === attacker.id || target.role !== "player" || !target.body) continue;
+      const targetPosition = target.body.translation();
+      const dx = targetPosition.x - origin.x;
+      const dz = targetPosition.z - origin.z;
+      const distance = Math.hypot(dx, dz);
+      if (distance > range || distance < 0.001) continue;
+      const alignment = (dx / distance) * forward.x + (dz / distance) * forward.z;
+      if (alignment < cone) continue;
+      const airborneHead = kind === "head" && !attacker.grounded;
+      const damage = kind === "left"
+        ? FOOT_PLAYER_STAMINA_DAMAGE
+        : kind === "hand"
+          ? HAND_PLAYER_STAMINA_DAMAGE
+          : HEAD_PLAYER_STAMINA_DAMAGE + (airborneHead ? AIRBORNE_HEAD_STAMINA_DAMAGE_BONUS : 0);
+      target.stamina = Math.max(0, target.stamina - damage);
+      target.staminaRecoveryBlockedUntil = now + PLAYER_HIT_RECOVERY_DELAY_MS;
+      if (target.stamina <= 0.01) target.exhausted = true;
+      target.pushVelocity.x += forward.x * (kind === "hand" ? 3.7 : 2.7);
+      target.pushVelocity.z += forward.z * (kind === "hand" ? 3.7 : 2.7);
+      target.lastAction = "body";
+      target.lastActionAt = now;
+      hit = true;
+    }
+    return hit;
   }
 
   private actionLabel(kind: KickKind): string {
     if (kind === "left") return "\u0443\u0434\u0430\u0440\u0438\u043b \u043b\u0435\u0432\u043e\u0439 \u043d\u043e\u0433\u043e\u0439";
-    if (kind === "right") return "\u0443\u0434\u0430\u0440\u0438\u043b \u043f\u0440\u0430\u0432\u043e\u0439 \u043d\u043e\u0433\u043e\u0439";
+    if (kind === "hand") return "\u0443\u0434\u0430\u0440\u0438\u043b \u0440\u0443\u043a\u043e\u0439";
     if (kind === "head") return "\u0441\u044b\u0433\u0440\u0430\u043b \u0433\u043e\u043b\u043e\u0432\u043e\u0439";
+    if (kind === "jump") return "\u043f\u0440\u044b\u0433\u043d\u0443\u043b";
     return "\u0441\u044b\u0433\u0440\u0430\u043b \u043a\u043e\u0440\u043f\u0443\u0441\u043e\u043c";
   }
 
@@ -1086,22 +1375,25 @@ class UnsoccerServer {
     const halfWidth = FIELD_WIDTH / 2 - BALL_RADIUS;
     const halfLength = FIELD_LENGTH / 2 + GOAL_DEPTH;
     const environment = this.environmentAt(nextPosition);
-    nextVelocity.x = nextVelocity.x * environment.ballDrag + WEATHER.wind.x * WEATHER.intensity * 0.004;
-    nextVelocity.z = nextVelocity.z * environment.ballDrag + WEATHER.wind.z * WEATHER.intensity * 0.004;
+    const weather = this.currentWeather();
+    nextVelocity.x = nextVelocity.x * environment.ballDrag + weather.wind.x * weather.intensity * 0.004;
+    nextVelocity.z = nextVelocity.z * environment.ballDrag + weather.wind.z * weather.intensity * 0.004;
 
     if (Math.abs(nextPosition.x) > halfWidth) {
       nextPosition.x = clamp(nextPosition.x, -halfWidth, halfWidth);
-      nextVelocity.x *= -0.72;
+      nextVelocity.x *= -BALL_RESTITUTION;
     }
     if (Math.abs(nextPosition.z) > halfLength) {
       nextPosition.z = clamp(nextPosition.z, -halfLength, halfLength);
-      nextVelocity.z *= -0.72;
+      nextVelocity.z *= -BALL_RESTITUTION;
     }
     if (nextPosition.y <= BALL_RADIUS && nextVelocity.y < 0) {
-      nextVelocity.y *= -0.25;
+      nextVelocity.y *= -0.48;
     }
 
-    for (const hazard of WEATHER_HAZARDS) {
+    this.resolveGoalPostBounce(nextPosition, nextVelocity);
+
+    for (const hazard of weather.hazards) {
       if (hazard.type !== "snowbank") continue;
       const dx = nextPosition.x - hazard.position.x;
       const dz = nextPosition.z - hazard.position.z;
@@ -1124,6 +1416,37 @@ class UnsoccerServer {
 
     this.ballBody.setTranslation(nextPosition, true);
     this.ballBody.setLinvel(nextVelocity, true);
+  }
+
+  private resolveGoalPostBounce(nextPosition: Vec3, nextVelocity: Vec3): void {
+    const goalZs = [-FIELD_LENGTH / 2, FIELD_LENGTH / 2];
+    for (const goalZ of goalZs) {
+      for (const postX of [-GOAL_WIDTH / 2, GOAL_WIDTH / 2]) {
+        const dx = nextPosition.x - postX;
+        const dz = nextPosition.z - goalZ;
+        const distance = Math.hypot(dx, dz);
+        const safeRadius = GOAL_POST_RADIUS + BALL_RADIUS;
+        if (distance >= safeRadius || distance < 0.001 || nextPosition.y > GOAL_CROSSBAR_HEIGHT + BALL_RADIUS) continue;
+        const nx = dx / distance;
+        const nz = dz / distance;
+        const approach = nextVelocity.x * nx + nextVelocity.z * nz;
+        nextPosition.x = postX + nx * safeRadius;
+        nextPosition.z = goalZ + nz * safeRadius;
+        if (approach < 0) {
+          nextVelocity.x -= approach * nx * (1 + BALL_RESTITUTION);
+          nextVelocity.z -= approach * nz * (1 + BALL_RESTITUTION);
+          nextVelocity.y = Math.max(nextVelocity.y, 0.55);
+        }
+      }
+      const inCrossbarX = Math.abs(nextPosition.x) <= GOAL_WIDTH / 2 + GOAL_POST_RADIUS;
+      const nearGoalPlane = Math.abs(nextPosition.z - goalZ) <= GOAL_POST_RADIUS + BALL_RADIUS;
+      const nearCrossbarY = Math.abs(nextPosition.y - GOAL_CROSSBAR_HEIGHT) <= GOAL_CROSSBAR_RADIUS + BALL_RADIUS;
+      if (inCrossbarX && nearGoalPlane && nearCrossbarY && nextVelocity.y > 0) {
+        nextPosition.y = GOAL_CROSSBAR_HEIGHT - GOAL_CROSSBAR_RADIUS - BALL_RADIUS;
+        nextVelocity.y *= -BALL_RESTITUTION;
+        nextVelocity.z *= 0.92;
+      }
+    }
   }
 
   private checkGoal(now: number): void {
@@ -1164,11 +1487,15 @@ class UnsoccerServer {
     this.ballBody.setTranslation({ x: 0, y: BALL_RADIUS + 0.04, z: 0 }, true);
     this.ballBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.ballBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    this.activeBallVariant = (this.activeBallVariant + 1) % BALL_VARIANT_COUNT;
     this.countdownUntil = now + 1200;
     for (const player of this.players.values()) {
       if (!player.body) continue;
       const spawn = this.spawnForIndex(player.index);
       player.body.setNextKinematicTranslation(spawn);
+      player.grounded = true;
+      player.verticalVelocity = 0;
+      player.pushVelocity = zeroVec();
     }
   }
 
@@ -1176,11 +1503,13 @@ class UnsoccerServer {
     this.trimAudioEvents(now);
     const ball: BallSnapshot = {
       position: vec3FromRapier(this.ballBody.translation()),
-      velocity: vec3FromRapier(this.ballBody.linvel())
+      velocity: vec3FromRapier(this.ballBody.linvel()),
+      variant: this.activeBallVariant
     };
     return {
       version: GAME_VERSION,
       serverTime: now,
+      dayTimeSeconds: this.dayTimeSeconds(now),
       tick: this.tickCount,
       players: [...this.players.values()]
         .sort((a, b) => a.index - b.index)
@@ -1189,7 +1518,7 @@ class UnsoccerServer {
       score: { ...this.score },
       message: this.message,
       countdown: Math.max(0, this.countdownUntil - now),
-      weather: WEATHER,
+      weather: this.currentWeather(now),
       audioEvents: this.audioEvents.slice()
     };
   }
@@ -1206,6 +1535,11 @@ class UnsoccerServer {
       position,
       velocity: player.velocity,
       yaw: player.yaw,
+      stamina: Math.round(player.stamina * 10) / 10,
+      sprinting: player.sprinting,
+      airborne: !player.grounded,
+      exhausted: player.exhausted,
+      grounded: player.grounded,
       lastAction: player.lastAction,
       lastActionAt: player.lastActionAt
     };

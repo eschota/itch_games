@@ -241,14 +241,15 @@
     <rule>Generated package output belongs under dist/ and is not committed.</rule>
     <rule>Packaging fails if internal skill, role, agent coordination, deploy, or source-control docs leak into the public zip.</rule>
   </tooling>
-  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.010">
+  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.011">
     <client path="unsoccer/client" package="dist/unsoccer-itch.zip" productionPath="/unsoccer/" productionStatic="unsoccer/client/dist" />
     <server path="unsoccer/server" port="8787" health="/api/health" transport="plain-websocket-json" fallback="http-polling" productionApiPath="/unsoccer/api/" productionSocketPath="/unsoccer/socket/" />
     <shared path="unsoccer/shared" />
     <audio path="unsoccer/client/src/audio.ts" evidence="sound_designer/implementation/unsoccer-audio-pass-v0.0.008.md" mode="procedural-web-audio server-authored-events" />
     <ui path="unsoccer/client/src/main.ts" settings="unsoccer/client/src/settings.ts" inputMap="unsoccer/client/src/input-map.ts" styles="unsoccer/client/src/styles.css" evidence="ui_designer/public_pages/unsoccer-ui-final-local-gate-v0.0.010-rerun.json" mode="hud-settings-remap-runtime" />
     <assetRules path="unsoccer/assets/licenses/free3d-provenance.json">
-      <rule>Free3D downloads require FREE3D_API_TOKEN and exact format/lod/relativePath tuples.</rule>
+      <rule>Free3D authenticated downloads require FREE3D_API_TOKEN/F3D_API_TOKEN and exact format/lod/relativePath tuples.</rule>
+      <rule>Tokenless Free3D LowPoly 1k assets may use exact public worker inventory paths.json relativePath entries with provenance.</rule>
       <rule>Runtime assets must be local optimized GLB files with provenance before shipping.</rule>
     </assetRules>
     <rule>First 4 connected clients are players; clients 5-32 are spectators/testers.</rule>
@@ -260,6 +261,7 @@
     <rule>v0.0.009 fixes team-relative WASD movement, immediate local controlled-player rendering, and removes artificial pitch bounds from player movement.</rule>
     <rule>v0.0.009 ships the UI Designer runtime pass: redesigned HUD, event/status/network panels, toolbar, settings modal tabs, localStorage settings, remappable input, audio/graphics/network/accessibility controls, and QA-readable UI datasets.</rule>
     <rule>v0.0.010 is the unified 0010 release build with all current runtime workstreams, a camera-framed sun/moon marker, synchronized version surfaces, stable network HUD numeric columns, and repo-side publication evidence.</rule>
+    <rule>v0.0.011 doubles the field/courtyard, starts authoritative time at 06:00, rotates sun/moon by server day time, randomizes weather every 60-120s, adds dawn birds/day traffic audio, moving cars, sprint/stamina/exhaustion/jump, foot/hand/head player hits, bouncier ball physics, thicker goal rebounds, local cloth net ripples, and 10 local Free3D vertex-color soccer-ball GLBs.</rule>
     <rule>tools/unsoccer_acceptance.mjs derives the expected version from package.json.games.unsoccer.version and checks HTTP fallback join/input/state.</rule>
     <rule>npm run package:unsoccer rebuilds before writing dist/unsoccer-itch.zip so stale dist output cannot become the release package.</rule>
   </game>
@@ -290,7 +292,7 @@
     <rule>Orbital Courier itch upload must include vendored Three.js and must not require cdn.jsdelivr.net at runtime.</rule>
     <rule>External itch.io pages remain incomplete until the public URL, uploaded zip, exact live copy, screenshots, publication date, and version match are recorded under ui_designer/public_pages/.</rule>
   </publicSurfaces>
-  <versioning initial="v0.0.001" current="v0.0.010">
+  <versioning initial="v0.0.001" current="v0.0.011">
     <rule>Every created game starts at v0.0.001.</rule>
     <rule>Every shipped bump increments the version.</rule>
     <rule>The current version is visible in the bottom-left corner.</rule>

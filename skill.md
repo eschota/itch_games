@@ -211,8 +211,8 @@ Use this root skill when changing, packaging, validating, or publishing the
 
 ## Current Behavior
 
-- Current game release: `v0.0.010`.
-- `unsoccer` current prototype release: `v0.0.010`.
+- Current game release: `v0.0.011`.
+- `unsoccer` current prototype release: `v0.0.011`.
 - `unsoccer` uses a headless authoritative Node server with Rapier3D physics,
   plain WebSocket transport, and HTTP polling fallback; the itch package is
   static client-only and needs the live game server for multiplayer.
@@ -267,6 +267,14 @@ Use this root skill when changing, packaging, validating, or publishing the
   `tester/checks/2026-07-01-unsoccer-v0.0.010-local-release-gate/`. The
   network HUD uses fixed numeric columns and tabular numerals so live ping/
   snapshot counters do not resize the panel.
+- `unsoccer` v0.0.011 is the Producer mechanics/art integration build: it
+  doubles the field and surrounding courtyard, starts the authoritative day at
+  06:00, rotates sun/moon by server day time, randomizes weather every 60-120s,
+  adds dawn birds/day traffic audio and visible cars, adds stamina sprint,
+  exhaustion, jump, foot/hand/head attacks, player stamina damage, bouncier ball
+  physics, thicker post/crossbar rebounds, local-only goal net cloth ripples,
+  and 10 Free3D Online LowPoly 1k soccer-ball GLB sources baked/exported as
+  local textureless vertex-color runtime assets.
 - `v0.0.006` adds procedural Web Audio feedback and exposes
   `window.orbitalCourierAudio` plus `orbital-courier:audio-event` so future
   network code can replicate semantic sound events instead of audio files.

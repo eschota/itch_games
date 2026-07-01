@@ -22,15 +22,15 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 
 ## Rules
 
-- Current release: `v0.0.010`.
+- Current release: `v0.0.011`.
 - Keep client and server separated; browser bundles must not import server-only
   modules.
 - The server is authoritative for room assignment, teams, player physics, ball
   physics, goals, score, and reset after goal.
 - First 4 connected clients are active players. Additional clients up to 32 are
   spectators/testers so QA can observe without displacing a player.
-- Controls: WASD movement, left mouse kick, right mouse kick, mouse wheel head
-  hit.
+- Controls: WASD movement, `Shift` sprint, `Space` jump, left mouse foot kick,
+  right mouse hand hit, mouse wheel head hit.
 - `v0.0.002` engine pass must preserve the Producer requirements: Russian
   player-facing text, HDR-style environment lighting, visible sun, 120-second
   realtime day cycle, reactive lighting, inertial perspective camera over the
@@ -75,12 +75,22 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
   version across package, client, server, shared, acceptance, public page, and
   skill surfaces, and keeps external itch.io publication blocked until the
   URL/upload evidence is recorded.
+- `v0.0.011` is the Producer mechanics/art integration build. It doubles the
+  field and courtyard footprint, starts authoritative time at 06:00 sunrise,
+  rotates sun/moon from server day time, randomizes weather every 60-120s,
+  adds dawn birds/day traffic audio and moving cars, adds sprint/stamina/
+  exhaustion/jump plus foot/hand/head attacks that can drain player stamina,
+  makes the ball bouncier for headers, adds thicker posts/crossbars with
+  explicit rebound handling, removes the old camera-attached central blob, adds
+  local-only visual cloth ripples for goal nets, and loads 10 local Free3D
+  Online LowPoly 1k soccer-ball GLBs optimized to textureless vertex colors for
+  the sideline ball rack.
 - `tools/unsoccer_acceptance.mjs` derives the expected version from
   `package.json.games.unsoccer.version`; keep it that way so version bumps do
   not require multiple acceptance edits.
 - `npm run package:unsoccer` rebuilds before creating `dist/unsoccer-itch.zip`;
   do not replace it with a source-less zip step that can reuse stale dist.
-- Server-confirmed left-foot, right-foot, head, and body contacts must stay
+- Server-confirmed left-foot, hand, head, jump, and body contacts must stay
   visually distinguishable in the client and expose QA-readable
   `data-last-action-*` fields on `document.documentElement`.
 - `v0.0.003` server acceptance uses `UNSOCCER_TEST_MODE=1` only on an isolated
@@ -100,10 +110,14 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 
 ## Free3D Asset Contract
 
-- Use only the documented Free3D direct-download API and an explicit
-  `FREE3D_API_TOKEN` environment variable.
+- Use only the documented Free3D direct-download API with an explicit
+  `FREE3D_API_TOKEN`/`F3D_API_TOKEN`, or tokenless public LowPoly 1k worker
+  inventory files whose exact `paths.json` relative path is recorded.
 - Do not guess asset paths or depend on remote assets at runtime.
-- Runtime character assets should be optimized `.glb` files with documented
-  source GUID, format, LOD, license/provenance, and download timestamp.
-- Until per-model provenance is confirmed, ship procedural placeholder players
-  and keep Free3D candidates in `assets/models/characters/roster.json`.
+- Runtime `.glb` assets must be optimized, textureless where possible, and
+  documented with source GUID, model URL, inventory URL, direct worker URL,
+  format, LOD, relative path, bytes, and download timestamp.
+- Soccer-ball sources live under `assets/models/balls/free3d/raw`; optimized
+  runtime GLBs and `roster.json` live under `client/public/assets/balls/free3d`.
+- Free3D character candidates remain in `assets/models/characters/roster.json`
+  until per-model rig/animation provenance is confirmed.

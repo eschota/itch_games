@@ -33,6 +33,7 @@ export function resolveMovementInput(
   next.right = xAxis > 0.05;
   next.up = zAxis < -0.05;
   next.down = zAxis > 0.05;
+  next.sprint = actionPressed(settings, "sprint", pressedCodes);
   if (xAxis !== 0 || zAxis !== 0) next.yaw = Math.atan2(xAxis, zAxis);
   return next;
 }

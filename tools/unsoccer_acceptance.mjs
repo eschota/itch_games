@@ -8,10 +8,13 @@ import path from "node:path";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGE = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
 const EXPECTED_GAME_VERSION = String(PACKAGE.games?.unsoccer?.version || PACKAGE.gameVersion || PACKAGE.version);
-const FIELD_WIDTH = 24;
-const FIELD_LENGTH = 36;
+const FIELD_WIDTH = 48;
+const FIELD_LENGTH = 72;
 const BALL_RADIUS = 0.48;
 const PLAYER_HEIGHT = 1.75;
+const DAY_START_SECONDS = 6 * 60 * 60;
+const WEATHER_CHANGE_MIN_MS = 60_000;
+const WEATHER_CHANGE_MAX_MS = 120_000;
 
 async function freePort() {
   return new Promise((resolve, reject) => {
@@ -58,6 +61,22 @@ async function stopServer(child) {
 
 function speed3(velocity) {
   return Math.hypot(velocity.x, velocity.y, velocity.z);
+}
+
+function inputState(patch = {}) {
+  return {
+    up: false,
+    down: false,
+    left: false,
+    right: false,
+    kickLeft: 0,
+    kickRight: 0,
+    head: 0,
+    jump: 0,
+    sprint: false,
+    yaw: 0,
+    ...patch
+  };
 }
 
 function playerAt(state, index) {
@@ -153,12 +172,12 @@ async function assertHttpFallback(api) {
 
   await api("POST", `/api/test/player/${join.joined.index}`, {
     position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
-    input: { up: false, down: false, left: false, right: false, kickLeft: 0, kickRight: 0, head: 0, yaw: 0 }
+    input: inputState()
   });
   await api("POST", "/api/input", {
     clientId: join.joined.id,
     sequence: 1,
-    input: { up: true, down: false, left: false, right: false, kickLeft: 0, kickRight: 0, head: 0, yaw: 0 }
+    input: inputState({ up: true })
   });
 
   state = (await api("POST", "/api/test/tick", { frames: 6 })).state;
@@ -250,9 +269,12 @@ async function main() {
     );
     await assertMovementControls(api);
     await assertPlayerCanLeavePitch(api);
+    await assertDayAndWeather(api);
+    await assertSprintAndJump(api);
+    await assertPlayerHitStamina(api);
 
     await assertKick(api, "left", { x: -0.34, y: BALL_RADIUS + 0.04, z: 1.0 }, { kickLeft: 1 });
-    await assertKick(api, "right", { x: 0.34, y: BALL_RADIUS + 0.04, z: 1.0 }, { kickRight: 1 });
+    await assertKick(api, "hand", { x: 0.34, y: BALL_RADIUS + 0.04, z: 1.0 }, { kickRight: 1 });
     await assertKick(api, "head", { x: 0, y: BALL_RADIUS + 0.04, z: 0.95 }, { head: 1 });
 
     state = await prepareSinglePlayer(api);
@@ -260,7 +282,7 @@ async function main() {
     await api("POST", "/api/test/player/0", {
       position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
       yaw: 0,
-      input: { up: true, down: false, left: false, right: false, kickLeft: 0, kickRight: 0, head: 0, yaw: 0 }
+      input: inputState({ up: true })
     });
     await api("POST", "/api/test/ball", {
       position: { x: 0, y: BALL_RADIUS + 0.04, z: 0.95 },
@@ -279,6 +301,7 @@ async function main() {
 
     await api("POST", "/api/test/players", { count: 2 });
     state = (await api("POST", "/api/test/reset", {})).state;
+    const beforeGoalVariant = state.ball.variant;
     state = (await api("POST", "/api/test/ball", {
       position: { x: 0, y: BALL_RADIUS + 0.04, z: FIELD_LENGTH / 2 + 0.2 },
       velocity: { x: 0, y: 0, z: 1 }
@@ -289,6 +312,7 @@ async function main() {
     assert.equal(state.score.orange, 0);
     assert.ok(Math.abs(state.ball.position.x) < 0.01);
     assert.ok(Math.abs(state.ball.position.z) < 0.01);
+    assert.notEqual(state.ball.variant, beforeGoalVariant, "goal reset should rotate the active ball variant");
     assert.ok(state.countdown > 0, "goal reset should start countdown");
     assertAudioEvent(state, beforeGoalAudioId, (event) => event.kind === "goal" && event.team === 0, "blue goal");
     assertAudioEvent(state, beforeGoalAudioId, (event) => event.kind === "countdown" && event.remainingSeconds > 0, "goal countdown");
@@ -307,11 +331,14 @@ async function main() {
         "5-client role assignment",
         "team-relative WASD movement",
         "player movement beyond pitch bounds",
+        "authoritative day start and weather controls",
+        "sprint stamina and jump",
+        "player hit stamina damage",
         "left kick",
-        "right kick",
+        "hand hit",
         "head hit",
         "body contact",
-        "goal score/reset/countdown",
+        "goal score/reset/countdown/ball variant",
         "server audioEvents roster",
         "server audioEvents kicks/body/goal/countdown"
       ]
@@ -336,14 +363,14 @@ async function assertMovementControls(api) {
 
   await api("POST", "/api/test/player/0", {
     position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
-    input: { up: true, down: false, left: false, right: false, kickLeft: 0, kickRight: 0, head: 0, yaw: 0 }
+    input: inputState({ up: true })
   });
   let state = (await api("POST", "/api/test/tick", { frames: 6 })).state;
   assert.ok(playerAt(state, 0).position.z > 0.5, "blue player W should move toward +Z/opponent goal");
 
   await api("POST", "/api/test/player/1", {
     position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
-    input: { up: true, down: false, left: false, right: false, kickLeft: 0, kickRight: 0, head: 0, yaw: Math.PI }
+    input: inputState({ up: true, yaw: Math.PI })
   });
   state = (await api("POST", "/api/test/tick", { frames: 6 })).state;
   assert.ok(playerAt(state, 1).position.z < -0.5, "orange player W should move toward -Z/opponent goal");
@@ -358,13 +385,106 @@ async function assertPlayerCanLeavePitch(api) {
   });
   await api("POST", "/api/test/player/0", {
     position: { x: FIELD_WIDTH / 2 - 0.1, y: PLAYER_HEIGHT / 2, z: 0 },
-    input: { up: false, down: false, left: false, right: true, kickLeft: 0, kickRight: 0, head: 0, yaw: Math.PI / 2 }
+    input: inputState({ right: true, yaw: Math.PI / 2 })
   });
   const state = (await api("POST", "/api/test/tick", { frames: 20 })).state;
   assert.ok(
     playerAt(state, 0).position.x > FIELD_WIDTH / 2 + 1,
     "player movement should not be clamped to the pitch rectangle"
   );
+}
+
+async function assertDayAndWeather(api) {
+  await api("POST", "/api/test/players", { count: 1 });
+  let state = (await api("POST", "/api/test/reset", {})).state;
+  assert.equal(state.weather.kind, "dawn", "server should start at dawn weather");
+  assert.ok(
+    state.dayTimeSeconds >= DAY_START_SECONDS && state.dayTimeSeconds < DAY_START_SECONDS + 10 * 60,
+    "server day time should start near 06:00 sunrise"
+  );
+  assert.ok(
+    state.weather.nextChangeInMs <= WEATHER_CHANGE_MAX_MS && state.weather.nextChangeInMs > WEATHER_CHANGE_MIN_MS - 1_000,
+    "weather should expose randomized 60-120s next-change timer"
+  );
+
+  state = (await api("POST", "/api/test/weather", { kind: "rain" })).state;
+  assert.equal(state.weather.kind, "rain");
+  assert.ok(state.weather.hazards.some((hazard) => hazard.type === "puddle"), "rain should expose puddle hazards");
+  assert.ok(!state.weather.hazards.some((hazard) => hazard.type === "snowbank"), "rain should not include snowbanks");
+
+  state = (await api("POST", "/api/test/weather", { kind: "clear" })).state;
+  assert.equal(state.weather.kind, "clear");
+  assert.equal(state.weather.hazards.length, 0, "clear weather should remove field hazards");
+}
+
+async function assertSprintAndJump(api) {
+  await api("POST", "/api/test/players", { count: 1 });
+  await api("POST", "/api/test/reset", {});
+  await api("POST", "/api/test/weather", { kind: "clear" });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 18 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+
+  await api("POST", "/api/test/player/0", {
+    position: { x: -2, y: PLAYER_HEIGHT / 2, z: 0 },
+    input: inputState({ up: true })
+  });
+  let state = (await api("POST", "/api/test/tick", { frames: 30 })).state;
+  const walkZ = playerAt(state, 0).position.z;
+
+  await api("POST", "/api/test/player/0", {
+    position: { x: 2, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: 100,
+    input: inputState({ up: true, sprint: true })
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 30 })).state;
+  const sprinter = playerAt(state, 0);
+  assert.ok(sprinter.position.z > walkZ + 1.1, "sprint should move farther than walking over the same frames");
+  assert.ok(sprinter.stamina < 100, "sprint should drain stamina");
+  assert.equal(sprinter.sprinting, true, "snapshot should mark sprinting players");
+
+  const beforeJumpAudioId = maxAudioEventId(state);
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: 100,
+    grounded: true,
+    verticalVelocity: 0,
+    input: inputState({ jump: 1 })
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 6 })).state;
+  const jumper = playerAt(state, 0);
+  assert.ok(jumper.position.y > PLAYER_HEIGHT / 2 + 0.15, "jump should raise the player");
+  assert.equal(jumper.airborne, true, "jumping player should be airborne in snapshot");
+  assert.ok(jumper.stamina < 100, "jump should spend stamina");
+  assertAudioEvent(state, beforeJumpAudioId, (event) => event.kind === "kick" && event.kick === "jump", "jump");
+}
+
+async function assertPlayerHitStamina(api) {
+  await api("POST", "/api/test/players", { count: 2 });
+  let state = (await api("POST", "/api/test/reset", {})).state;
+  const targetId = playerAt(state, 1).id;
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: 100,
+    yaw: 0,
+    input: inputState()
+  });
+  await api("POST", "/api/test/player/1", {
+    position: { x: 0.25, y: PLAYER_HEIGHT / 2, z: 1.05 },
+    stamina: 16,
+    yaw: Math.PI,
+    input: inputState()
+  });
+  await api("POST", "/api/test/player/0", {
+    input: inputState({ kickRight: 1 })
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 3 })).state;
+  const target = state.players.find((player) => player.id === targetId);
+  assert.ok(target, "hit target should remain in state");
+  assert.equal(playerAt(state, 0).lastAction, "hand");
+  assert.ok(target.stamina < 16, "hand hit should drain target stamina");
+  assert.equal(target.exhausted, true, "target should become exhausted at zero stamina");
 }
 
 async function assertKick(api, kind, ballPosition, input) {
@@ -374,7 +494,7 @@ async function assertKick(api, kind, ballPosition, input) {
   await api("POST", "/api/test/player/0", {
     position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
     yaw: 0,
-    input: { up: false, down: false, left: false, right: false, kickLeft: 0, kickRight: 0, head: 0, yaw: 0 }
+    input: inputState()
   });
   await api("POST", "/api/test/ball", {
     position: ballPosition,

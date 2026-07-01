@@ -1,5 +1,23 @@
 # Changelog
 
+## unsoccer v0.0.011
+
+- Expand the authoritative pitch and courtyard footprint to 2x width/length and
+  move roads, lights, props, hazards, and spectators out around the larger
+  field.
+- Replace static snow-only weather with server-randomized 60-120 second weather
+  cycles, sunrise start time, smooth day/night sun rotation, dawn bird ambience,
+  and daylight road traffic ambience.
+- Add player stamina, sprint, exhaustion, jump, foot/hand/head attacks, player
+  stamina damage, lighter body bumps, and a bouncier ball tuned for headers.
+- Add local-only goal net cloth ripples, thicker goal posts/crossbars, and
+  explicit post/crossbar ball rebound handling.
+- Download 10 Free3D Online LowPoly 1k soccer-ball GLBs from public worker
+  inventory paths, bake/derive textureless vertex-color optimized GLBs with
+  Blender, record provenance, and load them as the sideline ball rack.
+- Remove the camera-attached central sun/moon blob and keep sun/moon markers in
+  world space.
+
 ## unsoccer v0.0.010
 
 - Cut the 0010 release line as the single main build after the v0.0.009

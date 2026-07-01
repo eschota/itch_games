@@ -29,5 +29,7 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
 - Do not edit the main qwertystock.com app or nginx server block from this
   folder.
 - Keep IO Games isolated behind `server_name io-games.mecharulez.com`.
+- Keep the HTTP `io-games.mecharulez.com` root redirect pointed at the HTTPS
+  catalog root, not a single game route.
 - Keep webhook and Telegram secrets only in server environment files.
 - Deployment changes must be reported to `/ai_chat` with validation status.

@@ -33,6 +33,8 @@
   not depend on a CDN at runtime.
 - Redesign the local IO Games catalog as a public Orbital Courier entry surface
   and document UI Designer ownership for local and itch.io public pages.
+- Keep the production HTTP root redirect pointed at the shared HTTPS catalog
+  instead of bypassing the catalog to Orbital Courier.
 - Curate the itch.io zip so it excludes internal skill and agent coordination
   files.
 

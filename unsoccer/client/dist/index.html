@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>UnSoccer v0.0.010 | Ragdoll Soccer II</title>
+    <title>UnSoccer v0.0.011 | Ragdoll Soccer II</title>
     <meta
       name="description"
-      content="UnSoccer v0.0.010: единый релизный билд с двором, анимированными игроками, солнцем, HUD/settings и сетевым физическим футболом."
+      content="UnSoccer v0.0.011: расширенное поле, серверный рассвет, смена погоды, прыжок, стамина, удары, сетки ворот и двор с движением."
     />
     <link rel="icon" href="data:," />
     <style>
@@ -41,8 +41,8 @@
         }
       }
     </style>
-    <script type="module" crossorigin src="./assets/index-5FKYmbzV.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-DKlYk563.css">
+    <script type="module" crossorigin src="./assets/index-DUmbQkHV.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-IBx3975Q.css">
   </head>
   <body>
     <main id="app" aria-label="UnSoccer">
@@ -77,7 +77,7 @@
         <button id="fullscreen-button" class="icon-button" type="button" title="Fullscreen" aria-label="Fullscreen">FS</button>
         <button id="camera-reset-button" class="icon-button" type="button" title="Camera reset" aria-label="Camera reset">CAM</button>
       </div>
-      <div id="version-badge">v0.0.010 / 0.61 MB</div>
+      <div id="version-badge">v0.0.011 / 1.31 MB</div>
       <section id="settings-panel" class="settings-panel" aria-modal="true" role="dialog" aria-labelledby="settings-title" hidden>
         <form id="settings-form" class="settings-shell">
           <header class="settings-header">
@@ -105,8 +105,8 @@
                 <label><input id="setting-invert-lr" type="checkbox" /> <span>&#1048;&#1085;&#1074;&#1077;&#1088;&#1090; &#1083;&#1077;&#1074;&#1086;/&#1087;&#1088;&#1072;&#1074;&#1086;</span></label>
                 <label><input id="setting-mirror-team" type="checkbox" /> <span>&#1047;&#1077;&#1088;&#1082;&#1072;&#1083;&#1086; &#1089;&#1090;&#1086;&#1088;&#1086;&#1085;&#1099;</span></label>
               </div>
-              <div class="input-test-pad" id="input-test-pad" aria-hidden="true"><span data-pad="moveForward">W</span><span data-pad="moveLeft">A</span><span data-pad="moveBack">S</span><span data-pad="moveRight">D</span><span data-pad="leftKick">L</span><span data-pad="rightKick">R</span><span data-pad="headHit">H</span></div>
-              <div class="binding-grid"><button type="button" data-rebind-action="moveForward"></button><button type="button" data-rebind-action="moveBack"></button><button type="button" data-rebind-action="moveLeft"></button><button type="button" data-rebind-action="moveRight"></button><button type="button" data-rebind-action="leftKick"></button><button type="button" data-rebind-action="rightKick"></button><button type="button" data-rebind-action="headHit"></button><button type="button" data-rebind-action="settings"></button><button type="button" data-rebind-action="cameraReset"></button><button type="button" data-rebind-action="muteAudio"></button></div>
+              <div class="input-test-pad" id="input-test-pad" aria-hidden="true"><span data-pad="moveForward">W</span><span data-pad="moveLeft">A</span><span data-pad="moveBack">S</span><span data-pad="moveRight">D</span><span data-pad="leftKick">L</span><span data-pad="rightKick">R</span><span data-pad="headHit">H</span><span data-pad="jump">J</span><span data-pad="sprint">S</span></div>
+              <div class="binding-grid"><button type="button" data-rebind-action="moveForward"></button><button type="button" data-rebind-action="moveBack"></button><button type="button" data-rebind-action="moveLeft"></button><button type="button" data-rebind-action="moveRight"></button><button type="button" data-rebind-action="leftKick"></button><button type="button" data-rebind-action="rightKick"></button><button type="button" data-rebind-action="headHit"></button><button type="button" data-rebind-action="jump"></button><button type="button" data-rebind-action="sprint"></button><button type="button" data-rebind-action="settings"></button><button type="button" data-rebind-action="cameraReset"></button><button type="button" data-rebind-action="muteAudio"></button></div>
               <p id="binding-conflicts" class="settings-note"></p>
             </section>
             <section class="settings-tab-panel" data-settings-panel="audio" hidden>

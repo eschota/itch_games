@@ -1,31 +1,52 @@
-export declare const GAME_VERSION = "v0.0.010";
+export declare const GAME_VERSION = "v0.0.011";
 export declare const ROOM_ID = "unsoccer-default-room";
 export declare const MAX_ACTIVE_PLAYERS = 4;
 export declare const MAX_ROOM_CLIENTS = 32;
 export declare const SERVER_TICK_RATE = 60;
 export declare const SNAPSHOT_RATE = 20;
 export declare const DAY_CYCLE_SECONDS = 120;
-export declare const FIELD_WIDTH = 24;
-export declare const FIELD_LENGTH = 36;
-export declare const GOAL_WIDTH = 8;
-export declare const GOAL_DEPTH = 2.2;
+export declare const DAY_START_SECONDS: number;
+export declare const FIELD_WIDTH = 48;
+export declare const FIELD_LENGTH = 72;
+export declare const GOAL_WIDTH = 12;
+export declare const GOAL_DEPTH = 3.2;
 export declare const PLAYER_RADIUS = 0.52;
 export declare const PLAYER_HEIGHT = 1.75;
-export declare const PLAYER_SPEED = 8.6;
+export declare const PLAYER_SPEED = 8.2;
+export declare const PLAYER_SPRINT_MULTIPLIER = 1.58;
+export declare const PLAYER_EXHAUSTED_SPEED_MULTIPLIER = 0.46;
+export declare const PLAYER_EXHAUSTED_RECOVERY_THRESHOLD = 20;
+export declare const PLAYER_STAMINA_MAX = 100;
+export declare const PLAYER_STAMINA_SPRINT_DRAIN_PER_SECOND = 24;
+export declare const PLAYER_STAMINA_JUMP_COST = 18;
+export declare const PLAYER_STAMINA_HIT_COST = 9;
+export declare const PLAYER_STAMINA_RECOVERY_DELAY_MS = 700;
+export declare const PLAYER_STAMINA_RECOVERY_PER_SECOND = 17;
+export declare const PLAYER_JUMP_STRENGTH = 6.1;
+export declare const PLAYER_JUMP_COOLDOWN_MS = 520;
+export declare const PLAYER_GRAVITY = 18;
+export declare const PLAYER_AIR_CONTROL_MULTIPLIER = 0.82;
 export declare const BALL_RADIUS = 0.48;
+export declare const BALL_RESTITUTION = 0.9;
 export declare const KICK_RANGE = 2.05;
-export declare const FOOT_KICK_STRENGTH = 7.6;
-export declare const HEAD_KICK_STRENGTH = 8.8;
+export declare const FOOT_KICK_STRENGTH = 8.2;
+export declare const HAND_HIT_STRENGTH = 5.2;
+export declare const HEAD_KICK_STRENGTH = 9.8;
 export declare const KICK_COOLDOWN_MS = 320;
+export declare const HAND_COOLDOWN_MS = 420;
 export declare const HEAD_COOLDOWN_MS = 520;
+export declare const FOOT_PLAYER_STAMINA_DAMAGE = 12;
+export declare const HAND_PLAYER_STAMINA_DAMAGE = 20;
+export declare const HEAD_PLAYER_STAMINA_DAMAGE = 16;
+export declare const AIRBORNE_HEAD_STAMINA_DAMAGE_BONUS = 6;
 export declare const BODY_BUMP_RANGE = 1.18;
 export declare const BODY_BUMP_MIN_SPEED = 2.25;
-export declare const BODY_BUMP_STRENGTH = 4.9;
+export declare const BODY_BUMP_STRENGTH = 1.75;
 export declare const BODY_BUMP_COOLDOWN_MS = 140;
 export type TeamId = 0 | 1;
 export type PlayerRole = "player" | "spectator";
-export type KickKind = "left" | "right" | "head" | "body";
-export type WeatherKind = "snow";
+export type KickKind = "left" | "hand" | "head" | "body" | "jump";
+export type WeatherKind = "clear" | "dawn" | "rain" | "snow";
 export type HazardType = "puddle" | "slush" | "snowbank";
 export type AudioEventKind = "roster" | "kick" | "goal" | "countdown";
 export type RosterAudioChange = "join" | "leave" | "spectator";
@@ -42,6 +63,8 @@ export interface InputState {
     kickLeft: number;
     kickRight: number;
     head: number;
+    jump: number;
+    sprint: boolean;
     yaw: number;
 }
 export interface PlayerSnapshot {
@@ -54,12 +77,18 @@ export interface PlayerSnapshot {
     position: Vec3;
     velocity: Vec3;
     yaw: number;
+    stamina: number;
+    sprinting: boolean;
+    airborne: boolean;
+    exhausted: boolean;
+    grounded: boolean;
     lastAction: KickKind | null;
     lastActionAt: number;
 }
 export interface BallSnapshot {
     position: Vec3;
     velocity: Vec3;
+    variant: number;
 }
 export interface HazardSnapshot {
     id: string;
@@ -74,6 +103,7 @@ export interface WeatherSnapshot {
     intensity: number;
     wind: Vec3;
     hazards: HazardSnapshot[];
+    nextChangeInMs: number;
 }
 export interface ScoreState {
     blue: number;
@@ -122,6 +152,7 @@ export interface JoinAccepted {
 export interface ServerState {
     version: string;
     serverTime: number;
+    dayTimeSeconds: number;
     tick: number;
     players: PlayerSnapshot[];
     ball: BallSnapshot;

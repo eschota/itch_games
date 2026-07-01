@@ -1,0 +1,97 @@
+{
+  "version": "v0.0.011",
+  "mode": "free3d-1k-glb-vertex-color-optimized",
+  "texturePolicy": "Textures are baked or approximated into COLOR_0; runtime materials use vertex colors.",
+  "assets": [
+    {
+      "index": 0,
+      "guid": "6493379",
+      "title": "Sleek Black Soccer Ball model pack",
+      "src": "/assets/balls/free3d/01-6493379-vertex.glb",
+      "source": "https://free3d.online/model/6493379-sleek-black-soccer-ball-model-pack",
+      "lod": "1k",
+      "format": "glb"
+    },
+    {
+      "index": 1,
+      "guid": "6493403",
+      "title": "Camouflage Soccer Ball model pack",
+      "src": "/assets/balls/free3d/02-6493403-vertex.glb",
+      "source": "https://free3d.online/model/6493403-camouflage-soccer-ball-model-pack",
+      "lod": "1k",
+      "format": "glb"
+    },
+    {
+      "index": 2,
+      "guid": "6493457",
+      "title": "Textured Soccer Ball model pack",
+      "src": "/assets/balls/free3d/03-6493457-vertex.glb",
+      "source": "https://free3d.online/model/6493457-textured-soccer-ball-model-pack",
+      "lod": "1k",
+      "format": "glb"
+    },
+    {
+      "index": 3,
+      "guid": "6493239",
+      "title": "Pink Gradient Soccer Ball model pack",
+      "src": "/assets/balls/free3d/04-6493239-vertex.glb",
+      "source": "https://free3d.online/model/6493239-pink-gradient-soccer-ball-model-pack",
+      "lod": "1k",
+      "format": "glb"
+    },
+    {
+      "index": 4,
+      "guid": "6493488",
+      "title": "Red and White Soccer Ball model pack",
+      "src": "/assets/balls/free3d/05-6493488-vertex.glb",
+      "source": "https://free3d.online/model/6493488-red-and-white-soccer-ball-model-pack",
+      "lod": "1k",
+      "format": "glb"
+    },
+    {
+      "index": 5,
+      "guid": "6493371",
+      "title": "Vibrant Soccer Ball model pack",
+      "src": "/assets/balls/free3d/06-6493371-vertex.glb",
+      "source": "https://free3d.online/model/6493371-vibrant-soccer-ball-model-pack",
+      "lod": "1k",
+      "format": "glb"
+    },
+    {
+      "index": 6,
+      "guid": "6493256",
+      "title": "Golden Soccer Ball model pack",
+      "src": "/assets/balls/free3d/07-6493256-vertex.glb",
+      "source": "https://free3d.online/model/6493256-golden-soccer-ball-model-pack",
+      "lod": "1k",
+      "format": "glb"
+    },
+    {
+      "index": 7,
+      "guid": "6493342",
+      "title": "Stylized Leather Soccer Ball model pack",
+      "src": "/assets/balls/free3d/08-6493342-vertex.glb",
+      "source": "https://free3d.online/model/6493342-stylized-leather-soccer-ball-model-pack",
+      "lod": "1k",
+      "format": "glb"
+    },
+    {
+      "index": 8,
+      "guid": "6493507",
+      "title": "Neon Green Soccer Ball model pack",
+      "src": "/assets/balls/free3d/09-6493507-vertex.glb",
+      "source": "https://free3d.online/model/6493507-neon-green-soccer-ball-model-pack",
+      "lod": "1k",
+      "format": "glb"
+    },
+    {
+      "index": 9,
+      "guid": "6493481",
+      "title": "Blue Soccer Ball model pack",
+      "src": "/assets/balls/free3d/10-6493481-vertex.glb",
+      "source": "https://free3d.online/model/6493481-blue-soccer-ball-model-pack",
+      "lod": "1k",
+      "format": "glb"
+    }
+  ]
+}

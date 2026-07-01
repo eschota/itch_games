@@ -54,9 +54,10 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
   kick/body contacts, or goal/reset behavior is ready.
 - Keep the itch.io package static. The zip contains the built client only; live
   multiplayer requires a separately deployed HTTPS/WebSocket server.
-- Production uses `/unsoccer/socket/` as the WebSocket proxy path. Do not
-  reintroduce geckos.io as a required production dependency on the Qwertystock
-  host; its native `node-datachannel` addon is not compatible with that target.
+- Production uses `/unsoccer/socket/` as the WebSocket proxy path with the
+  server's built-in Node `http`/`net`/`crypto` handshake and frame handling.
+  Do not reintroduce geckos.io, `ws`, or native `node-datachannel` as required
+  production transport dependencies on the Qwertystock host.
 - Treat `index.html` as a UI Designer-owned public surface for catalog
   continuity, prototype status, itch.io page direction, and safe local-server
   presentation. It must never expose a directory listing.

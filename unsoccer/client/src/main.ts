@@ -735,14 +735,23 @@ function connect() {
 
 function connectWebSocket(name: string) {
   transportMode = "websocket";
-  channel = new WebSocketNetworkChannel(webSocketUrl());
+  const wsChannel = new WebSocketNetworkChannel(webSocketUrl());
+  channel = wsChannel;
   const fallbackTimer = window.setTimeout(() => {
-    if (!connected) void connectHttp(name, "websocket-timeout");
+    if (!connected && transportMode === "websocket" && channel === wsChannel) {
+      wsChannel.close();
+      channel = null;
+      void connectHttp(name, "websocket-timeout");
+    }
   }, 1800);
-  channel.onConnect((error) => {
-    if (transportMode !== "websocket") return;
+  wsChannel.onConnect((error) => {
+    if (transportMode !== "websocket" || channel !== wsChannel) {
+      wsChannel.close();
+      return;
+    }
     if (error) {
       window.clearTimeout(fallbackTimer);
+      channel = null;
       void connectHttp(name, error.message);
       console.warn("unsoccer connection failed", error.message);
       return;
@@ -752,12 +761,13 @@ function connectWebSocket(name: string) {
     document.documentElement.dataset.transport = "websocket";
     audio.playConnection(true);
     statusEl.textContent = "\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u043e. WASD - \u0434\u0432\u0438\u0436\u0435\u043d\u0438\u0435, \u041b\u041a\u041c/\u041f\u041a\u041c - \u0443\u0434\u0430\u0440 \u043d\u043e\u0433\u043e\u0439, \u043a\u043e\u043b\u0435\u0441\u043e - \u0443\u0434\u0430\u0440 \u0433\u043e\u043b\u043e\u0432\u043e\u0439.";
-    channel?.emit("join", { name });
+    wsChannel.emit("join", { name });
   });
-  channel.onDisconnect(() => {
-    if (transportMode !== "websocket") return;
+  wsChannel.onDisconnect(() => {
+    if (transportMode !== "websocket" || channel !== wsChannel) return;
     connected = false;
     transportMode = "none";
+    channel = null;
     document.documentElement.dataset.transport = "none";
     audio.playConnection(false);
     audioObservedPlayers.clear();
@@ -765,13 +775,13 @@ function connectWebSocket(name: string) {
     audioCountdownSecond = null;
     statusEl.textContent = "\u041e\u0442\u043a\u043b\u044e\u0447\u0435\u043d\u043e. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0438\u0433\u0440\u043e\u0432\u043e\u0439 \u0441\u0435\u0440\u0432\u0435\u0440.";
   });
-  channel.on("joined", (data) => {
+  wsChannel.on("joined", (data) => {
     acceptJoin(data as JoinAccepted);
   });
-  channel.on("server-full", () => {
+  wsChannel.on("server-full", () => {
     statusEl.textContent = "\u0421\u0435\u0440\u0432\u0435\u0440 \u0437\u0430\u043f\u043e\u043b\u043d\u0435\u043d.";
   });
-  channel.on("state", (data) => {
+  wsChannel.on("state", (data) => {
     latestState = data as ServerState;
     observeAudioState(latestState);
   });

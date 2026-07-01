@@ -1388,7 +1388,7 @@ async function deployHealthSnapshot() {
   const dependencyCheck = await execFileReport(process.execPath, [
     "--input-type=module",
     "-e",
-    "await import('@dimforge/rapier3d-compat'); await import('ws'); await import('@itch-games/unsoccer-shared'); console.log('unsoccer required dependencies ok')",
+    "await import('@dimforge/rapier3d-compat'); await import('@itch-games/unsoccer-shared'); console.log('unsoccer required dependencies ok')",
   ], 5000);
   const hasBuiltHtml = /(?:src|href)="\.\/assets\/index-[^"]+\.(?:js|css)"/.test(distHtml);
   const hasJsAsset = distAssets.some((asset) => asset.exists && /\.js$/i.test(asset.path));

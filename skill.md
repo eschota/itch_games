@@ -211,8 +211,8 @@ Use this root skill when changing, packaging, validating, or publishing the
 
 ## Current Behavior
 
-- Current game release: `v0.0.011`.
-- `unsoccer` current prototype release: `v0.0.011`.
+- Current game release: `v0.0.014`.
+- `unsoccer` current prototype release: `v0.0.014`.
 - `unsoccer` uses a headless authoritative Node server with Rapier3D physics,
   plain WebSocket transport, and HTTP polling fallback; the itch package is
   static client-only and needs the live game server for multiplayer.
@@ -275,6 +275,25 @@ Use this root skill when changing, packaging, validating, or publishing the
   physics, thicker post/crossbar rebounds, local-only goal net cloth ripples,
   and 10 Free3D Online LowPoly 1k soccer-ball GLB sources baked/exported as
   local textureless vertex-color runtime assets.
+- `unsoccer` v0.0.012 is the local lighting/weather correction preview: it
+  keeps the current scene size, makes server time drive lighting under
+  `qaTime=0`, limits dark hours to 20:00-04:00, hides the old sun-path debug
+  line, makes clear/dawn dry and bright, and weights weather changes toward
+  clear/dawn so rain is rare. It also upgrades the local-only goal net visual
+  to a Verlet cloth grid, keeps the active Free3D/vertex-color ball on the
+  field while hiding that variant from the sideline rack, aligns visible goal
+  posts with the thicker server colliders, and extends acceptance coverage for
+  post rebounds plus bouncier heading physics.
+- `unsoccer` v0.0.013 replaces the primary primitive player body with a local
+  Free3D Online `6300420` rigged/skinned GLB character optimized from 10.73 MB
+  to 2.09 MB with `KHR_mesh_quantization`. The procedural footballer remains
+  only as a loading/error fallback while the runtime exposes
+  `data-player-rig="free3d-skinned-mixamo-character"` when the real model is
+  attached.
+- `unsoccer` v0.0.014 replaces the white all-animation character runtime with
+  a different textured Free3D `6299851` split pipeline: `rigged_unity.glb`,
+  WebP albedo/normal/ORM maps, and separate FBX `idle`, `walk`, `run`, and
+  `jump` clips selected by player speed/airborne state.
 - `v0.0.006` adds procedural Web Audio feedback and exposes
   `window.orbitalCourierAudio` plus `orbital-courier:audio-event` so future
   network code can replicate semantic sound events instead of audio files.

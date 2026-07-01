@@ -176,8 +176,8 @@ Use this file for work inside `/itch_games`.
 
 ## Versioning
 
-- Current release: `v0.0.011`.
-- `unsoccer` release: `v0.0.011`.
+- Current release: `v0.0.014`.
+- `unsoccer` release: `v0.0.014`.
 - Game releases start at `v0.0.001` and every behavior change increments the
   version.
 - The visible bottom-left badge, `package.json.gameVersion`, README, and skill
@@ -223,3 +223,19 @@ Use this file for work inside `/itch_games`.
     `ui_designer/public_pages/unsoccer-ui-final-local-gate-v0.0.010-rerun.json`.
 13. Confirm `/unsoccer/` never exposes a directory listing on local or
     production static hosts.
+14. For UnSoccer v0.0.012 local QA, confirm browser datasets show
+    `data-daylight="1.000"` during clear daytime, `data-dark-hours="20:00-04:00"`,
+    `data-weather-particles-visible="false"`, `data-sun-path-visible="false"`,
+    `data-active-ball-model="free3d-vertex-color-glb"`,
+    `data-goal-net-mode="local-verlet-cloth-no-network"`, and
+    `data-goal-post-radius="0.38"`.
+15. For UnSoccer v0.0.013 character QA, confirm browser datasets show
+    `data-player-rig="free3d-skinned-mixamo-character"`,
+    `data-player-rig-asset="6300420"`, `data-player-rig-clip-count="1"`, and
+    a visible skinned footballer instead of the primitive Capsule/Sphere/Box
+    fallback.
+16. For UnSoccer v0.0.014 character QA, confirm browser datasets show
+    `data-player-rig-asset="6299851"`,
+    `data-player-rig-mode="free3d-1k-skinned-glb-webp-textures-fbx-clips"`,
+    `data-player-rig-textures="3"`, `data-player-rig-clip-count="4"`, and
+    `data-player-rig-action` switches among `idle`, `walk`, `run`, and `jump`.

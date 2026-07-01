@@ -22,7 +22,7 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 
 ## Rules
 
-- Current release: `v0.0.011`.
+- Current release: `v0.0.014`.
 - Keep client and server separated; browser bundles must not import server-only
   modules.
 - The server is authoritative for room assignment, teams, player physics, ball
@@ -85,6 +85,25 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
   local-only visual cloth ripples for goal nets, and loads 10 local Free3D
   Online LowPoly 1k soccer-ball GLBs optimized to textureless vertex colors for
   the sideline ball rack.
+- `v0.0.012` is the local lighting/weather correction build. It keeps the
+  current scene size, uses server day time even when `qaTime=0` is present,
+  makes 04:00-20:00 the bright daytime window, limits dark hours to 20:00-04:00,
+  removes the old visible sun-path debug line from gameplay, prevents clear
+  weather from showing precipitation particles, and makes rain/snow rare in
+  the 60-120s weather rotation. It also replaces the simple net ripple with a
+  client-only Verlet cloth grid, shows the active Free3D/vertex-color GLB ball
+  on the field while removing that variant from the sideline rack, aligns the
+  visible goal posts with the thicker server colliders, and acceptance-tests
+  post rebounds plus the bouncier ball tuning for headers.
+- `v0.0.013` is the rigged-character correction build. Runtime players use the
+  local Free3D Online `6300420` skinned GLB, optimized from 10.73 MB raw to
+  2.09 MB runtime with `KHR_mesh_quantization`, via `GLTFLoader`,
+  `SkeletonUtils.clone`, and per-player `AnimationMixer`. The primitive
+  procedural footballer is now only a loading/error fallback.
+- `v0.0.014` is the textured-character correction build. Runtime players use
+  the different Free3D `6299851/rigged_unity.glb` with WebP albedo/normal/ORM
+  maps applied at load time and separate FBX clips for `idle`, `walk`, `run`,
+  and `jump`, avoiding the previous single 44s `all_animations` clip autoplay.
 - `tools/unsoccer_acceptance.mjs` derives the expected version from
   `package.json.games.unsoccer.version`; keep it that way so version bumps do
   not require multiple acceptance edits.
@@ -119,5 +138,7 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
   format, LOD, relative path, bytes, and download timestamp.
 - Soccer-ball sources live under `assets/models/balls/free3d/raw`; optimized
   runtime GLBs and `roster.json` live under `client/public/assets/balls/free3d`.
-- Free3D character candidates remain in `assets/models/characters/roster.json`
-  until per-model rig/animation provenance is confirmed.
+- Free3D character runtime provenance lives in
+  `assets/models/characters/roster.json`,
+  `assets/licenses/free3d-provenance.json`, and
+  `client/public/assets/characters/free3d/roster.json`.

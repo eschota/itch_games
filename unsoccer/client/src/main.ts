@@ -1,5 +1,7 @@
 import * as THREE from "three";
+import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import {
   BALL_RADIUS,
   DAY_CYCLE_SECONDS,
@@ -214,8 +216,8 @@ const graphicsStateEl = requireElement<HTMLElement>("#graphics-state");
 const networkStateEl = requireElement<HTMLElement>("#network-state");
 const testSoundButton = requireElement<HTMLButtonElement>("#test-sound-button");
 const versionBadge = requireElement<HTMLElement>("#version-badge");
-const ART_PASS_VERSION = "v0.0.011";
-const BUILD_WEIGHT_LABEL = "1.31 MB";
+const ART_PASS_VERSION = "v0.0.014";
+const BUILD_WEIGHT_LABEL = "3.26 MB";
 
 versionBadge.textContent = `${GAME_VERSION} / ${BUILD_WEIGHT_LABEL}`;
 document.documentElement.dataset.gameVersion = GAME_VERSION;
@@ -276,30 +278,27 @@ sun.shadow.camera.bottom = -28;
 scene.add(sun);
 const sunMesh = new THREE.Mesh(
   new THREE.SphereGeometry(1.25, 24, 16),
-  new THREE.MeshBasicMaterial({ color: 0xfff1d0, depthTest: false, depthWrite: false, toneMapped: false })
+  new THREE.MeshBasicMaterial({ color: 0xfff1d0, depthTest: true, depthWrite: false, toneMapped: false })
 );
-sunMesh.renderOrder = 30;
 const sunGlowMaterial = new THREE.MeshBasicMaterial({
   color: 0xfff0b8,
   transparent: true,
-  opacity: 0.46,
+  opacity: 0.18,
   blending: THREE.AdditiveBlending,
-  depthTest: false,
+  depthTest: true,
   depthWrite: false,
   toneMapped: false
 });
 const sunGlow = new THREE.Mesh(new THREE.SphereGeometry(2.85, 32, 16), sunGlowMaterial);
-sunGlow.renderOrder = 29;
 const moonMaterial = new THREE.MeshBasicMaterial({
   color: 0xbfd6ff,
   transparent: true,
   opacity: 0.82,
-  depthTest: false,
+  depthTest: true,
   depthWrite: false,
   toneMapped: false
 });
 const moonMesh = new THREE.Mesh(new THREE.SphereGeometry(0.82, 20, 12), moonMaterial);
-moonMesh.renderOrder = 28;
 scene.add(camera, sunGlow, sunMesh, moonMesh);
 const sunPathMaterial = new THREE.LineBasicMaterial({ color: 0xfff0b8, transparent: true, opacity: 0.26 });
 const sunPath = new THREE.LineLoop(
@@ -312,6 +311,7 @@ const sunPath = new THREE.LineLoop(
   sunPathMaterial
 );
 sunPath.position.y = 0;
+sunPath.visible = false;
 scene.add(sunPath);
 
 const rimLight = new THREE.DirectionalLight(0x8bbcff, 0.55);
@@ -361,7 +361,19 @@ scene.add(fieldGroup);
 const movingCars: MovingCar[] = [];
 const goalNets: GoalNetVisual[] = [];
 const sidelineBalls: THREE.Group[] = [];
+const activeFree3dBalls: THREE.Object3D[] = [];
+const activeFree3dBallRoot = new THREE.Group();
 const free3dBallLoader = new GLTFLoader();
+const free3dCharacterLoader = new GLTFLoader();
+const transparentFbxTexture =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=";
+const free3dCharacterAnimationManager = new THREE.LoadingManager();
+free3dCharacterAnimationManager.setURLModifier((url) => {
+  if (/\.(png|jpe?g|webp|bmp|tga)(\?.*)?$/i.test(url)) return transparentFbxTexture;
+  return url;
+});
+const free3dCharacterAnimationLoader = new FBXLoader(free3dCharacterAnimationManager);
+const free3dTextureLoader = new THREE.TextureLoader();
 const free3dBallMaterial = new THREE.MeshStandardMaterial({
   color: 0xffffff,
   roughness: 0.56,
@@ -391,6 +403,9 @@ const ballAuraMaterial = new THREE.MeshBasicMaterial({
 });
 const ballAura = new THREE.Mesh(new THREE.SphereGeometry(BALL_RADIUS * 1.52, 32, 18), ballAuraMaterial);
 scene.add(ballAura);
+activeFree3dBallRoot.visible = false;
+scene.add(activeFree3dBallRoot);
+let currentActiveBallVariant = 0;
 
 const ACTION_TELEGRAPH: Record<KickKind, {
   color: number;
@@ -918,6 +933,47 @@ interface Free3dBallRoster {
   assets: Free3dBallAsset[];
 }
 
+interface Free3dCharacterAsset {
+  guid: string;
+  title: string;
+  src: string;
+  mode: string;
+  heightMeters: number;
+  scale?: number;
+  textures?: {
+    albedo?: string;
+    normal?: string;
+    orm?: string;
+  };
+  clips?: {
+    idle?: string;
+    walk?: string;
+    run?: string;
+    jump?: string;
+  };
+}
+
+interface Free3dCharacterRoster {
+  version: string;
+  mode: string;
+  assets: Free3dCharacterAsset[];
+}
+
+interface LoadedFree3dCharacter {
+  asset: Free3dCharacterAsset;
+  scene: THREE.Object3D;
+  clips: Record<string, THREE.AnimationClip>;
+  textures: {
+    albedo?: THREE.Texture;
+    normal?: THREE.Texture;
+    orm?: THREE.Texture;
+  };
+}
+
+let loadedFree3dCharacter: LoadedFree3dCharacter | null = null;
+let free3dCharacterPromise: Promise<LoadedFree3dCharacter | null> | null = null;
+let free3dCharacterAttachCount = 0;
+
 function resolveClientAsset(src: string): string {
   return new URL(src.replace(/^\/+/, ""), window.location.href).toString();
 }
@@ -952,26 +1008,196 @@ function loadFree3dBall(asset: Free3dBallAsset, radius: number): Promise<THREE.O
   });
 }
 
+function prepareFree3dCharacterScene(model: THREE.Object3D, asset: Free3dCharacterAsset): THREE.Object3D {
+  const box = new THREE.Box3().setFromObject(model);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+  model.position.sub(center);
+  model.position.y += size.y / 2;
+  const height = Math.max(size.y, 0.001);
+  model.scale.setScalar((asset.scale || 1) * PLAYER_HEIGHT / height);
+  model.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return;
+    child.castShadow = true;
+    child.receiveShadow = true;
+    const material = child.material;
+    if (Array.isArray(material)) {
+      child.material = material.map((entry) => entry.clone());
+    } else if (material) {
+      child.material = material.clone();
+    }
+    if (child.material instanceof THREE.MeshStandardMaterial) {
+      child.material.roughness = Math.max(child.material.roughness, 0.52);
+      child.material.metalness *= 0.25;
+    }
+  });
+  return model;
+}
+
+function loadTexture(src: string | undefined, colorSpace: THREE.ColorSpace = THREE.NoColorSpace): Promise<THREE.Texture | undefined> {
+  if (!src) return Promise.resolve(undefined);
+  return new Promise((resolve, reject) => {
+    free3dTextureLoader.load(
+      resolveClientAsset(src),
+      (texture) => {
+        texture.colorSpace = colorSpace;
+        texture.flipY = false;
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        resolve(texture);
+      },
+      undefined,
+      reject
+    );
+  });
+}
+
+function loadCharacterClip(name: string, src: string | undefined): Promise<[string, THREE.AnimationClip] | null> {
+  if (!src) return Promise.resolve(null);
+  return new Promise((resolve, reject) => {
+    free3dCharacterAnimationLoader.load(
+      resolveClientAsset(src),
+      (group) => {
+        const clip = group.animations[0] || null;
+        if (!clip) {
+          resolve(null);
+          return;
+        }
+        clip.name = name;
+        resolve([name, clip]);
+      },
+      undefined,
+      reject
+    );
+  });
+}
+
+async function loadOptionalCharacterClip(name: string, src: string | undefined): Promise<[string, THREE.AnimationClip] | null> {
+  try {
+    return await loadCharacterClip(name, src);
+  } catch (error) {
+    console.warn(`Free3D character ${name} clip failed`, error);
+    return null;
+  }
+}
+
+function loadFree3dCharacter(): Promise<LoadedFree3dCharacter | null> {
+  if (loadedFree3dCharacter) return Promise.resolve(loadedFree3dCharacter);
+  if (free3dCharacterPromise) return free3dCharacterPromise;
+  free3dCharacterPromise = (async () => {
+    try {
+      const response = await fetch(resolveClientAsset("assets/characters/free3d/roster.json"), { cache: "no-cache" });
+      if (!response.ok) throw new Error(`Free3D character roster HTTP ${response.status}`);
+      const roster = await response.json() as Free3dCharacterRoster;
+      const asset = roster.assets[0];
+      if (!asset) throw new Error("Free3D character roster is empty");
+      const [gltf, albedo, normal, orm, ...clipEntries] = await Promise.all([
+        new Promise<{ scene: THREE.Object3D; animations: THREE.AnimationClip[] }>((resolve, reject) => {
+          free3dCharacterLoader.load(
+            resolveClientAsset(asset.src),
+            resolve,
+            undefined,
+            reject
+          );
+        }),
+        loadTexture(asset.textures?.albedo, THREE.SRGBColorSpace),
+        loadTexture(asset.textures?.normal),
+        loadTexture(asset.textures?.orm),
+        loadOptionalCharacterClip("idle", asset.clips?.idle),
+        loadOptionalCharacterClip("walk", asset.clips?.walk),
+        loadOptionalCharacterClip("run", asset.clips?.run),
+        loadOptionalCharacterClip("jump", asset.clips?.jump)
+      ]);
+      const clips = Object.fromEntries(
+        clipEntries.filter((entry): entry is [string, THREE.AnimationClip] => Boolean(entry))
+      );
+      for (const clip of gltf.animations) {
+        if (!clips.idle) clips.idle = clip;
+      }
+      const loaded: LoadedFree3dCharacter = {
+        asset,
+        scene: prepareFree3dCharacterScene(gltf.scene, asset),
+        clips,
+        textures: { albedo, normal, orm }
+      };
+      loadedFree3dCharacter = loaded;
+      delete document.documentElement.dataset.playerRigError;
+      document.documentElement.dataset.playerRigAsset = asset.guid;
+      document.documentElement.dataset.playerRigMode = roster.mode;
+      document.documentElement.dataset.playerRigClipCount = String(Object.keys(loaded.clips).length);
+      document.documentElement.dataset.playerRigTextures = String(
+        Number(Boolean(albedo)) + Number(Boolean(normal)) + Number(Boolean(orm))
+      );
+      return loaded;
+    } catch (error) {
+      document.documentElement.dataset.playerRigMode = "procedural-fallback";
+      document.documentElement.dataset.playerRigError = error instanceof Error
+        ? `${error.name}: ${error.message}`
+        : String(error);
+      console.warn("Free3D character hydration failed", error);
+      return null;
+    }
+  })();
+  return free3dCharacterPromise;
+}
+
 async function hydrateFree3dSidelineBalls(): Promise<void> {
   try {
-    const response = await fetch(resolveClientAsset("assets/balls/free3d/roster.json"), { cache: "force-cache" });
+    const response = await fetch(resolveClientAsset("assets/balls/free3d/roster.json"), { cache: "no-cache" });
     if (!response.ok) throw new Error(`Free3D roster HTTP ${response.status}`);
     const roster = await response.json() as Free3dBallRoster;
     await Promise.all(roster.assets.slice(0, sidelineBalls.length).map(async (asset) => {
       const target = sidelineBalls[asset.index];
       if (!target) return;
       const model = await loadFree3dBall(asset, BALL_RADIUS * 0.86);
+      const activeModel = model.clone(true);
+      activeModel.visible = false;
       target.clear();
       target.add(model);
+      activeFree3dBalls[asset.index] = activeModel;
+      activeFree3dBallRoot.add(activeModel);
       target.userData.free3dGuid = asset.guid;
       target.userData.free3dTitle = asset.title;
     }));
     document.documentElement.dataset.ballRack = `${roster.assets.length}-free3d-vertex-color-glb`;
     document.documentElement.dataset.free3dBallMode = roster.mode;
+    updateSidelineBallVisibility(currentActiveBallVariant);
+    updateActiveBallModel(currentActiveBallVariant);
   } catch (error) {
     document.documentElement.dataset.free3dBallMode = "fallback-procedural";
     console.warn("Free3D sideline ball hydration failed", error);
   }
+}
+
+function activeBallIndex(variant: number): number {
+  return ((variant % BALL_VARIANT_COLORS.length) + BALL_VARIANT_COLORS.length) % BALL_VARIANT_COLORS.length;
+}
+
+function updateSidelineBallVisibility(activeVariant: number): void {
+  const activeIndex = activeBallIndex(activeVariant);
+  let visibleCount = 0;
+  for (let index = 0; index < sidelineBalls.length; index += 1) {
+    const ball = sidelineBalls[index];
+    const visible = index !== activeIndex;
+    ball.visible = visible;
+    if (visible) visibleCount += 1;
+  }
+  document.documentElement.dataset.ballRackVisible = String(visibleCount);
+  document.documentElement.dataset.ballRackActiveRemoved = String(activeIndex);
+}
+
+function updateActiveBallModel(activeVariant: number): void {
+  const activeIndex = activeBallIndex(activeVariant);
+  const activeModel = activeFree3dBalls[activeIndex] || null;
+  for (let index = 0; index < activeFree3dBalls.length; index += 1) {
+    const model = activeFree3dBalls[index];
+    if (model) model.visible = model === activeModel;
+  }
+  activeFree3dBallRoot.visible = Boolean(activeModel);
+  ballMesh.visible = !activeModel;
+  document.documentElement.dataset.activeBallModel = activeModel ? "free3d-vertex-color-glb" : "procedural-fallback";
 }
 
 function buildSidelineBalls(root: THREE.Group): void {
@@ -985,6 +1211,8 @@ function buildSidelineBalls(root: THREE.Group): void {
     sidelineBalls.push(ball);
   }
   document.documentElement.dataset.ballRack = "10-vertex-color-free3d-candidates";
+  updateSidelineBallVisibility(currentActiveBallVariant);
+  updateActiveBallModel(currentActiveBallVariant);
   void hydrateFree3dSidelineBalls();
 }
 
@@ -1078,54 +1306,159 @@ function updateMovingCars(time: number, daylight: number): void {
 }
 
 class GoalNetVisual {
+  private readonly nodes: Array<{
+    position: THREE.Vector3;
+    previous: THREE.Vector3;
+    rest: THREE.Vector3;
+    fixed: boolean;
+  }> = [];
+  private readonly constraints: Array<{ a: number; b: number; restDistance: number }> = [];
+  private readonly segments: Array<[number, number]> = [];
   private readonly geometry: THREE.BufferGeometry;
   private readonly positions: Float32Array;
-  private readonly restPositions: Float32Array;
-  private pulse = 0;
+  private readonly widthSegments = 18;
+  private readonly heightSegments = 9;
 
   constructor(private readonly side: -1 | 1, root: THREE.Group) {
-    const points: THREE.Vector3[] = [];
-    const zFront = side * (FIELD_LENGTH / 2 + 0.12);
-    const zBack = side * (FIELD_LENGTH / 2 + GOAL_DEPTH);
-    const columns = 14;
-    const rows = 6;
-    for (let row = 0; row <= rows; row += 1) {
-      const y = row / rows * 2.2;
-      points.push(new THREE.Vector3(-GOAL_WIDTH / 2, y, zBack), new THREE.Vector3(GOAL_WIDTH / 2, y, zBack));
+    const zBack = side * (FIELD_LENGTH / 2 + GOAL_DEPTH - 0.18);
+    const topY = 2.2;
+    for (let row = 0; row <= this.heightSegments; row += 1) {
+      const rowT = row / this.heightSegments;
+      const y = rowT * topY;
+      for (let column = 0; column <= this.widthSegments; column += 1) {
+        const columnT = column / this.widthSegments;
+        const x = -GOAL_WIDTH / 2 + columnT * GOAL_WIDTH;
+        const rest = new THREE.Vector3(x, y, zBack);
+        const fixed = row === 0 || row === this.heightSegments || column === 0 || column === this.widthSegments;
+        this.nodes.push({
+          position: rest.clone(),
+          previous: rest.clone(),
+          rest,
+          fixed
+        });
+      }
     }
-    for (let column = 0; column <= columns; column += 1) {
-      const x = -GOAL_WIDTH / 2 + column / columns * GOAL_WIDTH;
-      points.push(new THREE.Vector3(x, 0, zBack), new THREE.Vector3(x, 2.2, zBack));
-      points.push(new THREE.Vector3(x, 2.2, zBack), new THREE.Vector3(x, 2.05, zFront));
-      points.push(new THREE.Vector3(x, 0, zBack), new THREE.Vector3(x, 0.05, zFront));
+    for (let row = 0; row <= this.heightSegments; row += 1) {
+      for (let column = 0; column <= this.widthSegments; column += 1) {
+        const index = this.nodeIndex(column, row);
+        if (column < this.widthSegments) this.addConstraint(index, this.nodeIndex(column + 1, row));
+        if (row < this.heightSegments) this.addConstraint(index, this.nodeIndex(column, row + 1));
+        if (column < this.widthSegments) this.segments.push([index, this.nodeIndex(column + 1, row)]);
+        if (row < this.heightSegments) this.segments.push([index, this.nodeIndex(column, row + 1)]);
+      }
     }
-    this.geometry = new THREE.BufferGeometry().setFromPoints(points);
-    this.positions = this.geometry.getAttribute("position").array as Float32Array;
-    this.restPositions = new Float32Array(this.positions);
+    this.positions = new Float32Array(this.segments.length * 2 * 3);
+    this.geometry = new THREE.BufferGeometry();
+    this.geometry.setAttribute("position", new THREE.BufferAttribute(this.positions, 3));
     const mesh = new THREE.LineSegments(
       this.geometry,
       new THREE.LineBasicMaterial({ color: 0xf7ffff, transparent: true, opacity: 0.46 })
     );
     mesh.name = `visual-cloth-net-${side < 0 ? "south" : "north"}`;
     root.add(mesh);
+    this.writeGeometry();
   }
 
   update(state: ServerState, time: number): void {
-    const ball = state.ball.position;
-    const targetZ = this.side * (FIELD_LENGTH / 2 + GOAL_DEPTH * 0.65);
-    const ballNear = Math.abs(ball.z - targetZ) < GOAL_DEPTH * 1.15 && Math.abs(ball.x) < GOAL_WIDTH / 2 + 1.2 && ball.y < 3;
-    if (ballNear) this.pulse = Math.max(this.pulse, THREE.MathUtils.clamp(Math.hypot(state.ball.velocity.x, state.ball.velocity.z) / 12, 0.18, 1));
-    this.pulse *= 0.91;
-    const base = this.geometry.getAttribute("position");
-    for (let index = 0; index < base.count; index += 1) {
-      const offset = index * 3;
-      const x = this.restPositions[offset];
-      const y = this.restPositions[offset + 1];
-      const zRest = this.restPositions[offset + 2];
-      const sag = Math.sin((x / GOAL_WIDTH + 0.5) * Math.PI) * (1 - Math.min(1, y / 2.3)) * 0.18;
-      this.positions[offset] = x;
-      this.positions[offset + 1] = y;
-      this.positions[offset + 2] = zRest + this.side * sag + Math.sin(time * 8 + x * 1.8 + y) * this.pulse * 0.18;
+    const breeze = Math.sin(time * 1.7 + this.side) * 0.004;
+    for (const node of this.nodes) {
+      if (node.fixed) {
+        node.position.copy(node.rest);
+        node.previous.copy(node.rest);
+        continue;
+      }
+      const velocity = node.position.clone().sub(node.previous).multiplyScalar(0.965);
+      node.previous.copy(node.position);
+      node.position.add(velocity);
+      node.position.y -= 0.012;
+      node.position.z += this.side * breeze;
+      node.position.lerp(node.rest, 0.026);
+    }
+
+    this.applyInfluence(
+      new THREE.Vector3(state.ball.position.x, state.ball.position.y, state.ball.position.z),
+      1.55,
+      THREE.MathUtils.clamp(Math.hypot(state.ball.velocity.x, state.ball.velocity.y, state.ball.velocity.z) / 10, 0.22, 1.4)
+    );
+    for (const player of state.players) {
+      this.applyInfluence(
+        new THREE.Vector3(player.position.x, player.position.y + PLAYER_HEIGHT * 0.2, player.position.z),
+        0.95,
+        THREE.MathUtils.clamp(Math.hypot(player.velocity.x, player.velocity.y, player.velocity.z) / 6, 0.08, 0.55)
+      );
+    }
+
+    for (let iteration = 0; iteration < 5; iteration += 1) this.solveConstraints();
+    for (const node of this.nodes) {
+      node.position.y = THREE.MathUtils.clamp(node.position.y, 0, 2.32);
+      node.position.x = THREE.MathUtils.clamp(node.position.x, -GOAL_WIDTH / 2 - 0.45, GOAL_WIDTH / 2 + 0.45);
+      const minZ = this.side * (FIELD_LENGTH / 2 + GOAL_DEPTH - 0.72);
+      const maxZ = this.side * (FIELD_LENGTH / 2 + GOAL_DEPTH + 0.84);
+      node.position.z = this.side > 0
+        ? THREE.MathUtils.clamp(node.position.z, minZ, maxZ)
+        : THREE.MathUtils.clamp(node.position.z, maxZ, minZ);
+    }
+    this.writeGeometry();
+  }
+
+  private nodeIndex(column: number, row: number): number {
+    return row * (this.widthSegments + 1) + column;
+  }
+
+  private addConstraint(a: number, b: number): void {
+    this.constraints.push({
+      a,
+      b,
+      restDistance: this.nodes[a].rest.distanceTo(this.nodes[b].rest)
+    });
+  }
+
+  private applyInfluence(center: THREE.Vector3, radius: number, strength: number): void {
+    const netZ = this.side * (FIELD_LENGTH / 2 + GOAL_DEPTH - 0.18);
+    if (Math.abs(center.z - netZ) > GOAL_DEPTH + radius || center.y > 3.1) return;
+    for (const node of this.nodes) {
+      if (node.fixed) continue;
+      const distance = node.position.distanceTo(center);
+      if (distance >= radius) continue;
+      const normal = node.position.clone().sub(center);
+      if (normal.lengthSq() < 0.0001) normal.set(0, 0, this.side);
+      normal.normalize();
+      const impulse = (radius - distance) * strength * 0.42;
+      node.position.addScaledVector(normal, impulse);
+      node.position.z += this.side * impulse * 0.7;
+    }
+  }
+
+  private solveConstraints(): void {
+    for (const constraint of this.constraints) {
+      const a = this.nodes[constraint.a];
+      const b = this.nodes[constraint.b];
+      const delta = b.position.clone().sub(a.position);
+      const distance = Math.max(delta.length(), 0.0001);
+      const correction = delta.multiplyScalar((distance - constraint.restDistance) / distance);
+      if (!a.fixed && !b.fixed) {
+        a.position.addScaledVector(correction, 0.5);
+        b.position.addScaledVector(correction, -0.5);
+      } else if (!a.fixed) {
+        a.position.add(correction);
+      } else if (!b.fixed) {
+        b.position.sub(correction);
+      }
+    }
+  }
+
+  private writeGeometry(): void {
+    let offset = 0;
+    for (const [a, b] of this.segments) {
+      const first = this.nodes[a].position;
+      const second = this.nodes[b].position;
+      this.positions[offset] = first.x;
+      this.positions[offset + 1] = first.y;
+      this.positions[offset + 2] = first.z;
+      this.positions[offset + 3] = second.x;
+      this.positions[offset + 4] = second.y;
+      this.positions[offset + 5] = second.z;
+      offset += 6;
     }
     this.geometry.attributes.position.needsUpdate = true;
   }
@@ -1558,29 +1891,44 @@ function addBench(root: THREE.Group, x: number, z: number, rotation: number): vo
 function addGoal(root: THREE.Group, side: -1 | 1) {
   const material = new THREE.MeshStandardMaterial({ color: side < 0 ? 0x58a8ff : 0xff9d42, roughness: 0.45 });
   const z = side * (FIELD_LENGTH / 2);
-  const postGeometry = new THREE.CylinderGeometry(0.18, 0.22, 2.22, 16);
-  const barGeometry = new THREE.CylinderGeometry(0.18, 0.18, GOAL_WIDTH + 0.45, 16);
+  const postGeometry = new THREE.CylinderGeometry(0.34, 0.38, 2.28, 20);
+  const barGeometry = new THREE.CylinderGeometry(0.32, 0.32, GOAL_WIDTH + 0.76, 20);
+  const depthBarGeometry = new THREE.CylinderGeometry(0.16, 0.16, GOAL_DEPTH, 14);
   [-GOAL_WIDTH / 2, GOAL_WIDTH / 2].forEach((x) => {
     const post = new THREE.Mesh(postGeometry, material);
     post.position.set(x, 1.05, z);
     post.castShadow = true;
     root.add(post);
+    const topRail = new THREE.Mesh(depthBarGeometry, material);
+    topRail.rotation.x = Math.PI / 2;
+    topRail.position.set(x, 2.16, z + side * GOAL_DEPTH * 0.5);
+    topRail.castShadow = true;
+    root.add(topRail);
   });
   const bar = new THREE.Mesh(barGeometry, material);
   bar.rotation.z = Math.PI / 2;
   bar.position.set(0, 2.16, z);
   bar.castShadow = true;
   root.add(bar);
-  const backBar = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, GOAL_WIDTH, 10), material);
+  const backBar = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, GOAL_WIDTH, 14), material);
   backBar.rotation.z = Math.PI / 2;
   backBar.position.set(0, 0.08, z + side * GOAL_DEPTH);
   root.add(backBar);
+  const backTopBar = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, GOAL_WIDTH, 14), material);
+  backTopBar.rotation.z = Math.PI / 2;
+  backTopBar.position.set(0, 2.16, z + side * GOAL_DEPTH);
+  backTopBar.castShadow = true;
+  root.add(backTopBar);
   goalNets.push(new GoalNetVisual(side, root));
+  document.documentElement.dataset.goalPostRadius = "0.38";
+  document.documentElement.dataset.goalNetMode = "local-verlet-cloth-no-network";
+  document.documentElement.dataset.goalNetCount = String(goalNets.length);
 }
 
 class PlayerVisual {
   readonly root = new THREE.Group();
   private readonly rig = new THREE.Group();
+  private readonly characterRoot = new THREE.Group();
   private readonly body: THREE.Mesh;
   private readonly chest: THREE.Mesh;
   private readonly shorts: THREE.Mesh;
@@ -1598,6 +1946,12 @@ class PlayerVisual {
   private readonly ring: THREE.Mesh;
   private readonly contactFlash: THREE.Mesh;
   private readonly contactFlashMaterial: THREE.MeshBasicMaterial;
+  private characterModel: THREE.Object3D | null = null;
+  private characterMixer: THREE.AnimationMixer | null = null;
+  private readonly characterActions = new Map<string, THREE.AnimationAction>();
+  private activeCharacterAction = "";
+  private characterLastUpdateTime = 0;
+  private characterReady = false;
 
   constructor(private readonly snapshot: PlayerSnapshot) {
     const color = teamColor(snapshot.team);
@@ -1608,8 +1962,10 @@ class PlayerVisual {
     const skin = new THREE.MeshStandardMaterial({ color: 0xf1c7a7, roughness: 0.55 });
     const hair = new THREE.MeshStandardMaterial({ color: variant === 1 ? 0x3a2419 : variant === 2 ? 0xd6b46b : 0x15100c, roughness: 0.64 });
     const boots = new THREE.MeshStandardMaterial({ color: variant === 3 ? 0xf5f1d0 : 0x111111, roughness: 0.46, metalness: 0.08 });
-
-    this.root.add(this.rig);
+    this.rig.name = "procedural-player-fallback";
+    this.characterRoot.name = "free3d-skinned-player";
+    this.characterRoot.visible = false;
+    this.root.add(this.rig, this.characterRoot);
 
     this.shadowMaterial = new THREE.MeshBasicMaterial({
       color: 0x020807,
@@ -1689,13 +2045,78 @@ class PlayerVisual {
       toneMapped: false
     });
     this.contactFlash = new THREE.Mesh(new THREE.SphereGeometry(0.18, 14, 8), this.contactFlashMaterial);
-    this.rig.add(this.contactFlash);
+    this.root.add(this.contactFlash);
 
     this.label = makeLabel(snapshot.name);
     this.label.position.y = 2.15;
     this.root.add(this.label);
     scene.add(this.root);
+    void this.attachCharacterModel();
     this.update(snapshot, 0);
+  }
+
+  private async attachCharacterModel(): Promise<void> {
+    const loaded = await loadFree3dCharacter();
+    if (!loaded || this.characterModel) return;
+    const model = SkeletonUtils.clone(loaded.scene) as THREE.Object3D;
+    const color = new THREE.Color(teamColor(this.snapshot.team));
+    model.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      child.castShadow = true;
+      child.receiveShadow = true;
+      const sourceMaterial = child.material;
+      if (Array.isArray(sourceMaterial)) {
+        child.material = sourceMaterial.map((material) => material.clone());
+      } else if (sourceMaterial) {
+        child.material = sourceMaterial.clone();
+      }
+      const material = child.material;
+      if (material instanceof THREE.MeshStandardMaterial) {
+        if (loaded.textures.albedo) material.map = loaded.textures.albedo;
+        if (loaded.textures.normal) material.normalMap = loaded.textures.normal;
+        if (loaded.textures.orm) {
+          material.roughnessMap = loaded.textures.orm;
+          material.metalnessMap = loaded.textures.orm;
+        }
+        material.color.lerp(color, material.map ? 0.08 : 0.52);
+        material.roughness = Math.max(material.roughness, 0.56);
+        material.metalness *= 0.2;
+        material.needsUpdate = true;
+      }
+    });
+    model.rotation.y = Math.PI;
+    this.characterRoot.add(model);
+    this.characterModel = model;
+    this.characterMixer = new THREE.AnimationMixer(model);
+    for (const [name, clip] of Object.entries(loaded.clips)) {
+      const action = this.characterMixer.clipAction(clip);
+      action.enabled = true;
+      action.setLoop(name === "jump" ? THREE.LoopOnce : THREE.LoopRepeat, Infinity);
+      action.clampWhenFinished = name === "jump";
+      this.characterActions.set(name, action);
+    }
+    this.setCharacterAction("idle", true);
+    this.characterReady = true;
+    this.rig.visible = false;
+    this.characterRoot.visible = true;
+    free3dCharacterAttachCount += 1;
+    document.documentElement.dataset.playerRig = "free3d-skinned-mixamo-character";
+    document.documentElement.dataset.playerRigAttached = String(free3dCharacterAttachCount);
+  }
+
+  private setCharacterAction(name: string, immediate = false): void {
+    const nextName = this.characterActions.has(name) ? name : "idle";
+    if (this.activeCharacterAction === nextName) return;
+    const previous = this.characterActions.get(this.activeCharacterAction);
+    const next = this.characterActions.get(nextName);
+    if (!next) return;
+    if (previous) previous.fadeOut(immediate ? 0 : 0.12);
+    next.reset();
+    next.enabled = true;
+    next.fadeIn(immediate ? 0 : 0.12);
+    next.play();
+    this.activeCharacterAction = nextName;
+    document.documentElement.dataset.playerRigAction = nextName;
   }
 
   update(snapshot: PlayerSnapshot, time: number) {
@@ -1710,6 +2131,30 @@ class PlayerVisual {
     const actionAge = Math.max(0, Date.now() - snapshot.lastActionAt);
     const actionPulse = THREE.MathUtils.clamp(1 - actionAge / 260, 0, 1);
     const kickArc = Math.sin(actionPulse * Math.PI);
+    const deltaTime = this.characterLastUpdateTime > 0 ? Math.min(0.05, Math.max(0, time - this.characterLastUpdateTime)) : 1 / 60;
+    this.characterLastUpdateTime = time;
+    if (this.characterReady && this.characterMixer) {
+      const actionName = snapshot.airborne || snapshot.lastAction === "jump"
+        ? "jump"
+        : speed > 4.8
+          ? "run"
+          : speed > 0.65
+            ? "walk"
+            : "idle";
+      this.setCharacterAction(actionName);
+      const speedScale = actionName === "run"
+        ? THREE.MathUtils.clamp(speed / 5.6, 0.82, 1.42)
+        : actionName === "walk"
+          ? THREE.MathUtils.clamp(speed / 2.2, 0.65, 1.18)
+          : actionName === "jump"
+            ? 1.05
+            : 0.72;
+      const currentAction = this.characterActions.get(this.activeCharacterAction);
+      if (currentAction) currentAction.timeScale = speedScale;
+      this.characterMixer.update(deltaTime);
+      this.characterRoot.position.y = bob + (snapshot.airborne ? 0.12 : 0);
+      this.characterRoot.scale.setScalar(1 + actionPulse * 0.035);
+    }
 
     this.rig.position.y = bob + (snapshot.airborne ? 0.08 : 0);
     this.body.position.set(0, 1.08, 0);
@@ -2288,6 +2733,7 @@ function updateWeatherHud(weather: WeatherSnapshot | undefined) {
   document.documentElement.dataset.weatherSlush = String(counts.slush);
   document.documentElement.dataset.weatherSnowbanks = String(counts.snowbank);
   document.documentElement.dataset.weatherKind = weather.kind;
+  document.documentElement.dataset.weatherIntensity = weather.intensity.toFixed(3);
   document.documentElement.dataset.weatherNextChangeMs = String(Math.round(weather.nextChangeInMs));
   weatherEl.textContent =
     `\u041f\u043e\u0433\u043e\u0434\u0430: ${weather.label} ` +
@@ -2341,11 +2787,16 @@ function applyState(state: ServerState, time: number) {
     applyBallVertexColors(ballGeometry, variant);
     setBallSeamVariant(ballMesh, variant);
     ballGeometry.attributes.color.needsUpdate = true;
+    currentActiveBallVariant = variant;
+    updateSidelineBallVisibility(variant);
+    updateActiveBallModel(variant);
     document.documentElement.dataset.activeBallVariant = String(variant);
   }
   ballMesh.position.set(state.ball.position.x, state.ball.position.y, state.ball.position.z);
   ballMesh.rotation.x += state.ball.velocity.z * 0.01;
   ballMesh.rotation.z -= state.ball.velocity.x * 0.01;
+  activeFree3dBallRoot.position.copy(ballMesh.position);
+  activeFree3dBallRoot.rotation.copy(ballMesh.rotation);
   ballAura.position.copy(ballMesh.position);
   ballPulse = Math.max(0, ballPulse - 0.055);
   ballAuraMaterial.opacity = ballPulse * 0.5;
@@ -2378,7 +2829,9 @@ function applyState(state: ServerState, time: number) {
       players.delete(id);
     }
   }
-  document.documentElement.dataset.playerRig = "procedural-animated-footballer";
+  document.documentElement.dataset.playerRig = loadedFree3dCharacter
+    ? "free3d-skinned-mixamo-character"
+    : "procedural-animated-footballer-loading";
   document.documentElement.dataset.animatedPlayers = String([...players.values()].filter((visual) => visual.root.visible).length);
   weatherLayer.update(state.weather, time);
   for (const net of goalNets) net.update(state, time);
@@ -2490,13 +2943,16 @@ function updateAudioMix(state: ServerState) {
 
 function updateLighting(elapsedSeconds: number) {
   const serverDayTime = (renderedState ?? latestState)?.dayTimeSeconds;
-  const daySeconds = qaDayCycleSeconds === null
-    ? serverDayTime ?? DAY_START_SECONDS + elapsedSeconds / DAY_CYCLE_SECONDS * 24 * 60 * 60
-    : DAY_START_SECONDS + qaDayCycleSeconds / DAY_CYCLE_SECONDS * 24 * 60 * 60;
-  const solarCycle = THREE.MathUtils.euclideanModulo(daySeconds, 24 * 60 * 60) / (24 * 60 * 60);
+  const fallbackCycleSeconds = qaDayCycleSeconds === null ? elapsedSeconds : qaDayCycleSeconds + elapsedSeconds;
+  const fallbackDayTime = DAY_START_SECONDS + fallbackCycleSeconds / DAY_CYCLE_SECONDS * 24 * 60 * 60;
+  const daySeconds = serverDayTime ?? fallbackDayTime;
+  const dayTime = THREE.MathUtils.euclideanModulo(daySeconds, 24 * 60 * 60);
+  const solarCycle = dayTime / (24 * 60 * 60);
   const angle = (solarCycle - 0.25) * Math.PI * 2;
   const sunHeight = Math.sin(angle);
-  const daylight = THREE.MathUtils.smoothstep(sunHeight, -0.08, 0.62);
+  const sunrise = THREE.MathUtils.smoothstep(dayTime, 4 * 60 * 60, 6 * 60 * 60);
+  const sunsetFade = 1 - THREE.MathUtils.smoothstep(dayTime, 20 * 60 * 60, 22 * 60 * 60);
+  const daylight = Math.max(0, Math.min(sunrise, sunsetFade));
   const sunset = Math.max(0, 1 - Math.abs(sunHeight) * 5.2) * (1 - Math.abs(daylight - 0.5));
   const skyRadius = 46;
   sun.position.set(Math.cos(angle) * skyRadius, Math.max(1.2, sunHeight * skyRadius), Math.sin(angle + 0.42) * 28);
@@ -2507,30 +2963,32 @@ function updateLighting(elapsedSeconds: number) {
   moonMesh.position.set(Math.cos(moonAngle) * 70, 12 + Math.sin(moonAngle) * 42, Math.sin(moonAngle + 0.42) * 42);
   sunColor.copy(dayColor).lerp(sunsetColor, sunset).lerp(nightColor, 1 - daylight);
   skyColor.copy(nightColor).lerp(dayColor, daylight).lerp(sunsetColor, sunset * 0.36);
-  const snowIntensity = (renderedState ?? latestState)?.weather?.intensity ?? 0;
-  fogColor.copy(fogNightColor).lerp(fogDayColor, daylight).lerp(sunsetColor, sunset * 0.22).lerp(snowFogColor, snowIntensity * 0.14);
+  const weather = (renderedState ?? latestState)?.weather;
+  const precipitationIntensity = weather?.kind === "rain" || weather?.kind === "snow" ? weather.intensity : 0;
+  const snowIntensity = weather?.kind === "snow" ? weather.intensity : 0;
+  fogColor.copy(fogNightColor).lerp(fogDayColor, daylight).lerp(sunsetColor, sunset * 0.18).lerp(snowFogColor, snowIntensity * 0.1);
   sun.color.copy(sunColor);
-  sun.intensity = 0.32 + daylight * 2.6 + sunset * 0.75;
-  hemi.intensity = 0.38 + daylight * 1.45;
+  sun.intensity = 1.05 + daylight * 4.15 + sunset * 1.05 - precipitationIntensity * 0.38;
+  hemi.intensity = 1.05 + daylight * 2.1 - precipitationIntensity * 0.16;
   ambientFill.color.copy(fogColor);
-  ambientFill.intensity = 0.12 + daylight * 0.22 + (1 - daylight) * 0.1 + snowIntensity * 0.04;
+  ambientFill.intensity = 0.34 + daylight * 0.58 + (1 - daylight) * 0.12 + snowIntensity * 0.02;
   bounceColor.set(0x9fc7b3).lerp(sunsetColor, sunset * 0.32).lerp(nightColor, (1 - daylight) * 0.22);
   courtyardBounce.color.copy(bounceColor);
-  courtyardBounce.intensity = 0.2 + daylight * 0.62 + sunset * 0.38 + (1 - daylight) * 0.2;
+  courtyardBounce.intensity = 0.48 + daylight * 1.12 + sunset * 0.42 + (1 - daylight) * 0.18;
   rimLight.color.copy(fogColor);
   rimLight.intensity = 0.28 + (1 - daylight) * 0.72 + sunset * 0.24;
   for (const flood of floodLights) {
     flood.intensity = 0.12 + (1 - daylight) * 1.18;
     flood.color.set(daylight > 0.55 ? 0xc6dbff : 0xe7f0ff);
   }
-  renderer.toneMappingExposure = 0.78 + daylight * 0.58 + sunset * 0.14;
+  renderer.toneMappingExposure = 1.12 + daylight * 0.9 + sunset * 0.18 - precipitationIntensity * 0.16;
   scene.background = skyColor;
   skyMaterial.color.copy(skyColor).lerp(fogColor, 0.18);
   if (scene.fog) {
     const fog = scene.fog as THREE.Fog;
     fog.color.copy(fogColor);
-    fog.near = 24 + daylight * 8;
-    fog.far = 54 + daylight * 18 - snowIntensity * 6;
+    fog.near = 32 + daylight * 18;
+    fog.far = 86 + daylight * 34 - snowIntensity * 8;
   }
   (sunMesh.material as THREE.MeshBasicMaterial).color.copy(sunColor);
   sunMesh.scale.setScalar(0.82 + daylight * 0.34 + sunset * 0.28);
@@ -2540,12 +2998,15 @@ function updateLighting(elapsedSeconds: number) {
   sunGlowMaterial.opacity = (0.12 + daylight * 0.34 + sunset * 0.3) * (sunMesh.visible ? 1 : 0);
   moonMesh.visible = daylight < 0.7;
   moonMaterial.opacity = THREE.MathUtils.clamp((1 - daylight) * 0.78 + 0.08, 0, 0.86);
-  sunPathMaterial.opacity = 0.1 + daylight * 0.12 + sunset * 0.1;
-  sunPath.visible = true;
+  sunPathMaterial.opacity = 0;
+  sunPath.visible = false;
   document.documentElement.dataset.dayCycleSeconds = THREE.MathUtils.euclideanModulo((solarCycle - 0.25) * DAY_CYCLE_SECONDS, DAY_CYCLE_SECONDS).toFixed(2);
-  document.documentElement.dataset.dayTimeSeconds = THREE.MathUtils.euclideanModulo(daySeconds, 24 * 60 * 60).toFixed(1);
+  document.documentElement.dataset.dayTimeSeconds = dayTime.toFixed(1);
+  document.documentElement.dataset.dayCycleSource = serverDayTime === undefined ? "fallback-animated" : "server";
   document.documentElement.dataset.dayCycleLengthSeconds = String(DAY_CYCLE_SECONDS);
   document.documentElement.dataset.daylight = daylight.toFixed(3);
+  document.documentElement.dataset.darkHours = "20:00-04:00";
+  document.documentElement.dataset.sunPathVisible = String(sunPath.visible);
   document.documentElement.dataset.sunVisible = String(sunMesh.visible);
   document.documentElement.dataset.moonVisible = String(moonMesh.visible);
   document.documentElement.dataset.sunFramed = "false";

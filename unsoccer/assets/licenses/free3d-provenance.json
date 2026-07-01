@@ -1,12 +1,58 @@
 {
-  "version": "v0.0.011",
+  "version": "v0.0.014",
   "generatedAt": "2026-07-01T16:21:19.655Z",
   "source": {
     "apiDocsUrl": "https://free3d.online/api-docs",
     "skillUrl": "https://free3d.online/skill.md",
     "searchUrl": "https://free3d.online/api-embeddings/?q=soccer%20ball&topK=80",
-    "note": "LowPoly 1k GLB assets were selected only from public worker inventory paths.json exact relative paths. No API token was available in this environment. Runtime UnSoccer v0.0.011 uses lightweight vertex-color ball variants; raw downloaded GLBs are retained as source/provenance assets and are not loaded remotely."
+    "note": "Runtime UnSoccer v0.0.014 uses lightweight vertex-color Free3D ball variants and a local Free3D skinned character runtime with WebP texture maps plus separate FBX animation clips. Assets are local; runtime does not load remote Free3D URLs."
   },
+  "characterAssets": [
+    {
+      "guid": "6299851",
+      "title": "Male Soccer Player Character Rigged and Animated",
+      "category": "Character",
+      "modelPageUrl": "https://free3d.online/model/6299851-male-soccer-player-character-rigged-and-animated",
+      "searchUrl": "https://free3d.online/api-embeddings/?q=soccer%20player%20rigged%20animated%20textured&topK=24",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6299851_Male Soccer Player Character Rigged and Animated/paths.json",
+      "format": "glb+fbx+webp",
+      "lod": "1k",
+      "runtimeMode": "skinned GLB body, WebP albedo/normal/ORM textures, separate FBX idle/walk/run/jump clips",
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6299851/rigged_unity.glb",
+      "runtimeTexturePaths": [
+        "unsoccer/client/public/assets/characters/free3d/6299851/albedo.webp",
+        "unsoccer/client/public/assets/characters/free3d/6299851/normal.webp",
+        "unsoccer/client/public/assets/characters/free3d/6299851/orm.webp"
+      ],
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/free3d/6299851/idle.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6299851/walking.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6299851/running.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6299851/jumping.fbx"
+      ],
+      "rawLocalPaths": [
+        "unsoccer/assets/models/characters/free3d/raw/6299851-textured-rig/rigged_unity.glb",
+        "unsoccer/assets/models/characters/free3d/raw/6299851-textured-rig/albedo.png",
+        "unsoccer/assets/models/characters/free3d/raw/6299851-textured-rig/normal.png",
+        "unsoccer/assets/models/characters/free3d/raw/6299851-textured-rig/orm.png",
+        "unsoccer/assets/models/characters/free3d/raw/6299851-textured-rig/idle.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6299851-textured-rig/walking.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6299851-textured-rig/running.fbx",
+        "unsoccer/assets/models/characters/free3d/raw/6299851-textured-rig/jumping.fbx"
+      ],
+      "runtimeBytes": {
+        "riggedGlb": 96292,
+        "albedoWebp": 55632,
+        "normalWebp": 63358,
+        "ormWebp": 46670,
+        "idleFbx": 463756,
+        "walkingFbx": 422060,
+        "runningFbx": 402108,
+        "jumpingFbx": 465868
+      },
+      "downloadedAt": "2026-07-01T18:10:00Z"
+    }
+  ],
   "assets": [
     {
       "index": 0,

@@ -282,10 +282,11 @@ const AUDIO_EVENT_TTL_MS = 5000;
 const WEATHER_CHANGE_MIN_MS = 60000;
 const WEATHER_CHANGE_MAX_MS = 120000;
 const PLAYER_HIT_RECOVERY_DELAY_MS = 600;
-const GOAL_POST_RADIUS = 0.28;
+const GOAL_POST_RADIUS = 0.38;
 const GOAL_CROSSBAR_HEIGHT = 2.18;
-const GOAL_CROSSBAR_RADIUS = 0.22;
+const GOAL_CROSSBAR_RADIUS = 0.32;
 const BALL_VARIANT_COUNT = 10;
+const WEATHER_PICK_WEIGHTS = [3, 12, 1, 1] as const;
 
 const WEATHER_HAZARDS: HazardSnapshot[] = [
   {
@@ -344,14 +345,14 @@ const WEATHER_PRESETS: WeatherPreset[] = [
   {
     kind: "dawn",
     label: "\u0420\u0430\u0441\u0441\u0432\u0435\u0442, \u0441\u0443\u0445\u043e",
-    intensity: 0.06,
+    intensity: 0.02,
     wind: { x: 0.04, y: 0, z: -0.02 },
     hazards: []
   },
   {
     kind: "clear",
     label: "\u042f\u0441\u043d\u043e",
-    intensity: 0.12,
+    intensity: 0.02,
     wind: { x: 0.08, y: 0, z: 0.04 },
     hazards: []
   },
@@ -694,13 +695,23 @@ class UnsoccerServer {
     return WEATHER_CHANGE_MIN_MS + Math.floor(Math.random() * (WEATHER_CHANGE_MAX_MS - WEATHER_CHANGE_MIN_MS + 1));
   }
 
+  private randomWeatherIndex(previousIndex: number): number {
+    const totalWeight = WEATHER_PRESETS.reduce((sum, _preset, index) => (
+      index === previousIndex ? sum : sum + (WEATHER_PICK_WEIGHTS[index] || 1)
+    ), 0);
+    let cursor = Math.random() * totalWeight;
+    for (let index = 0; index < WEATHER_PRESETS.length; index += 1) {
+      if (index === previousIndex) continue;
+      cursor -= WEATHER_PICK_WEIGHTS[index] || 1;
+      if (cursor <= 0) return index;
+    }
+    return previousIndex === 1 ? 0 : 1;
+  }
+
   private updateWeather(now: number): void {
     if (now < this.nextWeatherChangeAt) return;
     const previousIndex = this.currentWeatherIndex;
-    let nextIndex = previousIndex;
-    if (WEATHER_PRESETS.length > 1) {
-      while (nextIndex === previousIndex) nextIndex = Math.floor(Math.random() * WEATHER_PRESETS.length);
-    }
+    const nextIndex = WEATHER_PRESETS.length > 1 ? this.randomWeatherIndex(previousIndex) : previousIndex;
     this.currentWeatherIndex = nextIndex;
     this.nextWeatherChangeAt = now + this.randomWeatherDelayMs();
     this.message = `\u041f\u043e\u0433\u043e\u0434\u0430: ${WEATHER_PRESETS[nextIndex].label}`;
@@ -1294,7 +1305,7 @@ class UnsoccerServer {
         : kind === "hand"
           ? HAND_HIT_STRENGTH
           : FOOT_KICK_STRENGTH;
-      const lift = kind === "head" ? 3.9 : kind === "hand" ? 0.42 : 0.82;
+      const lift = kind === "head" ? 4.55 : kind === "hand" ? 0.42 : 0.82;
       this.ballBody.applyImpulse(
         {
           x: aimX / aimMagnitude * strength + sideX * side * (kind === "hand" ? 0.72 : 1.65),
@@ -1388,7 +1399,7 @@ class UnsoccerServer {
       nextVelocity.z *= -BALL_RESTITUTION;
     }
     if (nextPosition.y <= BALL_RADIUS && nextVelocity.y < 0) {
-      nextVelocity.y *= -0.48;
+      nextVelocity.y *= -0.72;
     }
 
     this.resolveGoalPostBounce(nextPosition, nextVelocity);

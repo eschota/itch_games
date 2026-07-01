@@ -1,0 +1,25 @@
+{
+  "version": "v0.0.014",
+  "mode": "free3d-1k-skinned-glb-webp-textures-fbx-clips",
+  "assets": [
+    {
+      "guid": "6299851",
+      "title": "Male Soccer Player Character Rigged and Animated",
+      "src": "assets/characters/free3d/6299851/rigged_unity.glb",
+      "mode": "skinned-mixamo-compatible-textured-fbx-clips",
+      "heightMeters": 1.75,
+      "scale": 1,
+      "textures": {
+        "albedo": "assets/characters/free3d/6299851/albedo.webp",
+        "normal": "assets/characters/free3d/6299851/normal.webp",
+        "orm": "assets/characters/free3d/6299851/orm.webp"
+      },
+      "clips": {
+        "idle": "assets/characters/free3d/6299851/idle.fbx",
+        "walk": "assets/characters/free3d/6299851/walking.fbx",
+        "run": "assets/characters/free3d/6299851/running.fbx",
+        "jump": "assets/characters/free3d/6299851/jumping.fbx"
+      }
+    }
+  ]
+}

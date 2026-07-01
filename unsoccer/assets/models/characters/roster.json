@@ -1,13 +1,34 @@
 {
-  "version": "v0.0.001",
-  "runtimeMode": "procedural-placeholders-until-free3d-provenance",
+  "version": "v0.0.014",
+  "runtimeMode": "free3d-1k-skinned-glb-webp-textures-fbx-clips-with-procedural-fallback",
   "assignment": "playerIndex maps deterministically to roster order",
   "candidates": [
     {
       "id": "6299851",
       "name": "Male Soccer Player Character Rigged and Animated",
       "source": "https://free3d.online/model/6299851-male-soccer-player-character-rigged-and-animated",
-      "status": "candidate-not-downloaded"
+      "status": "downloaded-optimized-runtime",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6299851_Male Soccer Player Character Rigged and Animated/paths.json",
+      "relativePath": "uploads_files_6299851_1k/Male Soccer Player Character Rigged and Animated_preview_edc53270-2cfb-4b67-8b25-968ad4417256_rigged_unity.glb",
+      "rawLocalPath": "unsoccer/assets/models/characters/free3d/raw/6299851-textured-rig/rigged_unity.glb",
+      "runtimeLocalPath": "unsoccer/client/public/assets/characters/free3d/6299851/rigged_unity.glb",
+      "runtimeTexturePaths": [
+        "unsoccer/client/public/assets/characters/free3d/6299851/albedo.webp",
+        "unsoccer/client/public/assets/characters/free3d/6299851/normal.webp",
+        "unsoccer/client/public/assets/characters/free3d/6299851/orm.webp"
+      ],
+      "runtimeClipPaths": [
+        "unsoccer/client/public/assets/characters/free3d/6299851/idle.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6299851/walking.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6299851/running.fbx",
+        "unsoccer/client/public/assets/characters/free3d/6299851/jumping.fbx"
+      ]
+    },
+    {
+      "id": "6300420",
+      "name": "Young Male Soccer Player Rigged and Animated D Character Model",
+      "source": "https://free3d.online/model/6300420-young-male-soccer-player-rigged-and-animated-d-character-model",
+      "status": "superseded-by-6299851"
     },
     {
       "id": "6270753",

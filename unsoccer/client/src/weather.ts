@@ -54,6 +54,8 @@ export class WeatherVisualLayer {
     );
     this.snow.name = "weather-particles";
     this.snow.frustumCulled = false;
+    this.snow.visible = false;
+    document.documentElement.dataset.weatherParticlesVisible = "false";
     this.group.add(this.snow);
   }
 
@@ -70,7 +72,8 @@ export class WeatherVisualLayer {
   setOptions(options: { particlesEnabled: boolean; opacityScale: number }): void {
     this.particlesEnabled = options.particlesEnabled;
     this.opacityScale = THREE.MathUtils.clamp(options.opacityScale, 0.25, 1);
-    this.snow.visible = this.particlesEnabled;
+    if (!this.particlesEnabled) this.snow.visible = false;
+    document.documentElement.dataset.weatherParticlesVisible = String(this.snow.visible);
   }
 
   private syncHazards(hazards: HazardSnapshot[], time: number): void {
@@ -159,6 +162,7 @@ export class WeatherVisualLayer {
     const intensity = THREE.MathUtils.clamp(weather.intensity, 0, 1);
     const precipitation = weather.kind === "rain" || weather.kind === "snow";
     this.snow.visible = this.particlesEnabled && precipitation;
+    document.documentElement.dataset.weatherParticlesVisible = String(this.snow.visible);
     if (!precipitation) return;
     const material = this.snow.material as THREE.PointsMaterial;
     material.color.setHex(weather.kind === "rain" ? 0x9fd4ff : 0xeaf8ff);

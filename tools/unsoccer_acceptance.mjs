@@ -10,7 +10,10 @@ const PACKAGE = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf
 const EXPECTED_GAME_VERSION = String(PACKAGE.games?.unsoccer?.version || PACKAGE.gameVersion || PACKAGE.version);
 const FIELD_WIDTH = 48;
 const FIELD_LENGTH = 72;
+const GOAL_WIDTH = 12;
+const GOAL_POST_RADIUS = 0.38;
 const BALL_RADIUS = 0.48;
+const BALL_RESTITUTION = 1.05;
 const PLAYER_HEIGHT = 1.75;
 const DAY_START_SECONDS = 6 * 60 * 60;
 const WEATHER_CHANGE_MIN_MS = 60_000;
@@ -272,6 +275,7 @@ async function main() {
     await assertDayAndWeather(api);
     await assertSprintAndJump(api);
     await assertPlayerHitStamina(api);
+    await assertGoalPostAndBouncePhysics(api);
 
     await assertKick(api, "left", { x: -0.34, y: BALL_RADIUS + 0.04, z: 1.0 }, { kickLeft: 1 });
     await assertKick(api, "hand", { x: 0.34, y: BALL_RADIUS + 0.04, z: 1.0 }, { kickRight: 1 });
@@ -334,6 +338,7 @@ async function main() {
         "authoritative day start and weather controls",
         "sprint stamina and jump",
         "player hit stamina damage",
+        "thick post rebound and bouncier ball",
         "left kick",
         "hand hit",
         "head hit",
@@ -398,6 +403,7 @@ async function assertDayAndWeather(api) {
   await api("POST", "/api/test/players", { count: 1 });
   let state = (await api("POST", "/api/test/reset", {})).state;
   assert.equal(state.weather.kind, "dawn", "server should start at dawn weather");
+  assert.ok(state.weather.intensity <= 0.03, "dawn should be a bright dry low-intensity weather state");
   assert.ok(
     state.dayTimeSeconds >= DAY_START_SECONDS && state.dayTimeSeconds < DAY_START_SECONDS + 10 * 60,
     "server day time should start near 06:00 sunrise"
@@ -414,6 +420,7 @@ async function assertDayAndWeather(api) {
 
   state = (await api("POST", "/api/test/weather", { kind: "clear" })).state;
   assert.equal(state.weather.kind, "clear");
+  assert.ok(state.weather.intensity <= 0.03, "clear weather should not carry rain-like intensity");
   assert.equal(state.weather.hazards.length, 0, "clear weather should remove field hazards");
 }
 
@@ -485,6 +492,33 @@ async function assertPlayerHitStamina(api) {
   assert.equal(playerAt(state, 0).lastAction, "hand");
   assert.ok(target.stamina < 16, "hand hit should drain target stamina");
   assert.equal(target.exhausted, true, "target should become exhausted at zero stamina");
+}
+
+async function assertGoalPostAndBouncePhysics(api) {
+  await api("POST", "/api/test/players", { count: 0 });
+  await api("POST", "/api/test/reset", {});
+  await api("POST", "/api/test/weather", { kind: "clear" });
+
+  const safeRadius = GOAL_POST_RADIUS + BALL_RADIUS;
+  let state = (await api("POST", "/api/test/ball", {
+    position: {
+      x: GOAL_WIDTH / 2 + safeRadius - 0.04,
+      y: BALL_RADIUS + 0.05,
+      z: FIELD_LENGTH / 2
+    },
+    velocity: { x: -2.2, y: 0, z: 0 }
+  })).state;
+  state = (await api("POST", "/api/test/tick", { frames: 1 })).state;
+  assert.ok(state.ball.velocity.x > 1.2, "ball should rebound sideways from the thicker goal post collider");
+  assert.ok(state.ball.velocity.y >= 0.5, "goal post rebound should add a small lift");
+
+  state = (await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.015, z: 0 },
+    velocity: { x: 0, y: -4.2, z: 0 }
+  })).state;
+  state = (await api("POST", "/api/test/tick", { frames: 1 })).state;
+  assert.ok(state.ball.velocity.y > 2.6, "ball should be bouncy enough for head play");
+  assert.ok(BALL_RESTITUTION > 1, "acceptance constants should track the bouncier server tuning");
 }
 
 async function assertKick(api, kind, ballPosition, input) {

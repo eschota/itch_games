@@ -19,7 +19,7 @@
     <rule>Use art_director/ for non-runtime art-direction audits, references, tests, drafts, prompts, and QA evidence.</rule>
     <rule>Do not place shipped game code or final game assets in art_director/.</rule>
   </artDirection>
-  <versioning initial="v0.0.001" current="v0.0.002">
+  <versioning initial="v0.0.001" current="v0.0.003">
     <rule>Every created game starts at v0.0.001.</rule>
     <rule>Every shipped bump increments the version.</rule>
     <rule>The current version is visible in the bottom-left corner.</rule>

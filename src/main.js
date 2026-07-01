@@ -8,7 +8,7 @@ const overlay = document.querySelector("#overlay");
 const startButton = document.querySelector("#start-button");
 const versionBadge = document.querySelector("#version-badge");
 
-const gameVersion = "v0.0.002";
+const gameVersion = "v0.0.003";
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -305,6 +305,11 @@ function startFromControl(event) {
   startGame();
 }
 
+function startFromOverlay(event) {
+  if (!overlay.classList.contains("visible")) return;
+  startFromControl(event);
+}
+
 addEventListener("resize", resize);
 addEventListener("keydown", (event) => {
   if (event.code === "ArrowLeft" || event.code === "KeyA") input.left = true;
@@ -332,12 +337,18 @@ canvas.addEventListener("pointermove", (event) => {
 });
 canvas.addEventListener("pointerup", stopPointerControl);
 canvas.addEventListener("pointercancel", stopPointerControl);
+startButton.addEventListener("pointerdown", startFromControl);
 startButton.addEventListener("pointerup", startFromControl);
+startButton.addEventListener("mousedown", startFromControl);
+startButton.addEventListener("mouseup", startFromControl);
 startButton.addEventListener("click", startFromControl);
 startButton.addEventListener("touchstart", startFromControl, { passive: false });
+startButton.addEventListener("touchend", startFromControl);
 startButton.addEventListener("keydown", (event) => {
   if (event.code === "Enter" || event.code === "Space") startFromControl(event);
 });
+overlay.addEventListener("pointerdown", startFromOverlay, { capture: true });
+overlay.addEventListener("mousedown", startFromOverlay, { capture: true });
 
 resize();
 hud();

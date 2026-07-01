@@ -18,6 +18,8 @@ INCLUDE = [
     "skill.md",
     "skill.xml",
     "itch_games.skill.md",
+    "art_director_skill.md",
+    "art_director/art_director.skill.md",
     "src/main.js",
     "src/styles.css",
 ]

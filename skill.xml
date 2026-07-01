@@ -2,6 +2,8 @@
 <skills project="itch_games" root="/itch_games">
   <skill path="skill.md" role="root">
     <child path="itch_games.skill.md" role="directory" />
+    <child path="art_director_skill.md" role="art-director-root" />
+    <child path="art_director/art_director.skill.md" role="art-director-workspace" />
     <child path="skill.xml" role="machine-map" />
     <child path="index.html" role="runtime-entry" />
     <child path="src/main.js" role="game-code" />
@@ -12,4 +14,14 @@
     <server alias="freestock-moscow" path="/itch_games" />
     <github repository="eschota/itch_games" visibility="public" />
   </transport>
+  <artDirection workspace="art_director" rootSkill="art_director_skill.md">
+    <rule>Use art_director/ for non-runtime art-direction audits, references, tests, drafts, prompts, and QA evidence.</rule>
+    <rule>Do not place shipped game code or final game assets in art_director/.</rule>
+  </artDirection>
+  <versioning initial="v0.0.001" current="v0.0.002">
+    <rule>Every created game starts at v0.0.001.</rule>
+    <rule>Every shipped bump increments the version.</rule>
+    <rule>The current version is visible in the bottom-left corner.</rule>
+    <rule>Version bumps are committed, pushed to GitHub, and autodeployed.</rule>
+  </versioning>
 </skills>

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Orbital Courier</title>
+    <meta
+      name="description"
+      content="A small Three.js dodge-and-collect browser game packaged for itch.io."
+    />
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <main id="game-shell" aria-label="Orbital Courier game">
+      <canvas id="game-canvas"></canvas>
+      <section id="hud" aria-live="polite">
+        <div>
+          <span class="label">Score</span>
+          <strong id="score">0</strong>
+        </div>
+        <div>
+          <span class="label">Shield</span>
+          <strong id="lives">3</strong>
+        </div>
+        <div>
+          <span class="label">Best</span>
+          <strong id="best">0</strong>
+        </div>
+      </section>
+      <section id="overlay" class="overlay visible">
+        <h1>Orbital Courier</h1>
+        <p>Collect energy cores, dodge debris, and keep the courier alive.</p>
+        <button id="start-button" type="button">Start Run</button>
+      </section>
+    </main>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js"
+        }
+      }
+    </script>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

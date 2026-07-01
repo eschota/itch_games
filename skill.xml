@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<skills project="itch_games" root="/itch_games">
+  <skill path="skill.md" role="root">
+    <child path="itch_games.skill.md" role="directory" />
+    <child path="skill.xml" role="machine-map" />
+    <child path="index.html" role="runtime-entry" />
+    <child path="src/main.js" role="game-code" />
+    <child path="src/styles.css" role="game-style" />
+    <child path="tools/package_itch.py" role="itch-package-helper" />
+  </skill>
+  <transport>
+    <server alias="freestock-moscow" path="/itch_games" />
+    <github repository="eschota/itch_games" visibility="public" />
+  </transport>
+</skills>

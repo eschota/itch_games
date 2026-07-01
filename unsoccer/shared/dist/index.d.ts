@@ -112,6 +112,10 @@ export interface ServerInfo {
     connectedClients: number;
     maxActivePlayers: number;
     maxRoomClients: number;
+    transports?: {
+        websocket: boolean;
+        http: boolean;
+    };
 }
 export declare const DEFAULT_INPUT: InputState;
 export declare const CHARACTER_ROSTER: readonly ["6299851", "6270753", "6298507", "6300462"];

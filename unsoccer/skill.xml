@@ -24,7 +24,7 @@
     <rule>v0.0.003 keeps weather and hazards server-authoritative; any puddle, slush, or snowbank that changes movement or ball physics must also be visible in the client.</rule>
     <rule>Server-confirmed left-foot, right-foot, head, and body contacts must stay visually distinguishable and expose data-last-action-kind, data-last-action-player, and data-last-action-at for QA.</rule>
     <rule>Server owns physics, score, teams, and room assignment.</rule>
-    <rule>Production transport is plain WebSocket JSON under /unsoccer/socket/ with HTTP polling fallback; do not require geckos.io or native node-datachannel on the Qwertystock host.</rule>
+    <rule>Production transport is plain WebSocket JSON under /unsoccer/socket/ with HTTP polling fallback, implemented with built-in Node http/net/crypto primitives; do not require geckos.io, ws, or native node-datachannel on the Qwertystock host.</rule>
     <rule>UNSOCCER_TEST_MODE enables /api/test/* only for isolated local acceptance and must not be exposed in production.</rule>
     <rule>npm run test:unsoccer:acceptance is the deterministic gate for spectator roles, kicks, body contact, and goal reset.</rule>
     <rule>Client audio is procedural Web Audio driven by authoritative ServerState diffs, not local input prediction.</rule>

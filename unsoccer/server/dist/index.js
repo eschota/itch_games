@@ -1,10 +1,158 @@
+import crypto from "node:crypto";
 import http from "node:http";
 import express from "express";
 import RAPIER from "@dimforge/rapier3d-compat";
-import geckos, { iceServers } from "@geckos.io/server";
-import { BALL_RADIUS, BODY_BUMP_COOLDOWN_MS, BODY_BUMP_MIN_SPEED, BODY_BUMP_RANGE, BODY_BUMP_STRENGTH, CHARACTER_ROSTER, DEFAULT_INPUT, FIELD_LENGTH, FIELD_WIDTH, FOOT_KICK_STRENGTH, GAME_VERSION, GOAL_DEPTH, GOAL_WIDTH, HEAD_KICK_STRENGTH, HEAD_COOLDOWN_MS, KICK_COOLDOWN_MS, KICK_RANGE, MAX_ACTIVE_PLAYERS, MAX_ROOM_CLIENTS, PLAYER_HEIGHT, PLAYER_RADIUS, PLAYER_SPEED, ROOM_ID, SERVER_TICK_RATE, SNAPSHOT_RATE, clamp, sanitizePlayerName } from "@itch-games/unsoccer-shared";
+import { BALL_RADIUS, BODY_BUMP_COOLDOWN_MS, BODY_BUMP_MIN_SPEED, BODY_BUMP_RANGE, BODY_BUMP_STRENGTH, CHARACTER_ROSTER, DEFAULT_INPUT, FIELD_LENGTH, FIELD_WIDTH, FOOT_KICK_STRENGTH, GAME_VERSION, GOAL_DEPTH, GOAL_WIDTH, HEAD_KICK_STRENGTH, HEAD_COOLDOWN_MS, KICK_COOLDOWN_MS, KICK_RANGE, MAX_ACTIVE_PLAYERS, MAX_ROOM_CLIENTS, PLAYER_HEIGHT, PLAYER_RADIUS, PLAYER_SPEED, SERVER_TICK_RATE, SNAPSHOT_RATE, clamp, sanitizePlayerName } from "@itch-games/unsoccer-shared";
+const WEBSOCKET_ACCEPT_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+const MAX_WEBSOCKET_PAYLOAD_BYTES = 64 * 1024;
+const MAX_WEBSOCKET_BUFFER_BYTES = MAX_WEBSOCKET_PAYLOAD_BYTES + 16;
+class WebSocketChannel {
+    socket;
+    id = `ws-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    handlers = new Map();
+    disconnectHandlers = [];
+    buffer = Buffer.alloc(0);
+    closed = false;
+    disconnected = false;
+    constructor(socket) {
+        this.socket = socket;
+        socket.on("data", (chunk) => this.receive(chunk));
+        socket.on("close", () => this.emitDisconnect());
+        socket.on("error", () => {
+            // Close performs player cleanup; this listener prevents an unhandled error crash.
+        });
+    }
+    receive(chunk) {
+        if (this.closed)
+            return;
+        this.buffer = Buffer.concat([this.buffer, chunk]);
+        if (this.buffer.length > MAX_WEBSOCKET_BUFFER_BYTES) {
+            this.close();
+            return;
+        }
+        this.drainFrames();
+    }
+    emit(eventName, data) {
+        if (this.closed || this.socket.destroyed)
+            return;
+        this.writeFrame(0x1, Buffer.from(JSON.stringify({ event: eventName, data }), "utf8"));
+    }
+    on(eventName, handler) {
+        const handlers = this.handlers.get(eventName) || [];
+        handlers.push(handler);
+        this.handlers.set(eventName, handlers);
+    }
+    onDisconnect(handler) {
+        this.disconnectHandlers.push(handler);
+    }
+    close() {
+        if (this.closed)
+            return;
+        this.closed = true;
+        if (!this.socket.destroyed) {
+            this.writeFrame(0x8, Buffer.alloc(0));
+            this.socket.end();
+        }
+        this.emitDisconnect();
+    }
+    handleMessage(raw) {
+        let message;
+        try {
+            message = JSON.parse(raw);
+        }
+        catch (_) {
+            return;
+        }
+        if (typeof message.event !== "string")
+            return;
+        for (const handler of this.handlers.get(message.event) || []) {
+            handler(message.data);
+        }
+    }
+    drainFrames() {
+        while (this.buffer.length >= 2) {
+            const first = this.buffer[0];
+            const second = this.buffer[1];
+            const opcode = first & 0x0f;
+            const masked = Boolean(second & 0x80);
+            let payloadLength = second & 0x7f;
+            let offset = 2;
+            if (payloadLength === 126) {
+                if (this.buffer.length < offset + 2)
+                    return;
+                payloadLength = this.buffer.readUInt16BE(offset);
+                offset += 2;
+            }
+            else if (payloadLength === 127) {
+                if (this.buffer.length < offset + 8)
+                    return;
+                const largeLength = this.buffer.readBigUInt64BE(offset);
+                if (largeLength > BigInt(Number.MAX_SAFE_INTEGER)) {
+                    this.close();
+                    return;
+                }
+                payloadLength = Number(largeLength);
+                offset += 8;
+            }
+            if (!masked || payloadLength > MAX_WEBSOCKET_PAYLOAD_BYTES) {
+                this.close();
+                return;
+            }
+            const maskOffset = offset;
+            offset += 4;
+            if (this.buffer.length < offset + payloadLength)
+                return;
+            const mask = masked ? this.buffer.subarray(maskOffset, maskOffset + 4) : null;
+            const payload = Buffer.from(this.buffer.subarray(offset, offset + payloadLength));
+            this.buffer = this.buffer.subarray(offset + payloadLength);
+            if (mask) {
+                for (let index = 0; index < payload.length; index += 1) {
+                    payload[index] = payload[index] ^ mask[index % 4];
+                }
+            }
+            if (opcode === 0x8) {
+                this.close();
+                return;
+            }
+            if (opcode === 0x9) {
+                this.writeFrame(0xA, payload);
+                continue;
+            }
+            if (opcode !== 0x1)
+                continue;
+            this.handleMessage(payload.toString("utf8"));
+        }
+    }
+    writeFrame(opcode, payload) {
+        if (this.socket.destroyed)
+            return;
+        let header;
+        if (payload.length < 126) {
+            header = Buffer.alloc(2);
+            header[1] = payload.length;
+        }
+        else if (payload.length <= 0xffff) {
+            header = Buffer.alloc(4);
+            header[1] = 126;
+            header.writeUInt16BE(payload.length, 2);
+        }
+        else {
+            header = Buffer.alloc(10);
+            header[1] = 127;
+            header.writeBigUInt64BE(BigInt(payload.length), 2);
+        }
+        header[0] = 0x80 | opcode;
+        this.socket.write(Buffer.concat([header, payload]));
+    }
+    emitDisconnect() {
+        if (this.disconnected)
+            return;
+        this.disconnected = true;
+        for (const handler of this.disconnectHandlers)
+            handler();
+    }
+}
 const PORT = Number(process.env.UNSOCCER_PORT || 8787);
-const LOCAL_ICE = process.env.UNSOCCER_LOCAL_ICE === "1";
 const TEST_MODE = process.env.UNSOCCER_TEST_MODE === "1";
 const TEST_TOKEN = process.env.UNSOCCER_TEST_TOKEN || "";
 const WEATHER_HAZARDS = [
@@ -82,10 +230,7 @@ function cloneInput(input) {
 class UnsoccerServer {
     app = express();
     httpServer = http.createServer(this.app);
-    io = geckos({
-        cors: { origin: "*" },
-        iceServers: LOCAL_ICE ? [] : iceServers
-    });
+    websocketEnabled = false;
     world;
     ballBody;
     players = new Map();
@@ -99,17 +244,102 @@ class UnsoccerServer {
         await RAPIER.init();
         this.createPhysicsWorld();
         this.configureHttp();
-        this.io.addServer(this.httpServer);
-        this.io.onConnection((channel) => this.onConnection(channel));
+        this.configureWebSocket();
         this.httpServer.listen(PORT, () => {
             console.log(`unsoccer ${GAME_VERSION} listening on http://127.0.0.1:${PORT}`);
         });
         setInterval(() => this.tick(), 1000 / SERVER_TICK_RATE);
     }
+    configureWebSocket() {
+        this.websocketEnabled = true;
+        this.httpServer.on("upgrade", (request, socket, head) => {
+            if (!this.isWebSocketUpgrade(request)) {
+                socket.destroy();
+                return;
+            }
+            const key = String(request.headers["sec-websocket-key"] || "");
+            const accept = crypto
+                .createHash("sha1")
+                .update(`${key}${WEBSOCKET_ACCEPT_GUID}`)
+                .digest("base64");
+            socket.write([
+                "HTTP/1.1 101 Switching Protocols",
+                "Upgrade: websocket",
+                "Connection: Upgrade",
+                `Sec-WebSocket-Accept: ${accept}`,
+                "\r\n"
+            ].join("\r\n"));
+            const channel = new WebSocketChannel(socket);
+            this.onConnection(channel);
+            if (head.length)
+                channel.receive(head);
+        });
+    }
+    isWebSocketUpgrade(request) {
+        const upgrade = String(request.headers.upgrade || "").toLowerCase();
+        const key = request.headers["sec-websocket-key"];
+        const version = String(request.headers["sec-websocket-version"] || "");
+        if (upgrade !== "websocket" || typeof key !== "string" || version !== "13")
+            return false;
+        const requestUrl = new URL(request.url || "/", `http://${request.headers.host || "127.0.0.1"}`);
+        return requestUrl.pathname === "/" || requestUrl.pathname === "/ws";
+    }
     configureHttp() {
         this.app.use(express.json({ limit: "32kb" }));
         this.app.get("/api/health", (_request, response) => {
             response.json(this.serverInfo());
+        });
+        this.app.post("/api/join", (request, response) => {
+            if (this.players.size >= MAX_ROOM_CLIENTS) {
+                response.status(409).json({ ok: false, error: "server-full", maxRoomClients: MAX_ROOM_CLIENTS });
+                return;
+            }
+            const body = this.requestBody(request);
+            const runtime = this.createRuntime({
+                id: `http-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                name: sanitizePlayerName(body.name),
+                channel: null,
+                transport: "http"
+            });
+            this.players.set(runtime.id, runtime);
+            this.rebalanceRoles();
+            this.message = `${runtime.name} \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0438\u043b\u0441\u044f ${runtime.role === "player" ? "\u043a \u043f\u043e\u043b\u044e" : "\u043a\u0430\u043a \u043d\u0430\u0431\u043b\u044e\u0434\u0430\u0442\u0435\u043b\u044c"}`;
+            response.json({ ok: true, joined: this.joinPayload(runtime), state: this.snapshot() });
+        });
+        this.app.post("/api/input", (request, response) => {
+            const body = this.requestBody(request);
+            const player = this.players.get(String(body.clientId || ""));
+            if (!player || player.transport !== "http") {
+                response.status(404).json({ ok: false, error: "client not found" });
+                return;
+            }
+            const message = body;
+            if (typeof message.sequence === "number" && message.sequence >= player.inputSequence) {
+                player.input = cloneInput(message.input || DEFAULT_INPUT);
+                player.inputSequence = message.sequence;
+                player.lastSeenAt = Date.now();
+            }
+            response.json({ ok: true });
+        });
+        this.app.get("/api/state", (request, response) => {
+            const player = this.players.get(String(request.query.clientId || ""));
+            if (!player || player.transport !== "http") {
+                response.status(404).json({ ok: false, error: "client not found" });
+                return;
+            }
+            player.lastSeenAt = Date.now();
+            response.json({ ok: true, joined: this.joinPayload(player), state: this.snapshot() });
+        });
+        this.app.post("/api/leave", (request, response) => {
+            const body = this.requestBody(request);
+            const player = this.players.get(String(body.clientId || ""));
+            if (player && player.transport === "http") {
+                this.destroyBody(player);
+                this.players.delete(player.id);
+                this.rebalanceRoles();
+                this.message = `${player.name} \u0432\u044b\u0448\u0435\u043b`;
+            }
+            response.json({ ok: true });
         });
         if (TEST_MODE)
             this.configureTestHttp();
@@ -224,36 +454,45 @@ class UnsoccerServer {
         this.players.clear();
         this.joinCounter = 0;
         for (let index = 0; index < count; index += 1) {
-            const id = `test-player-${index + 1}`;
-            const runtime = {
-                id,
+            const runtime = this.createRuntime({
+                id: `test-player-${index + 1}`,
                 name: `\u0422\u0435\u0441\u0442 ${index + 1}`,
-                role: "spectator",
-                team: null,
-                index,
-                joinOrder: this.joinCounter++,
-                characterId: CHARACTER_ROSTER[index % CHARACTER_ROSTER.length],
                 channel: null,
-                input: { ...DEFAULT_INPUT },
-                inputSequence: 0,
-                body: null,
-                lastKickAt: 0,
-                lastHeadAt: 0,
-                lastKickLeft: 0,
-                lastKickRight: 0,
-                lastHead: 0,
-                lastBodyAt: 0,
-                lastAction: null,
-                lastActionAt: 0,
-                yaw: 0,
-                velocity: zeroVec()
-            };
-            this.players.set(id, runtime);
+                transport: "test"
+            });
+            this.players.set(runtime.id, runtime);
         }
         this.rebalanceRoles();
         this.message = count > 0
             ? "\u0422\u0435\u0441\u0442\u043e\u0432\u044b\u0435 \u0438\u0433\u0440\u043e\u043a\u0438 \u0433\u043e\u0442\u043e\u0432\u044b"
             : "\u0416\u0434\u0451\u043c \u0438\u0433\u0440\u043e\u043a\u043e\u0432";
+    }
+    createRuntime(options) {
+        return {
+            id: options.id,
+            name: options.name,
+            role: "spectator",
+            team: null,
+            index: this.players.size,
+            joinOrder: this.joinCounter++,
+            characterId: CHARACTER_ROSTER[0],
+            channel: options.channel,
+            transport: options.transport,
+            input: { ...DEFAULT_INPUT },
+            inputSequence: 0,
+            body: null,
+            lastKickAt: 0,
+            lastHeadAt: 0,
+            lastKickLeft: 0,
+            lastKickRight: 0,
+            lastHead: 0,
+            lastBodyAt: 0,
+            lastAction: null,
+            lastActionAt: 0,
+            yaw: 0,
+            velocity: zeroVec(),
+            lastSeenAt: Date.now()
+        };
     }
     resetMatch(now) {
         this.score.blue = 0;
@@ -312,35 +551,17 @@ class UnsoccerServer {
     }
     onConnection(channel) {
         if (this.players.size >= MAX_ROOM_CLIENTS) {
-            channel.emit("server-full", { maxRoomClients: MAX_ROOM_CLIENTS }, { reliable: true });
+            channel.emit("server-full", { maxRoomClients: MAX_ROOM_CLIENTS });
             channel.close();
             return;
         }
-        const id = channel.id || `client-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        channel.join(ROOM_ID);
-        const runtime = {
+        const id = channel.id;
+        const runtime = this.createRuntime({
             id,
             name: `\u0413\u043e\u0441\u0442\u044c ${this.players.size + 1}`,
-            role: "spectator",
-            team: null,
-            index: this.players.size,
-            joinOrder: this.joinCounter++,
-            characterId: CHARACTER_ROSTER[0],
             channel,
-            input: { ...DEFAULT_INPUT },
-            inputSequence: 0,
-            body: null,
-            lastKickAt: 0,
-            lastHeadAt: 0,
-            lastKickLeft: 0,
-            lastKickRight: 0,
-            lastHead: 0,
-            lastBodyAt: 0,
-            lastAction: null,
-            lastActionAt: 0,
-            yaw: 0,
-            velocity: zeroVec()
-        };
+            transport: "websocket"
+        });
         this.players.set(id, runtime);
         this.rebalanceRoles();
         channel.on("join", (data) => {
@@ -357,6 +578,7 @@ class UnsoccerServer {
                 return;
             runtime.input = cloneInput(message.input || DEFAULT_INPUT);
             runtime.inputSequence = message.sequence;
+            runtime.lastSeenAt = Date.now();
         });
         channel.onDisconnect(() => {
             this.destroyBody(runtime);
@@ -399,7 +621,10 @@ class UnsoccerServer {
         const channel = player.channel;
         if (!channel)
             return;
-        const payload = {
+        channel.emit("joined", this.joinPayload(player));
+    }
+    joinPayload(player) {
+        return {
             id: player.id,
             role: player.role,
             team: player.team,
@@ -409,7 +634,6 @@ class UnsoccerServer {
             maxActivePlayers: MAX_ACTIVE_PLAYERS,
             maxRoomClients: MAX_ROOM_CLIENTS
         };
-        channel.emit("joined", payload, { reliable: true });
     }
     spawnForIndex(index) {
         const team = index % 2;
@@ -423,6 +647,7 @@ class UnsoccerServer {
     tick(now = Date.now(), emitSnapshot = true) {
         const dt = 1 / SERVER_TICK_RATE;
         this.tickCount += 1;
+        this.cleanupStaleHttpPlayers(now);
         for (const player of this.players.values()) {
             this.updatePlayer(player, dt, now);
         }
@@ -432,7 +657,29 @@ class UnsoccerServer {
         this.checkGoal(now);
         if (emitSnapshot && now - this.lastSnapshotAt >= 1000 / SNAPSHOT_RATE) {
             this.lastSnapshotAt = now;
-            this.io.room(ROOM_ID).emit("state", this.snapshot(now));
+            this.broadcast("state", this.snapshot(now));
+        }
+    }
+    broadcast(eventName, data) {
+        for (const player of this.players.values()) {
+            if (player.transport === "websocket")
+                player.channel?.emit(eventName, data);
+        }
+    }
+    cleanupStaleHttpPlayers(now) {
+        let changed = false;
+        for (const player of this.players.values()) {
+            if (player.transport !== "http")
+                continue;
+            if (now - player.lastSeenAt < 30000)
+                continue;
+            this.destroyBody(player);
+            this.players.delete(player.id);
+            changed = true;
+        }
+        if (changed) {
+            this.rebalanceRoles();
+            this.message = "\u0418\u0433\u0440\u043e\u043a \u0432\u044b\u0448\u0435\u043b";
         }
     }
     updatePlayer(player, dt, now) {
@@ -734,7 +981,11 @@ class UnsoccerServer {
             activePlayers,
             connectedClients: this.players.size,
             maxActivePlayers: MAX_ACTIVE_PLAYERS,
-            maxRoomClients: MAX_ROOM_CLIENTS
+            maxRoomClients: MAX_ROOM_CLIENTS,
+            transports: {
+                websocket: this.websocketEnabled,
+                http: true
+            }
         };
     }
 }

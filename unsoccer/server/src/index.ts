@@ -1,7 +1,8 @@
+import crypto from "node:crypto";
 import http from "node:http";
+import type { Duplex } from "node:stream";
 import express, { type Request, type Response } from "express";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { WebSocket, WebSocketServer, type RawData } from "ws";
 import {
   BALL_RADIUS,
   BODY_BUMP_COOLDOWN_MS,
@@ -61,27 +62,39 @@ interface WireMessage {
   data?: unknown;
 }
 
-function rawDataToString(data: RawData): string {
-  if (typeof data === "string") return data;
-  if (Buffer.isBuffer(data)) return data.toString("utf8");
-  if (data instanceof ArrayBuffer) return Buffer.from(data).toString("utf8");
-  return Buffer.concat(data).toString("utf8");
-}
+const WEBSOCKET_ACCEPT_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+const MAX_WEBSOCKET_PAYLOAD_BYTES = 64 * 1024;
+const MAX_WEBSOCKET_BUFFER_BYTES = MAX_WEBSOCKET_PAYLOAD_BYTES + 16;
 
 class WebSocketChannel implements TransportChannel {
   readonly id = `ws-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   private readonly handlers = new Map<string, TransportEventHandler[]>();
+  private readonly disconnectHandlers: Array<() => void> = [];
+  private buffer = Buffer.alloc(0);
+  private closed = false;
+  private disconnected = false;
 
-  constructor(private readonly socket: WebSocket) {
-    socket.on("message", (raw) => this.handleMessage(rawDataToString(raw)));
+  constructor(private readonly socket: Duplex) {
+    socket.on("data", (chunk) => this.receive(chunk));
+    socket.on("close", () => this.emitDisconnect());
     socket.on("error", () => {
       // Close performs player cleanup; this listener prevents an unhandled error crash.
     });
   }
 
+  receive(chunk: Buffer): void {
+    if (this.closed) return;
+    this.buffer = Buffer.concat([this.buffer, chunk]);
+    if (this.buffer.length > MAX_WEBSOCKET_BUFFER_BYTES) {
+      this.close();
+      return;
+    }
+    this.drainFrames();
+  }
+
   emit(eventName: string, data: unknown): void {
-    if (this.socket.readyState !== WebSocket.OPEN) return;
-    this.socket.send(JSON.stringify({ event: eventName, data }));
+    if (this.closed || this.socket.destroyed) return;
+    this.writeFrame(0x1, Buffer.from(JSON.stringify({ event: eventName, data }), "utf8"));
   }
 
   on(eventName: string, handler: TransportEventHandler): void {
@@ -91,11 +104,17 @@ class WebSocketChannel implements TransportChannel {
   }
 
   onDisconnect(handler: () => void): void {
-    this.socket.once("close", handler);
+    this.disconnectHandlers.push(handler);
   }
 
   close(): void {
-    this.socket.close();
+    if (this.closed) return;
+    this.closed = true;
+    if (!this.socket.destroyed) {
+      this.writeFrame(0x8, Buffer.alloc(0));
+      this.socket.end();
+    }
+    this.emitDisconnect();
   }
 
   private handleMessage(raw: string): void {
@@ -109,6 +128,83 @@ class WebSocketChannel implements TransportChannel {
     for (const handler of this.handlers.get(message.event) || []) {
       handler(message.data);
     }
+  }
+
+  private drainFrames(): void {
+    while (this.buffer.length >= 2) {
+      const first = this.buffer[0];
+      const second = this.buffer[1];
+      const opcode = first & 0x0f;
+      const masked = Boolean(second & 0x80);
+      let payloadLength = second & 0x7f;
+      let offset = 2;
+      if (payloadLength === 126) {
+        if (this.buffer.length < offset + 2) return;
+        payloadLength = this.buffer.readUInt16BE(offset);
+        offset += 2;
+      } else if (payloadLength === 127) {
+        if (this.buffer.length < offset + 8) return;
+        const largeLength = this.buffer.readBigUInt64BE(offset);
+        if (largeLength > BigInt(Number.MAX_SAFE_INTEGER)) {
+          this.close();
+          return;
+        }
+        payloadLength = Number(largeLength);
+        offset += 8;
+      }
+      if (!masked || payloadLength > MAX_WEBSOCKET_PAYLOAD_BYTES) {
+        this.close();
+        return;
+      }
+      const maskOffset = offset;
+      offset += 4;
+      if (this.buffer.length < offset + payloadLength) return;
+
+      const mask = masked ? this.buffer.subarray(maskOffset, maskOffset + 4) : null;
+      const payload = Buffer.from(this.buffer.subarray(offset, offset + payloadLength));
+      this.buffer = this.buffer.subarray(offset + payloadLength);
+      if (mask) {
+        for (let index = 0; index < payload.length; index += 1) {
+          payload[index] = payload[index] ^ mask[index % 4];
+        }
+      }
+
+      if (opcode === 0x8) {
+        this.close();
+        return;
+      }
+      if (opcode === 0x9) {
+        this.writeFrame(0xA, payload);
+        continue;
+      }
+      if (opcode !== 0x1) continue;
+      this.handleMessage(payload.toString("utf8"));
+    }
+  }
+
+  private writeFrame(opcode: number, payload: Buffer): void {
+    if (this.socket.destroyed) return;
+    let header: Buffer;
+    if (payload.length < 126) {
+      header = Buffer.alloc(2);
+      header[1] = payload.length;
+    } else if (payload.length <= 0xffff) {
+      header = Buffer.alloc(4);
+      header[1] = 126;
+      header.writeUInt16BE(payload.length, 2);
+    } else {
+      header = Buffer.alloc(10);
+      header[1] = 127;
+      header.writeBigUInt64BE(BigInt(payload.length), 2);
+    }
+    header[0] = 0x80 | opcode;
+    this.socket.write(Buffer.concat([header, payload]));
+  }
+
+  private emitDisconnect(): void {
+    if (this.disconnected) return;
+    this.disconnected = true;
+    for (const handler of this.disconnectHandlers) handler();
   }
 }
 
@@ -221,7 +317,7 @@ function cloneInput(input: InputState): InputState {
 class UnsoccerServer {
   private readonly app = express();
   private readonly httpServer = http.createServer(this.app);
-  private readonly wss = new WebSocketServer({ server: this.httpServer });
+  private websocketEnabled = false;
 
   private world!: RAPIER.World;
   private ballBody!: RAPIER.RigidBody;
@@ -246,7 +342,37 @@ class UnsoccerServer {
   }
 
   private configureWebSocket(): void {
-    this.wss.on("connection", (socket) => this.onConnection(new WebSocketChannel(socket)));
+    this.websocketEnabled = true;
+    this.httpServer.on("upgrade", (request, socket, head) => {
+      if (!this.isWebSocketUpgrade(request)) {
+        socket.destroy();
+        return;
+      }
+      const key = String(request.headers["sec-websocket-key"] || "");
+      const accept = crypto
+        .createHash("sha1")
+        .update(`${key}${WEBSOCKET_ACCEPT_GUID}`)
+        .digest("base64");
+      socket.write([
+        "HTTP/1.1 101 Switching Protocols",
+        "Upgrade: websocket",
+        "Connection: Upgrade",
+        `Sec-WebSocket-Accept: ${accept}`,
+        "\r\n"
+      ].join("\r\n"));
+      const channel = new WebSocketChannel(socket);
+      this.onConnection(channel);
+      if (head.length) channel.receive(head);
+    });
+  }
+
+  private isWebSocketUpgrade(request: http.IncomingMessage): boolean {
+    const upgrade = String(request.headers.upgrade || "").toLowerCase();
+    const key = request.headers["sec-websocket-key"];
+    const version = String(request.headers["sec-websocket-version"] || "");
+    if (upgrade !== "websocket" || typeof key !== "string" || version !== "13") return false;
+    const requestUrl = new URL(request.url || "/", `http://${request.headers.host || "127.0.0.1"}`);
+    return requestUrl.pathname === "/" || requestUrl.pathname === "/ws";
   }
 
   private configureHttp(): void {
@@ -987,7 +1113,7 @@ class UnsoccerServer {
       maxActivePlayers: MAX_ACTIVE_PLAYERS,
       maxRoomClients: MAX_ROOM_CLIENTS,
       transports: {
-        websocket: Boolean(this.wss),
+        websocket: this.websocketEnabled,
         http: true
       }
     };

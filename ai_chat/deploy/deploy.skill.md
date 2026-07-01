@@ -79,6 +79,10 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
   `itch-games-ai-chat.service` before it exits. Schedule a delayed chat restart
   after local health checks so the parent process can append deploy
   completion/failure to `/ai_chat`.
+- The qwertystock autodeploy entrypoint may detach the long-running deploy work
+  into a locked `nohup` child and return quickly to the webhook process. Keep
+  this path when asset-heavy builds risk exceeding the chat webhook child
+  timeout or being killed by parent service restarts.
 - Keep `/ai_chat/` nginx `client_max_body_size` aligned with the Node media
   upload limit so Producer gameplay videos are not rejected before reaching the
   service.

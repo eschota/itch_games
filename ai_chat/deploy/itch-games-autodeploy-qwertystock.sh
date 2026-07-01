@@ -7,6 +7,17 @@ stage() {
 }
 
 cd /home/generic/itch_games
+if [ "${ITCH_GAMES_DEPLOY_DETACHED:-0}" != "1" ]; then
+  log="/tmp/itch-games-autodeploy-$(date -u +%Y%m%dT%H%M%SZ).log"
+  nohup env ITCH_GAMES_DEPLOY_DETACHED=1 "$0" >"$log" 2>&1 &
+  echo "detached autodeploy started; log=${log}"
+  exit 0
+fi
+exec 9>/tmp/itch-games-autodeploy.lock
+if ! flock -n 9; then
+  echo "another detached autodeploy is already running"
+  exit 0
+fi
 stage "git update"
 git fetch origin main
 git checkout main

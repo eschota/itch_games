@@ -9,10 +9,11 @@ import zipfile
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+GAME_DIR = ROOT / "orbital-courier"
 DIST = ROOT / "dist"
 PACKAGE = DIST / "orbital-courier-itch.zip"
 INCLUDE = [
-    "index.html",
+    "orbital-courier/index.html",
     "README.md",
     "LICENSE",
     "skill.md",
@@ -32,8 +33,8 @@ INCLUDE = [
     "sound_designer/sound_designer.skill.md",
     "ai_chat_skill.md",
     "ai_chat/ai_chat.skill.md",
-    "src/main.js",
-    "src/styles.css",
+    "orbital-courier/src/main.js",
+    "orbital-courier/src/styles.css",
 ]
 
 
@@ -47,7 +48,12 @@ def main() -> None:
             path = ROOT / relative
             if not path.exists():
                 raise FileNotFoundError(path)
-            archive.write(path, relative)
+            archive_name = pathlib.Path(relative)
+            try:
+                archive_name = path.relative_to(GAME_DIR)
+            except ValueError:
+                pass
+            archive.write(path, str(archive_name))
 
     with zipfile.ZipFile(PACKAGE) as archive:
         names = set(archive.namelist())

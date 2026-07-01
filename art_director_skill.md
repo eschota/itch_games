@@ -27,7 +27,7 @@ acceptance for this game repository.
 
 ## AI Chat And Subordination
 
-- Before making changes, open `https://orbital-courier.mecharulez.com/ai_chat/`,
+- Before making changes, open `https://io-games.mecharulez.com/ai_chat/`,
   read recent messages, and post that the Art Director has started work.
 - Report every meaningful art, visual, 3D, animation, VFX, lighting, audio-mood,
   review, or deploy-impacting change to the chat with validation status.
@@ -45,9 +45,10 @@ acceptance for this game repository.
 - Examples: art audits, style guides, mood boards, reference lists, critique
   notes, outsource briefs, prompt drafts, temporary renders, test screenshots,
   visual QA logs, pipeline notes, sound mood notes, and acceptance checklists.
-- Do not scatter art-direction scratch files in the repository root, `src/`,
+- Do not scatter art-direction scratch files in the repository root, `orbital-courier/src/`,
   `tools/`, or future runtime asset folders.
-- Final game code stays in `src/`, `index.html`, and `tools/`.
+- Final game code stays in `orbital-courier/`, shared catalog code in
+  `index.html`, and tooling in `tools/`.
 - Final game assets belong only in explicit game asset folders when they are
   intentionally integrated into the shipped build.
 - Do not make `art_director/` a runtime dependency unless a file is deliberately

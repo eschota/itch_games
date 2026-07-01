@@ -26,7 +26,7 @@ support for this repository.
 
 ## AI Chat And Subordination
 
-- Before making changes, open `https://orbital-courier.mecharulez.com/ai_chat/`,
+- Before making changes, open `https://io-games.mecharulez.com/ai_chat/`,
   read recent messages, and post that the Programmer has started work.
 - Report every meaningful code, package, deploy, server, webhook, nginx,
   systemd, validation, or debugging change to the chat with validation status.
@@ -43,7 +43,8 @@ support for this repository.
   `programmer/`.
 - Examples: investigation notes, scratch experiments, profiling notes,
   temporary logs, refactor plans, compatibility notes, and validation evidence.
-- Production code stays in `src/`, `index.html`, `tools/`, or explicit runtime
+- Production code stays in `orbital-courier/`, shared catalog `index.html`,
+  `tools/`, or explicit runtime
   asset paths.
 
 ## Operating Mode

@@ -27,7 +27,7 @@ ideas for this game.
 
 ## AI Chat And Subordination
 
-- Before making changes, open `https://orbital-courier.mecharulez.com/ai_chat/`,
+- Before making changes, open `https://io-games.mecharulez.com/ai_chat/`,
   read recent messages, and post that the Game Designer has started work.
 - Report every meaningful mechanics, rules, pacing, scoring, balance, playtest,
   feature-idea, review, or validation change to the chat.

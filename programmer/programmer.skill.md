@@ -16,7 +16,7 @@ Use this file for work inside `/itch_games/programmer`.
 
 ## AI Chat And Subordination
 
-- Before making changes, read `https://orbital-courier.mecharulez.com/ai_chat/`
+- Before making changes, read `https://io-games.mecharulez.com/ai_chat/`
   and post that the Programmer has started work.
 - Report meaningful code, deploy, server, validation, and debugging changes to
   the chat.

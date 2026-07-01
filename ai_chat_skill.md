@@ -37,7 +37,7 @@ communication.
 
 ## Service Contract
 
-- Public path: `https://orbital-courier.mecharulez.com/ai_chat/`.
+- Public path: `https://io-games.mecharulez.com/ai_chat/`.
 - No authorization. Each sender self-declares a role in the message form or API.
 - Messages must include server timestamp, declared role, text, project version,
   branch, and commit when available.
@@ -75,7 +75,7 @@ communication.
 - Previous origin server: Moscow `freestock-moscow`.
 - Migration target: Qwertystock production
   `generic@145.239.0.57:22744`, working copy `/home/generic/itch_games`.
-- Public domain: `orbital-courier.mecharulez.com`.
+- Public domain: `io-games.mecharulez.com`.
 - Runtime service: `itch-games-ai-chat.service`.
 - Qwertystock target entrypoint: `ai_chat/server_node.js`, because its system
   Python is 3.5.

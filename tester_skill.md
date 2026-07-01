@@ -26,7 +26,7 @@ playtest feedback for this game.
 ## AI Chat And Subordination
 
 - Before testing or making changes, open
-  `https://orbital-courier.mecharulez.com/ai_chat/`, read recent messages, and
+  `https://io-games.mecharulez.com/ai_chat/`, read recent messages, and
   post that the Tester has started work.
 - Report every meaningful bug, reproduction, test pass, regression result,
   creative QA idea, or validation change to the chat.

@@ -22,9 +22,11 @@ Use this root skill when changing, packaging, validating, or publishing the
 - Sound designer workspace: `sound_designer/sound_designer.skill.md`
 - AI chat skill: `ai_chat_skill.md`
 - AI chat service workspace: `ai_chat/ai_chat.skill.md`
-- Runtime entry: `index.html`
-- Game code: `src/main.js`
-- Styles: `src/styles.css`
+- Runtime catalog: `index.html`
+- Current game entry: `orbital-courier/index.html`
+- Current game code: `orbital-courier/src/main.js`
+- Current game styles: `orbital-courier/src/styles.css`
+- Current game folder skill: `orbital-courier/orbital-courier.skill.md`
 - Itch package helper: `tools/package_itch.py`
 
 ## Rules
@@ -63,7 +65,7 @@ Use this root skill when changing, packaging, validating, or publishing the
 
 ## AI Chat And Subordination
 
-- Public chat: `https://orbital-courier.mecharulez.com/ai_chat/`.
+- Public chat: `https://io-games.mecharulez.com/ai_chat/`.
 - Every development agent must read recent chat messages before making changes.
 - Every development agent must post a start message in chat before making
   changes, using its own role and the current task summary.
@@ -111,7 +113,7 @@ The current migration target is the main Qwertystock production server
 
 On `qwertystock.com`, do not edit or restart the main Qwertystock PM2 apps,
 `/home/generic/QwertyStock`, `/home/generic/QwertyData`, or the
-`server_name qwertystock.com` nginx block for this project. Orbital Courier
-must use its own `server_name orbital-courier.mecharulez.com`, its own
+`server_name qwertystock.com` nginx block for this project. The shared IO games
+host must use its own `server_name io-games.mecharulez.com`, its own
 `itch-games-ai-chat.service`, and `ai_chat/server_node.js` because the target
 server's system Python is 3.5.

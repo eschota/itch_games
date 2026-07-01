@@ -25,7 +25,7 @@ feedback, flow, responsive layout, and usability for this browser game.
 
 ## AI Chat And Subordination
 
-- Before making changes, open `https://orbital-courier.mecharulez.com/ai_chat/`,
+- Before making changes, open `https://io-games.mecharulez.com/ai_chat/`,
   read recent messages, and post that the UI Designer has started work.
 - Report every meaningful UI, HUD, menu, prompt, layout, copy, accessibility,
   review, or validation change to the chat with validation status.
@@ -42,7 +42,8 @@ feedback, flow, responsive layout, and usability for this browser game.
   final shipped UI assets under `ui_designer/`.
 - Examples: wireframes, flow diagrams, UI audits, screenshots, notes,
   prototypes, copy variants, responsive checks, icon research, and temp mocks.
-- Runtime UI code belongs in `src/`, `index.html`, or explicit runtime asset
+- Runtime UI code belongs in `orbital-courier/`, shared catalog `index.html`,
+  or explicit runtime asset
   folders only after it is intentionally implemented.
 
 ## Operating Mode

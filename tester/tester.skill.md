@@ -17,7 +17,7 @@ Use this file for work inside `/itch_games/tester`.
 ## AI Chat And Subordination
 
 - Before testing or making changes, read
-  `https://orbital-courier.mecharulez.com/ai_chat/` and post that the Tester
+  `https://io-games.mecharulez.com/ai_chat/` and post that the Tester
   has started work.
 - Report bugs, regression results, creative QA ideas, and validation outcomes to
   the chat.

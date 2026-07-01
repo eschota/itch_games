@@ -17,7 +17,7 @@ Use this file for work inside `/itch_games/sound_designer`.
 
 ## AI Chat And Subordination
 
-- Before making changes, read `https://orbital-courier.mecharulez.com/ai_chat/`
+- Before making changes, read `https://io-games.mecharulez.com/ai_chat/`
   and post that the Sound Designer has started work.
 - Report sound searches, license decisions, generated audio, edits,
   implementation, mix, and validation results to the chat.

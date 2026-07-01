@@ -17,20 +17,23 @@
     <child path="ai_chat_skill.md" role="ai-chat-root" />
     <child path="ai_chat/ai_chat.skill.md" role="ai-chat-workspace" />
     <child path="skill.xml" role="machine-map" />
-    <child path="index.html" role="runtime-entry" />
+    <child path="index.html" role="games-catalog" />
+    <child path="orbital-courier/index.html" role="current-game-entry" />
+    <child path="orbital-courier/orbital-courier.skill.md" role="current-game-folder-skill" />
+    <child path="orbital-courier/skill.xml" role="current-game-folder-map" />
     <child path="package.json" role="package-metadata" />
-    <child path="src/main.js" role="game-code" />
-    <child path="src/styles.css" role="game-style" />
+    <child path="orbital-courier/src/main.js" role="game-code" />
+    <child path="orbital-courier/src/styles.css" role="game-style" />
     <child path="tools/package_itch.py" role="itch-package-helper" />
   </skill>
   <transport>
     <server alias="freestock-moscow" path="/itch_games" role="previous-origin rollback" />
     <server host="145.239.0.57" user="generic" port="22744" path="/home/generic/itch_games" role="qwertystock-target" />
     <github repository="eschota/itch_games" visibility="public" />
-    <domain host="orbital-courier.mecharulez.com" aiChatPath="/ai_chat/" />
+    <domain host="io-games.mecharulez.com" aiChatPath="/ai_chat/" />
   </transport>
   <coordination>
-    <aiChat url="https://orbital-courier.mecharulez.com/ai_chat/" service="itch-games-ai-chat.service" port="8765" webhookPath="/ai_chat/api/deploy-webhook">
+    <aiChat url="https://io-games.mecharulez.com/ai_chat/" service="itch-games-ai-chat.service" port="8765" webhookPath="/ai_chat/api/deploy-webhook">
       <rule>Every development agent reads recent chat messages before making project changes.</rule>
       <rule>Every development agent posts a start message before making project changes.</rule>
       <rule>Every development agent reports meaningful changes and validation results to chat.</rule>

@@ -17,7 +17,7 @@ Use this file for work inside `/itch_games/ui_designer`.
 
 ## AI Chat And Subordination
 
-- Before making changes, read `https://orbital-courier.mecharulez.com/ai_chat/`
+- Before making changes, read `https://io-games.mecharulez.com/ai_chat/`
   and post that the UI Designer has started work.
 - Report meaningful changes and validation results to the chat.
 - Producer: the user, obey first. Art Director and Game Designer are

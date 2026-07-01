@@ -1,0 +1,17 @@
+<folderSkill repo="itch_games" root="R:\itch_games" path="orbital-courier">
+  <parent path="../skill.md" />
+  <parent path="../skill.xml" />
+  <parent path="../itch_games.skill.md" />
+  <entry file="orbital-courier.skill.md" />
+  <runtime url="https://io-games.mecharulez.com/orbital-courier/" />
+  <files>
+    <file path="index.html" role="game-entry" />
+    <file path="src/main.js" role="threejs-game-loop" />
+    <file path="src/styles.css" role="game-style" />
+  </files>
+  <rules>
+    <rule>Keep game-specific runtime files inside orbital-courier/.</rule>
+    <rule>Shared ai_chat, deploy, and future game folders stay outside this folder.</rule>
+    <rule>Validate through a local static server at /orbital-courier/.</rule>
+  </rules>
+</folderSkill>

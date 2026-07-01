@@ -16,9 +16,11 @@ Use this file for work inside `/itch_games`.
 
 ## Structure
 
-- `index.html`: itch.io HTML5 entrypoint.
-- `src/main.js`: Three.js game loop and input handling.
-- `src/styles.css`: fullscreen game shell and HUD styling.
+- `index.html`: shared IO Games catalog for the public domain root.
+- `orbital-courier/index.html`: current Orbital Courier game entrypoint.
+- `orbital-courier/src/main.js`: Three.js game loop and input handling.
+- `orbital-courier/src/styles.css`: fullscreen game shell and HUD styling.
+- `orbital-courier/orbital-courier.skill.md`: game-folder rules.
 - `tools/package_itch.py`: creates the upload zip in `dist/`.
 - `art_director/`: non-runtime Art Director workspace for audits, checks,
   references, briefs, prompts, temp documents, and QA evidence.
@@ -57,7 +59,7 @@ Use this file for work inside `/itch_games`.
 ## AI Chat
 
 - Before changing the project, every agent must read recent messages at
-  `https://orbital-courier.mecharulez.com/ai_chat/`.
+  `https://io-games.mecharulez.com/ai_chat/`.
 - Before changing the project, every agent must post that it has started work.
 - Agents must report meaningful changes and validation results to the chat.
 - Autodeploy is webhook-driven through `/ai_chat/api/deploy-webhook`; keep the
@@ -65,8 +67,8 @@ Use this file for work inside `/itch_games`.
 - On the Qwertystock migration target, run the chat with
   `ai_chat/server_node.js` from `/home/generic/itch_games`; the target system
   Python is 3.5.
-- Keep Orbital Courier isolated behind `server_name
-  orbital-courier.mecharulez.com`; do not add it as a location inside the main
+- Keep IO Games isolated behind `server_name io-games.mecharulez.com`; do not
+  add it as a location inside the main
   `qwertystock.com` site.
 - The Producer is the user and has highest authority; Art Director and Game
   Designer are second-level creative leads; all other roles have voice and
@@ -97,7 +99,7 @@ Use this file for work inside `/itch_games`.
 ## Validation
 
 1. Run `python3 -m http.server 8000`.
-2. Open the game from a browser, not directly from `file://`.
+2. Open `/orbital-courier/` from a browser, not directly from `file://`.
 3. Confirm the scene auto-starts on load and the bottom-left version badge shows
    the current release.
 4. Confirm mouse/touch drag on the canvas moves the courier, `A`/`D` or arrow

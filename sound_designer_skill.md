@@ -25,7 +25,7 @@ integration in this game.
 
 ## AI Chat And Subordination
 
-- Before making changes, open `https://orbital-courier.mecharulez.com/ai_chat/`,
+- Before making changes, open `https://io-games.mecharulez.com/ai_chat/`,
   read recent messages, and post that the Sound Designer has started work.
 - Report every meaningful sound search, license decision, generated sound,
   edit, implementation, mix, or audio validation change to the chat.

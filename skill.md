@@ -234,6 +234,9 @@ Use this root skill when changing, packaging, validating, or publishing the
 - `unsoccer` v0.0.009 expands the Art Director runtime pass with a visibly
   modeled residential courtyard, procedural animated footballer rigs, a visible
   sun/moon/orbit marker, and QA-readable 120-second day-cycle lighting data.
+- `unsoccer` v0.0.009 fixes team-relative WASD movement, renders the local
+  controlled player without the remote interpolation delay, and removes the
+  artificial pitch-rectangle clamp from player movement.
 - `v0.0.006` adds procedural Web Audio feedback and exposes
   `window.orbitalCourierAudio` plus `orbital-courier:audio-event` so future
   network code can replicate semantic sound events instead of audio files.

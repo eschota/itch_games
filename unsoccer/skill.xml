@@ -26,11 +26,12 @@
     <rule>v0.0.008 keeps the version and client weight always visible and starts the residential courtyard visual pass around the snowy field.</rule>
     <rule>v0.0.008 audio uses a server-authored audioEvents ring buffer in ServerState so roster, kick/body, goal, and countdown cues synchronize across WebSocket and HTTP fallback clients by authoritative event id.</rule>
     <rule>v0.0.009 expands the runtime Art Director pass with courtyard models, procedural animated footballer rigs, visible sun/moon/orbit marker, ambient/bounce lighting, and QA-readable art/day-cycle datasets.</rule>
+    <rule>v0.0.009 makes WASD team-relative, keeps local controlled movement responsive with a short client prediction lead, and removes artificial pitch bounds from player movement.</rule>
     <rule>Server-confirmed left-foot, right-foot, head, and body contacts must stay visually distinguishable and expose data-last-action-kind, data-last-action-player, and data-last-action-at for QA.</rule>
     <rule>Server owns physics, score, teams, and room assignment.</rule>
     <rule>Production transport is plain WebSocket JSON under /unsoccer/socket/ with HTTP polling fallback, implemented with built-in Node http/net/crypto primitives; do not require geckos.io, ws, or native node-datachannel on the Qwertystock host.</rule>
     <rule>UNSOCCER_TEST_MODE enables /api/test/* only for isolated local acceptance and must not be exposed in production.</rule>
-    <rule>npm run test:unsoccer:acceptance is the deterministic gate for spectator roles, kicks, body contact, goal reset, and server audioEvents.</rule>
+    <rule>npm run test:unsoccer:acceptance is the deterministic gate for spectator roles, team-relative WASD movement, pitch-bound freedom, kicks, body contact, goal reset, and server audioEvents.</rule>
     <rule>Client audio is procedural Web Audio driven by authoritative ServerState audioEvents and weather state, not local input prediction.</rule>
     <rule>Audio QA must inspect data-audio-played-events, data-audio-blocked-events, data-audio-context, and data-audio-unlocked after a real trusted browser gesture.</rule>
     <rule>First 4 clients are players; clients 5-32 are spectators/testers.</rule>

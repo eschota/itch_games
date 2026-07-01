@@ -58,6 +58,10 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
   residential courtyard models, procedural animated footballer rigs, visible
   sun/moon/orbit marker, ambient/bounce lighting, and QA-readable art/day-cycle
   datasets.
+- `v0.0.009` makes WASD team-relative, keeps the local controlled player
+  responsive with a small client-side prediction lead, and removes artificial
+  pitch bounds from player movement so only explicit gameplay colliders block
+  players.
 - Server-confirmed left-foot, right-foot, head, and body contacts must stay
   visually distinguishable in the client and expose QA-readable
   `data-last-action-*` fields on `document.documentElement`.

@@ -1,5 +1,16 @@
 # Changelog
 
+## unsoccer v0.0.009
+
+- Fix team-relative WASD movement so forward moves toward the opponent goal
+  instead of feeling inverted from the tactical camera.
+- Render the controlled local player from the latest authoritative snapshot
+  with a small client prediction lead instead of the 100 ms interpolation delay
+  used for remote entities.
+- Remove the artificial player clamp to the pitch rectangle; players can leave
+  the marked field and are only pushed by explicit gameplay colliders such as
+  snowbanks.
+
 ## unsoccer v0.0.008
 
 - Synchronize release metadata for the courtyard weight badge build.

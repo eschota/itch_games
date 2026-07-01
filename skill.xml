@@ -240,6 +240,7 @@
     <rule>v0.0.008 keeps the HUD version and client bundle weight visible and starts the residential courtyard visual pass around the field.</rule>
     <rule>v0.0.008 server audioEvents synchronize roster, kick/body, goal, and countdown cues across WebSocket and HTTP fallback clients by authoritative event id.</rule>
     <rule>v0.0.009 ships the Art Director runtime 3D/animation pass: expanded courtyard models, animated procedural footballer rigs, visible sun/moon/orbit marker, and 120-second lighting datasets.</rule>
+    <rule>v0.0.009 fixes team-relative WASD movement, immediate local controlled-player rendering, and removes artificial pitch bounds from player movement.</rule>
   </game>
   <publicSurfaces owner="UI Designer">
     <surface path="index.html" url="https://io-games.mecharulez.com/" role="local-public-catalog" />

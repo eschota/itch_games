@@ -9,6 +9,7 @@ import {
   GOAL_DEPTH,
   GOAL_WIDTH,
   PLAYER_HEIGHT,
+  PLAYER_SPEED,
   type HazardSnapshot,
   type HazardType,
   type TeamId,
@@ -123,6 +124,7 @@ declare global {
           delayMs: number;
           alpha: number;
           renderAgeMs: number;
+          localPredictionMs: number;
         };
         serverAudio: {
           lastEventId: number;
@@ -334,7 +336,9 @@ const STATE_INTERPOLATION_DELAY_SECONDS = 0.1;
 const STATE_HISTORY_LIMIT = 12;
 const PLAYER_SNAP_DISTANCE = 7.5;
 const BALL_SNAP_DISTANCE = FIELD_LENGTH * 0.45;
+const LOCAL_PLAYER_PREDICTION_MAX_SECONDS = 0.12;
 const stateHistory: Array<{ state: ServerState; receivedAt: number }> = [];
+let localPredictionLeadMs = 0;
 
 function readQaDayCycleSeconds(): number | null {
   const value = Number(new URLSearchParams(location.search).get("qaTime"));
@@ -367,7 +371,8 @@ window.unsoccerDebug = {
       bufferedStates: stateHistory.length,
       delayMs: Math.round(STATE_INTERPOLATION_DELAY_SECONDS * 1000),
       alpha: Number(interpolationAlpha.toFixed(3)),
-      renderAgeMs: Math.round(interpolationRenderAgeMs)
+      renderAgeMs: Math.round(interpolationRenderAgeMs),
+      localPredictionMs: Math.round(localPredictionLeadMs)
     },
     serverAudio: {
       lastEventId: lastConsumedAudioEventId,
@@ -1083,11 +1088,14 @@ function receiveState(state: ServerState) {
 }
 
 function selectRenderState(nowSeconds: number): ServerState | null {
+  localPredictionLeadMs = 0;
   if (!latestState) return null;
+  let state: ServerState;
   if (stateHistory.length < 2) {
     interpolationAlpha = 1;
     interpolationRenderAgeMs = 0;
-    return latestState;
+    state = latestState;
+    return withResponsiveLocalPlayer(state, nowSeconds);
   }
 
   const targetTime = nowSeconds - STATE_INTERPOLATION_DELAY_SECONDS;
@@ -1097,13 +1105,13 @@ function selectRenderState(nowSeconds: number): ServerState | null {
   if (targetTime <= from.receivedAt) {
     interpolationAlpha = 0;
     interpolationRenderAgeMs = (nowSeconds - from.receivedAt) * 1000;
-    return from.state;
+    return withResponsiveLocalPlayer(from.state, nowSeconds);
   }
 
   if (targetTime >= to.receivedAt) {
     interpolationAlpha = 1;
     interpolationRenderAgeMs = (nowSeconds - to.receivedAt) * 1000;
-    return to.state;
+    return withResponsiveLocalPlayer(to.state, nowSeconds);
   }
 
   for (let index = 0; index < stateHistory.length - 1; index += 1) {
@@ -1120,7 +1128,8 @@ function selectRenderState(nowSeconds: number): ServerState | null {
   const alpha = THREE.MathUtils.clamp((targetTime - from.receivedAt) / span, 0, 1);
   interpolationAlpha = alpha;
   interpolationRenderAgeMs = (nowSeconds - targetTime) * 1000;
-  return interpolateState(from.state, to.state, alpha);
+  state = interpolateState(from.state, to.state, alpha);
+  return withResponsiveLocalPlayer(state, nowSeconds);
 }
 
 function interpolateState(from: ServerState, to: ServerState, alpha: number): ServerState {
@@ -1147,6 +1156,60 @@ function interpolatePlayer(from: PlayerSnapshot | undefined, to: PlayerSnapshot,
     position: lerpVec3(from.position, to.position, alpha),
     velocity: lerpVec3(from.velocity, to.velocity, alpha),
     yaw: lerpAngle(from.yaw, to.yaw, alpha)
+  };
+}
+
+function withResponsiveLocalPlayer(state: ServerState, nowSeconds: number): ServerState {
+  const localId = localJoin?.id;
+  if (!localId || !latestState) return state;
+  const latestPlayer = latestState.players.find((player) => player.id === localId && player.role === "player");
+  if (!latestPlayer) return state;
+  const playerIndex = state.players.findIndex((player) => player.id === localId);
+  if (playerIndex < 0) return state;
+
+  const movement = movementDirection(input, latestPlayer.team);
+  const lastAuthoritative = stateHistory[stateHistory.length - 1];
+  const leadSeconds = movement.magnitude > 0 && lastAuthoritative
+    ? Math.min(
+      LOCAL_PLAYER_PREDICTION_MAX_SECONDS,
+      Math.max(nowSeconds - lastAuthoritative.receivedAt, 1 / 60)
+    )
+    : 0;
+  localPredictionLeadMs = leadSeconds * 1000;
+
+  const localPlayer: PlayerSnapshot = leadSeconds > 0
+    ? {
+      ...latestPlayer,
+      position: {
+        x: latestPlayer.position.x + movement.x * PLAYER_SPEED * leadSeconds,
+        y: latestPlayer.position.y,
+        z: latestPlayer.position.z + movement.z * PLAYER_SPEED * leadSeconds
+      },
+      velocity: {
+        x: movement.x * PLAYER_SPEED,
+        y: 0,
+        z: movement.z * PLAYER_SPEED
+      },
+      yaw: Math.atan2(movement.x, movement.z)
+    }
+    : latestPlayer;
+
+  const players = state.players.slice();
+  players[playerIndex] = localPlayer;
+  return { ...state, players };
+}
+
+function movementDirection(inputState: InputState, team: TeamId | null): { x: number; z: number; magnitude: number } {
+  const xAxis = (inputState.right ? 1 : 0) - (inputState.left ? 1 : 0);
+  const forwardAxis = (inputState.up ? 1 : 0) - (inputState.down ? 1 : 0);
+  const attackDirection = team === 1 ? -1 : 1;
+  const zAxis = forwardAxis * attackDirection;
+  const magnitude = Math.hypot(xAxis, zAxis);
+  if (magnitude <= 0) return { x: 0, z: 0, magnitude: 0 };
+  return {
+    x: xAxis / magnitude,
+    z: zAxis / magnitude,
+    magnitude
   };
 }
 
@@ -1457,15 +1520,13 @@ function updateCamera(delta: number) {
   cameraVelocity.multiplyScalar(0.28);
   cameraBallBlend.copy(cameraBall).sub(cameraFocus).multiplyScalar(0.34);
   cameraLookTarget.copy(cameraFocus).add(cameraBallBlend).add(cameraVelocity);
-  cameraLookTarget.x = THREE.MathUtils.clamp(cameraLookTarget.x, -FIELD_WIDTH * 0.44, FIELD_WIDTH * 0.44);
-  cameraLookTarget.z = THREE.MathUtils.clamp(cameraLookTarget.z, -FIELD_LENGTH * 0.48, FIELD_LENGTH * 0.48);
 
   const yawBackX = -Math.sin(yaw) * 3.5;
   const tacticalBackZ = -attackDirection * (12.5 + cameraImpulse * 1.3);
   cameraDesired.set(
-    THREE.MathUtils.clamp(cameraLookTarget.x + yawBackX, -FIELD_WIDTH * 0.52, FIELD_WIDTH * 0.52),
+    cameraLookTarget.x + yawBackX,
     14.5 + cameraImpulse * 1.4,
-    THREE.MathUtils.clamp(cameraLookTarget.z + tacticalBackZ, -FIELD_LENGTH * 0.56, FIELD_LENGTH * 0.56)
+    cameraLookTarget.z + tacticalBackZ
   );
 
   const positionDamp = 1 - Math.exp(-delta * 4.6);
@@ -1541,6 +1602,7 @@ function frame(time: number) {
   document.documentElement.dataset.interpolationDelayMs = String(Math.round(STATE_INTERPOLATION_DELAY_SECONDS * 1000));
   document.documentElement.dataset.interpolationAlpha = interpolationAlpha.toFixed(3);
   document.documentElement.dataset.interpolationRenderAgeMs = String(Math.round(interpolationRenderAgeMs));
+  document.documentElement.dataset.localPredictionMs = String(Math.round(localPredictionLeadMs));
   if (renderedState) applyState(renderedState, seconds);
   updateLighting(seconds);
   updateCamera(delta);

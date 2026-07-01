@@ -229,6 +229,20 @@ function cloneInput(input) {
         yaw: Number.isFinite(input.yaw) ? input.yaw : 0
     };
 }
+function movementDirection(input, team) {
+    const xAxis = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    const forwardAxis = (input.up ? 1 : 0) - (input.down ? 1 : 0);
+    const attackDirection = team === 1 ? -1 : 1;
+    const zAxis = forwardAxis * attackDirection;
+    const magnitude = Math.hypot(xAxis, zAxis);
+    if (magnitude <= 0)
+        return { x: 0, z: 0, magnitude: 0 };
+    return {
+        x: xAxis / magnitude,
+        z: zAxis / magnitude,
+        magnitude
+    };
+}
 class UnsoccerServer {
     app = express();
     httpServer = http.createServer(this.app);
@@ -749,16 +763,12 @@ class UnsoccerServer {
         const current = player.body.translation();
         const currentPoint = { x: current.x, y: PLAYER_HEIGHT / 2, z: current.z };
         const environment = this.environmentAt(currentPoint);
-        const xAxis = (player.input.right ? 1 : 0) - (player.input.left ? 1 : 0);
-        const zAxis = (player.input.down ? 1 : 0) - (player.input.up ? 1 : 0);
-        const magnitude = Math.hypot(xAxis, zAxis);
-        const nx = magnitude > 0 ? xAxis / magnitude : 0;
-        const nz = magnitude > 0 ? zAxis / magnitude : 0;
+        const movement = movementDirection(player.input, player.team);
         const weatherSpeed = PLAYER_SPEED * environment.playerSpeedMultiplier;
         const next = {
-            x: clamp(current.x + nx * weatherSpeed * dt, -FIELD_WIDTH / 2 + PLAYER_RADIUS, FIELD_WIDTH / 2 - PLAYER_RADIUS),
+            x: current.x + movement.x * weatherSpeed * dt,
             y: PLAYER_HEIGHT / 2,
-            z: clamp(current.z + nz * weatherSpeed * dt, -FIELD_LENGTH / 2 + PLAYER_RADIUS, FIELD_LENGTH / 2 - PLAYER_RADIUS)
+            z: current.z + movement.z * weatherSpeed * dt
         };
         const resolvedNext = this.resolvePlayerHazards(next);
         player.velocity = {
@@ -766,8 +776,8 @@ class UnsoccerServer {
             y: 0,
             z: (resolvedNext.z - current.z) / dt
         };
-        if (magnitude > 0.05)
-            player.yaw = Math.atan2(nx, nz);
+        if (movement.magnitude > 0.05)
+            player.yaw = Math.atan2(movement.x, movement.z);
         else
             player.yaw = player.input.yaw;
         player.body.setNextKinematicTranslation(resolvedNext);
@@ -811,8 +821,8 @@ class UnsoccerServer {
                 continue;
             const nx = distance > 0.001 ? dx / distance : 1;
             const nz = distance > 0.001 ? dz / distance : 0;
-            resolved.x = clamp(hazard.position.x + nx * safeRadius, -FIELD_WIDTH / 2 + PLAYER_RADIUS, FIELD_WIDTH / 2 - PLAYER_RADIUS);
-            resolved.z = clamp(hazard.position.z + nz * safeRadius, -FIELD_LENGTH / 2 + PLAYER_RADIUS, FIELD_LENGTH / 2 - PLAYER_RADIUS);
+            resolved.x = hazard.position.x + nx * safeRadius;
+            resolved.z = hazard.position.z + nz * safeRadius;
         }
         return resolved;
     }

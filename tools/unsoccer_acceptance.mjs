@@ -5,6 +5,7 @@ import net from "node:net";
 import path from "node:path";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const FIELD_WIDTH = 24;
 const FIELD_LENGTH = 36;
 const BALL_RADIUS = 0.48;
 const PLAYER_HEIGHT = 1.75;
@@ -177,7 +178,7 @@ async function main() {
   try {
     const health = await waitForHealth(baseUrl, () => exitCode, stderrLines);
     assert.equal(health.ok, true);
-    assert.equal(health.version, "v0.0.008");
+    assert.equal(health.version, "v0.0.009");
 
     let state = (await api("GET", "/api/test/state")).state;
     const beforeProbeAudioId = maxAudioEventId(state);
@@ -192,7 +193,7 @@ async function main() {
 
     const beforeWebSocketJoinAudioId = maxAudioEventId(state);
     const wsJoin = await joinWebSocketAndReadState(baseUrl, "WsAudio");
-    assert.equal(wsJoin.joined.version, "v0.0.008");
+    assert.equal(wsJoin.joined.version, "v0.0.009");
     assertAudioEvent(
       wsJoin.state,
       beforeWebSocketJoinAudioId,
@@ -209,6 +210,8 @@ async function main() {
       state.audioEvents.some((event) => event.kind === "roster" && event.change === "spectator" && event.playerId === playerAt(state, 4).id),
       "spectator assignment should emit roster audio event"
     );
+    await assertMovementControls(api);
+    await assertPlayerCanLeavePitch(api);
 
     await assertKick(api, "left", { x: -0.34, y: BALL_RADIUS + 0.04, z: 1.0 }, { kickLeft: 1 });
     await assertKick(api, "right", { x: 0.34, y: BALL_RADIUS + 0.04, z: 1.0 }, { kickRight: 1 });
@@ -218,11 +221,11 @@ async function main() {
     const bodyPlayerId = playerAt(state, 0).id;
     await api("POST", "/api/test/player/0", {
       position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
-      yaw: Math.PI,
-      input: { up: true, down: false, left: false, right: false, kickLeft: 0, kickRight: 0, head: 0, yaw: Math.PI }
+      yaw: 0,
+      input: { up: true, down: false, left: false, right: false, kickLeft: 0, kickRight: 0, head: 0, yaw: 0 }
     });
     await api("POST", "/api/test/ball", {
-      position: { x: 0, y: BALL_RADIUS + 0.04, z: -0.95 },
+      position: { x: 0, y: BALL_RADIUS + 0.04, z: 0.95 },
       velocity: { x: 0, y: 0, z: 0 }
     });
     const beforeBodyAudioId = maxAudioEventId(state);
@@ -263,6 +266,8 @@ async function main() {
         "websocket no-join has no phantom roster audio",
         "websocket join audioEvents",
         "5-client role assignment",
+        "team-relative WASD movement",
+        "player movement beyond pitch bounds",
         "left kick",
         "right kick",
         "head hit",
@@ -280,6 +285,47 @@ async function main() {
 async function prepareSinglePlayer(api) {
   await api("POST", "/api/test/players", { count: 1 });
   return (await api("POST", "/api/test/reset", {})).state;
+}
+
+async function assertMovementControls(api) {
+  await api("POST", "/api/test/players", { count: 2 });
+  await api("POST", "/api/test/reset", {});
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 8 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    input: { up: true, down: false, left: false, right: false, kickLeft: 0, kickRight: 0, head: 0, yaw: 0 }
+  });
+  let state = (await api("POST", "/api/test/tick", { frames: 6 })).state;
+  assert.ok(playerAt(state, 0).position.z > 0.5, "blue player W should move toward +Z/opponent goal");
+
+  await api("POST", "/api/test/player/1", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    input: { up: true, down: false, left: false, right: false, kickLeft: 0, kickRight: 0, head: 0, yaw: Math.PI }
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 6 })).state;
+  assert.ok(playerAt(state, 1).position.z < -0.5, "orange player W should move toward -Z/opponent goal");
+}
+
+async function assertPlayerCanLeavePitch(api) {
+  await api("POST", "/api/test/players", { count: 1 });
+  await api("POST", "/api/test/reset", {});
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 8 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  await api("POST", "/api/test/player/0", {
+    position: { x: FIELD_WIDTH / 2 - 0.1, y: PLAYER_HEIGHT / 2, z: 0 },
+    input: { up: false, down: false, left: false, right: true, kickLeft: 0, kickRight: 0, head: 0, yaw: Math.PI / 2 }
+  });
+  const state = (await api("POST", "/api/test/tick", { frames: 20 })).state;
+  assert.ok(
+    playerAt(state, 0).position.x > FIELD_WIDTH / 2 + 1,
+    "player movement should not be clamped to the pitch rectangle"
+  );
 }
 
 async function assertKick(api, kind, ballPosition, input) {

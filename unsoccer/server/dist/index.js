@@ -950,7 +950,8 @@ class UnsoccerServer {
             score: { ...this.score },
             message: this.message,
             countdown: Math.max(0, this.countdownUntil - now),
-            weather: WEATHER
+            weather: WEATHER,
+            audioEvents: []
         };
     }
     snapshotPlayer(player) {

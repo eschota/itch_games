@@ -27,7 +27,7 @@ stage "artifact checks"
 test -s unsoccer/client/dist/index.html
 test -d unsoccer/client/dist/assets
 find unsoccer/client/dist/assets -maxdepth 1 -type f -name '*.js' -print -quit | grep -q .
-grep -R -q 'v0.0.007' unsoccer/client/dist
+grep -R -q 'v0.0.008' unsoccer/client/dist
 ! grep -Eq 'geckos|node-datachannel|@geckos.io|from ["'\'']ws["'\'']|import\(["'\'']ws["'\'']\)' unsoccer/server/dist/index.js
 stage "install service references"
 sudo -n install -m 0644 ai_chat/deploy/itch-games-io-games-qwertystock.conf /etc/nginx/sites-available/itch-games-io-games.conf

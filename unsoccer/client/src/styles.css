@@ -82,6 +82,7 @@ body {
 #weather,
 #roster {
   width: min(360px, calc(100vw - 28px));
+  max-width: calc(100vw - 28px);
   padding: 8px 10px;
   border: 1px solid rgba(245, 255, 249, 0.16);
   border-radius: 8px;
@@ -89,6 +90,7 @@ body {
   color: #e7f3eb;
   font-size: 0.86rem;
   line-height: 1.35;
+  overflow-wrap: anywhere;
   backdrop-filter: blur(8px);
 }
 
@@ -153,9 +155,19 @@ body {
   #hud {
     top: 10px;
     left: 10px;
+    right: 10px;
+    min-width: 0;
+    width: calc(100vw - 20px);
   }
 
   .score strong {
     font-size: 1.3rem;
+  }
+
+  #status,
+  #weather,
+  #roster {
+    width: 100%;
+    max-width: 100%;
   }
 }

@@ -217,7 +217,7 @@
     <rule>Generated package output belongs under dist/ and is not committed.</rule>
     <rule>Packaging fails if internal skill, role, agent coordination, deploy, or source-control docs leak into the public zip.</rule>
   </tooling>
-  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.007">
+  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.008">
     <client path="unsoccer/client" package="dist/unsoccer-itch.zip" productionPath="/unsoccer/" productionStatic="unsoccer/client/dist" />
     <server path="unsoccer/server" port="8787" health="/api/health" transport="plain-websocket-json" fallback="http-polling" productionApiPath="/unsoccer/api/" productionSocketPath="/unsoccer/socket/" />
     <shared path="unsoccer/shared" />
@@ -229,6 +229,7 @@
     <rule>First 4 connected clients are players; clients 5-32 are spectators/testers.</rule>
     <rule>Itch package is static client-only and requires a separately deployed multiplayer server.</rule>
     <rule>Production transport is plain WebSocket JSON under /unsoccer/socket/ with HTTP polling fallback and built-in Node http/net/crypto handling; geckos.io, ws, and native node-datachannel must not be required runtime dependencies on the Qwertystock host.</rule>
+    <rule>v0.0.008 keeps the HUD version and client bundle weight visible and starts the residential courtyard visual pass around the field.</rule>
   </game>
   <publicSurfaces owner="UI Designer">
     <surface path="index.html" url="https://io-games.mecharulez.com/" role="local-public-catalog" />
@@ -252,7 +253,7 @@
     <rule>Orbital Courier itch upload must include vendored Three.js and must not require cdn.jsdelivr.net at runtime.</rule>
     <rule>External itch.io pages remain incomplete until the public URL, uploaded zip, exact live copy, screenshots, publication date, and version match are recorded under ui_designer/public_pages/.</rule>
   </publicSurfaces>
-  <versioning initial="v0.0.001" current="v0.0.007">
+  <versioning initial="v0.0.001" current="v0.0.008">
     <rule>Every created game starts at v0.0.001.</rule>
     <rule>Every shipped bump increments the version.</rule>
     <rule>The current version is visible in the bottom-left corner.</rule>

@@ -141,8 +141,12 @@ const statusEl = requireElement<HTMLElement>("#status");
 const weatherEl = requireElement<HTMLElement>("#weather");
 const rosterEl = requireElement<HTMLElement>("#roster");
 const versionBadge = requireElement<HTMLElement>("#version-badge");
+const BUILD_WEIGHT_LABEL = "0.56 MB";
 
-versionBadge.textContent = GAME_VERSION;
+versionBadge.textContent = `${GAME_VERSION} • ${BUILD_WEIGHT_LABEL}`;
+document.documentElement.dataset.gameVersion = GAME_VERSION;
+document.documentElement.dataset.gameWeightLabel = BUILD_WEIGHT_LABEL;
+document.documentElement.dataset.environment = "residential-courtyard";
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -426,41 +430,77 @@ function buildField(root: THREE.Group) {
 }
 
 function addStadiumFrame(root: THREE.Group) {
-  const standMaterial = new THREE.MeshStandardMaterial({
-    color: 0x273235,
-    roughness: 0.74,
-    metalness: 0.08
-  });
-  const seatMaterial = new THREE.MeshStandardMaterial({
-    color: 0x314a55,
-    roughness: 0.82,
-    metalness: 0.02
-  });
+  const asphaltMaterial = new THREE.MeshStandardMaterial({ color: 0x36413e, roughness: 0.96 });
+  const courtyard = new THREE.Mesh(
+    new THREE.BoxGeometry(FIELD_WIDTH + 20, 0.08, FIELD_LENGTH + 22),
+    asphaltMaterial
+  );
+  courtyard.position.y = -0.13;
+  courtyard.receiveShadow = true;
+  root.add(courtyard);
+
+  const fenceMaterial = new THREE.MeshStandardMaterial({ color: 0x20342e, roughness: 0.72, metalness: 0.16 });
+  for (const side of [-1, 1] as const) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(FIELD_WIDTH + 2.2, 0.32, 0.09), fenceMaterial);
+    rail.position.set(0, 0.32, side * (FIELD_LENGTH / 2 + 1.25));
+    rail.castShadow = true;
+    rail.receiveShadow = true;
+    root.add(rail);
+  }
+  for (const side of [-1, 1] as const) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.32, FIELD_LENGTH + 2.2), fenceMaterial);
+    rail.position.set(side * (FIELD_WIDTH / 2 + 1.25), 0.32, 0);
+    rail.castShadow = true;
+    rail.receiveShadow = true;
+    root.add(rail);
+  }
+
+  for (const [x, z, width, height, depth, color, side] of [
+    [-9.2, -FIELD_LENGTH / 2 - 8.2, 5.8, 8.4, 2.6, 0x6d7a7c, -1],
+    [0, -FIELD_LENGTH / 2 - 8.8, 6.6, 10.2, 2.8, 0x859092, -1],
+    [9.4, -FIELD_LENGTH / 2 - 8.1, 5.5, 7.6, 2.4, 0x5f7074, -1],
+    [-8.6, FIELD_LENGTH / 2 + 8.4, 5.9, 8.1, 2.7, 0x7d776f, 1],
+    [0.8, FIELD_LENGTH / 2 + 9.1, 6.8, 11.0, 2.9, 0x8b8176, 1],
+    [10.1, FIELD_LENGTH / 2 + 8.1, 5.2, 7.2, 2.5, 0x6b7370, 1]
+  ] as Array<[number, number, number, number, number, number, -1 | 1]>) {
+    addApartmentBlock(root, x, z, width, height, depth, color, side);
+  }
+
+  for (const [x, z, rotation, color] of [
+    [-FIELD_WIDTH / 2 - 5.3, -10.5, 0.08, 0xb9473f],
+    [-FIELD_WIDTH / 2 - 5.1, -4.4, -0.08, 0x416a91],
+    [-FIELD_WIDTH / 2 - 5.4, 5.2, 0.12, 0xd0b055],
+    [FIELD_WIDTH / 2 + 5.2, -7.2, Math.PI + 0.04, 0x8b8f98],
+    [FIELD_WIDTH / 2 + 5.4, 2.2, Math.PI - 0.1, 0x3d6f52]
+  ] as Array<[number, number, number, number]>) {
+    addParkedCar(root, x, z, rotation, color);
+  }
+
+  for (const [x, z, scale] of [
+    [-FIELD_WIDTH / 2 - 3.4, -FIELD_LENGTH / 2 - 5.4, 1.05],
+    [-FIELD_WIDTH / 2 - 4.0, FIELD_LENGTH / 2 + 5.8, 0.92],
+    [FIELD_WIDTH / 2 + 3.8, -FIELD_LENGTH / 2 - 5.6, 1.0],
+    [FIELD_WIDTH / 2 + 4.2, FIELD_LENGTH / 2 + 5.6, 1.1],
+    [-5.6, -FIELD_LENGTH / 2 - 5.8, 0.82],
+    [6.2, FIELD_LENGTH / 2 + 5.7, 0.86]
+  ] as Array<[number, number, number]>) {
+    addCourtyardTree(root, x, z, scale);
+  }
+
+  for (const [x, z, rotation] of [
+    [-6.8, -FIELD_LENGTH / 2 - 3.6, 0],
+    [6.8, FIELD_LENGTH / 2 + 3.6, Math.PI],
+    [-FIELD_WIDTH / 2 - 3.1, 9.2, Math.PI / 2],
+    [FIELD_WIDTH / 2 + 3.1, -9.2, -Math.PI / 2]
+  ] as Array<[number, number, number]>) {
+    addBench(root, x, z, rotation);
+  }
+
   const mastMaterial = new THREE.MeshStandardMaterial({
     color: 0xaebbc4,
     roughness: 0.36,
     metalness: 0.36
   });
-  const longStandGeometry = new THREE.BoxGeometry(FIELD_WIDTH + 8, 1.15, 1.6);
-  const sideStandGeometry = new THREE.BoxGeometry(1.45, 1.15, FIELD_LENGTH + 6);
-  for (const side of [-1, 1] as const) {
-    const stand = new THREE.Mesh(longStandGeometry, standMaterial);
-    stand.position.set(0, 0.62, side * (FIELD_LENGTH / 2 + 4.2));
-    stand.castShadow = true;
-    stand.receiveShadow = true;
-    root.add(stand);
-
-    const seats = new THREE.Mesh(new THREE.BoxGeometry(FIELD_WIDTH + 6.8, 0.18, 1.2), seatMaterial);
-    seats.position.set(0, 1.32, side * (FIELD_LENGTH / 2 + 4.25));
-    root.add(seats);
-  }
-  for (const side of [-1, 1] as const) {
-    const stand = new THREE.Mesh(sideStandGeometry, standMaterial);
-    stand.position.set(side * (FIELD_WIDTH / 2 + 4.2), 0.62, 0);
-    stand.castShadow = true;
-    stand.receiveShadow = true;
-    root.add(stand);
-  }
   for (const [x, z] of [
     [-FIELD_WIDTH / 2 - 5.5, -FIELD_LENGTH / 2 - 4.4],
     [FIELD_WIDTH / 2 + 5.5, -FIELD_LENGTH / 2 - 4.4],
@@ -478,6 +518,123 @@ function addStadiumFrame(root: THREE.Group) {
     lamp.position.set(x, 12.15, z);
     root.add(lamp);
   }
+}
+
+function addApartmentBlock(
+  root: THREE.Group,
+  x: number,
+  z: number,
+  width: number,
+  height: number,
+  depth: number,
+  color: number,
+  side: -1 | 1
+): void {
+  const wall = new THREE.Mesh(
+    new THREE.BoxGeometry(width, height, depth),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.82, metalness: 0.03 })
+  );
+  wall.position.set(x, height / 2 - 0.08, z);
+  wall.castShadow = true;
+  wall.receiveShadow = true;
+  root.add(wall);
+
+  const roof = new THREE.Mesh(
+    new THREE.BoxGeometry(width + 0.35, 0.18, depth + 0.35),
+    new THREE.MeshStandardMaterial({ color: 0xd8e5e2, roughness: 0.78 })
+  );
+  roof.position.set(x, height + 0.02, z);
+  roof.castShadow = true;
+  root.add(roof);
+
+  const windowMaterial = new THREE.MeshBasicMaterial({ color: 0xffd987, toneMapped: false });
+  const windowRows = Math.max(3, Math.floor(height / 1.35));
+  const windowColumns = Math.max(3, Math.floor(width / 1.25));
+  const facadeZ = z - side * (depth / 2 + 0.024);
+  for (let row = 0; row < windowRows; row += 1) {
+    for (let column = 0; column < windowColumns; column += 1) {
+      if ((row + column) % 5 === 0) continue;
+      const windowMesh = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.32, 0.035), windowMaterial);
+      windowMesh.position.set(
+        x - width / 2 + 0.72 + column * ((width - 1.4) / Math.max(1, windowColumns - 1)),
+        1.0 + row * ((height - 1.8) / Math.max(1, windowRows - 1)),
+        facadeZ
+      );
+      root.add(windowMesh);
+    }
+  }
+}
+
+function addParkedCar(root: THREE.Group, x: number, z: number, rotation: number, color: number): void {
+  const car = new THREE.Group();
+  car.position.set(x, 0, z);
+  car.rotation.y = rotation;
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(1.25, 0.36, 2.2),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.48, metalness: 0.18 })
+  );
+  body.position.y = 0.28;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  car.add(body);
+  const cabin = new THREE.Mesh(
+    new THREE.BoxGeometry(0.86, 0.42, 1.0),
+    new THREE.MeshStandardMaterial({ color: 0xa9d3e8, roughness: 0.25, metalness: 0.05 })
+  );
+  cabin.position.y = 0.68;
+  cabin.castShadow = true;
+  car.add(cabin);
+  const wheelMaterial = new THREE.MeshStandardMaterial({ color: 0x121616, roughness: 0.74 });
+  for (const wx of [-0.68, 0.68]) {
+    for (const wz of [-0.72, 0.72]) {
+      const wheel = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.24, 0.36), wheelMaterial);
+      wheel.position.set(wx, 0.18, wz);
+      wheel.castShadow = true;
+      car.add(wheel);
+    }
+  }
+  root.add(car);
+}
+
+function addCourtyardTree(root: THREE.Group, x: number, z: number, scale: number): void {
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.13 * scale, 0.18 * scale, 1.35 * scale, 9),
+    new THREE.MeshStandardMaterial({ color: 0x654832, roughness: 0.88 })
+  );
+  trunk.position.set(x, 0.68 * scale, z);
+  trunk.castShadow = true;
+  root.add(trunk);
+
+  const crown = new THREE.Mesh(
+    new THREE.SphereGeometry(0.9 * scale, 16, 10),
+    new THREE.MeshStandardMaterial({ color: 0x2f7a55, roughness: 0.92 })
+  );
+  crown.position.set(x, 1.65 * scale, z);
+  crown.scale.set(1.0, 1.18, 0.92);
+  crown.castShadow = true;
+  crown.receiveShadow = true;
+  root.add(crown);
+}
+
+function addBench(root: THREE.Group, x: number, z: number, rotation: number): void {
+  const bench = new THREE.Group();
+  bench.position.set(x, 0, z);
+  bench.rotation.y = rotation;
+  const wood = new THREE.MeshStandardMaterial({ color: 0x8a5a38, roughness: 0.82 });
+  const metal = new THREE.MeshStandardMaterial({ color: 0x232a2a, roughness: 0.7, metalness: 0.18 });
+  for (const y of [0.45, 0.72]) {
+    const plank = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.14, 0.18), wood);
+    plank.position.y = y;
+    plank.castShadow = true;
+    bench.add(plank);
+  }
+  for (const xOffset of [-0.72, 0.72]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.44, 0.14), metal);
+    leg.position.set(xOffset, 0.22, 0);
+    leg.castShadow = true;
+    bench.add(leg);
+  }
+  root.add(bench);
 }
 
 function addGoal(root: THREE.Group, side: -1 | 1) {

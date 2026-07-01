@@ -21,7 +21,7 @@ Orbital Courier is a tiny browser game built with Three.js for itch.io HTML5 upl
 
 ## unsoccer / Ragdoll Soccer II
 
-`unsoccer` is currently `v0.0.007` as a physical multiplayer soccer prototype:
+`unsoccer` is currently `v0.0.008` as a physical multiplayer soccer prototype:
 
 - MavonEngine-style client/server split with a headless authoritative server.
 - Three.js client rendering, Rapier3D server physics, WebSocket transport, and
@@ -35,6 +35,9 @@ Orbital Courier is a tiny browser game built with Three.js for itch.io HTML5 upl
 - Procedural Web Audio follows authoritative server snapshots for contacts,
   goals, roster changes, ball rolling, and weather; debug fields expose played
   and blocked audio events for browser unlock QA.
+- The HUD keeps the release version and current client bundle weight visible.
+- The field is framed as a residential courtyard with procedural apartment
+  blocks, parked cars, trees, benches, and floodlights.
 - Free3D character candidates are tracked in `unsoccer/assets/`, but runtime
   ships procedural placeholders until per-model provenance is confirmed.
 
@@ -47,7 +50,7 @@ and itch.io presentation guidance. The current source-of-truth brief is
 
 ## Version
 
-Current game release: `v0.0.007`.
+Current game release: `v0.0.008`.
 
 Game releases use `v0.0.001`-style semantic project versioning. The already
 published first build is treated as `v0.0.001`; this auto-start and input fix is
@@ -57,8 +60,9 @@ the game-over overlay visual-only so iframe mouse/touch restart clicks route
 through the canvas. The `v0.0.006` release adds procedural Web Audio feedback,
 browser gesture unlock, engine ambience, gameplay SFX, and a network-ready
 audio event contract. The `v0.0.007` release realigns release metadata after
-the deploy/version drift report. The game renders the release version in the
-bottom-left corner.
+the deploy/version drift report. The `v0.0.008` release adds the always-visible
+client bundle weight badge and starts the residential courtyard art pass. The
+game renders the release version in the bottom-left corner.
 
 ## Local Run
 

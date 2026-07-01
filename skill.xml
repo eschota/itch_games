@@ -20,6 +20,7 @@
     <child path="ui_designer/public_pages/unsoccer-itch-assets" role="unsoccer-itch-storefront-assets" />
     <child path="game_designer_skill.md" role="game-designer-root" />
     <child path="game_designer/game_designer.skill.md" role="game-designer-workspace" />
+    <child path="game_designer/briefs/unsoccer-v0.0.009-core-loop.md" role="unsoccer-v0.0.009-core-loop-brief" />
     <child path="programmer_skill.md" role="programmer-root" />
     <child path="programmer/programmer.skill.md" role="programmer-workspace" />
     <child path="programmer/checks/2026-07-01-unsoccer-v0.0.003-acceptance.md" role="unsoccer-v0.0.003-acceptance-evidence" />
@@ -93,6 +94,9 @@
       <node path="art_director" skill="art_director/art_director.skill.md">
         <node path="art_director/style_guides/unsoccer-hdr-day-cycle-camera.md" role="unsoccer-art-direction-target" owner="Art Director" />
         <node path="art_director/briefs/unsoccer-v0.0.001-visual-vertical-slice.md" role="unsoccer-visual-vertical-slice-brief" owner="Art Director" />
+      </node>
+      <node path="game_designer" skill="game_designer/game_designer.skill.md">
+        <node path="game_designer/briefs/unsoccer-v0.0.009-core-loop.md" role="unsoccer-v0.0.009-core-loop-brief" owner="Game Designer" />
       </node>
       <node path="ai_chat" skill="ai_chat/ai_chat.skill.md">
         <node path="ai_chat/deploy" skill="ai_chat/deploy/deploy.skill.md" role="transport-deploy-references" />
@@ -185,6 +189,7 @@
       <rule>Use game_designer/ for non-runtime ideas, systems, tuning, level notes, playtests, and briefs.</rule>
       <rule>Game Designer proposes creative ideas and feature improvements when a concrete opportunity improves the current task, without forcing constant idea posts.</rule>
       <rule>Game Designer posts project-development ideas to chat as concise Idea messages, but avoids repeated or constant idea posting unless the Producer asks.</rule>
+      <artifact path="game_designer/briefs/unsoccer-v0.0.009-core-loop.md" role="unsoccer-v0.0.009-core-loop-brief" />
     </workspace>
     <workspace name="programmer" rootSkill="programmer_skill.md" directorySkill="programmer/programmer.skill.md">
       <rule>Use programmer/ for non-runtime investigations, profiling, compatibility notes, plans, and validation checks.</rule>

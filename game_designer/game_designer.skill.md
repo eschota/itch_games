@@ -42,6 +42,9 @@ Use this file for work inside `/itch_games/game_designer`.
 - `tuning/`: difficulty tables, score curves, timing experiments.
 - `playtests/`: observations, player feedback, session notes.
 - `briefs/`: design briefs for programmer, art, UI, sound, and QA.
+- `briefs/unsoccer-v0.0.009-core-loop.md`: current UnSoccer Snowyard Pressure
+  core-loop brief covering weather lanes, stamina, sprint, super-shot rules,
+  scoring target, role handoff, and acceptance checks.
 - `temp/`: disposable prototypes and temporary design docs.
 
 ## Rules

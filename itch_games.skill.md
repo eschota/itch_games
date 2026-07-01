@@ -66,6 +66,9 @@ Use this file for work inside `/itch_games`.
   wireframes, copy, references, and viewport checks.
 - `game_designer/`: non-runtime Game Designer workspace for ideas, systems,
   tuning, level notes, playtests, and briefs.
+- `game_designer/briefs/unsoccer-v0.0.009-core-loop.md`: UnSoccer Snowyard
+  Pressure core-loop, weather-lane, stamina, sprint, super-shot, scoring, and
+  role-handoff brief.
 - `programmer/`: non-runtime Programmer workspace for investigations,
   profiling, compatibility notes, plans, and validation checks.
 - `programmer/checks/2026-07-01-unsoccer-v0.0.003-acceptance.md`: UnSoccer

@@ -43,6 +43,8 @@ Use this root skill when changing, packaging, validating, or publishing the
     `art_director/briefs/unsoccer-v0.0.001-visual-vertical-slice.md`
 - Game Designer: `game_designer_skill.md`,
   `game_designer/game_designer.skill.md`
+  - UnSoccer v0.0.009 core-loop brief:
+    `game_designer/briefs/unsoccer-v0.0.009-core-loop.md`
 - Programmer: `programmer_skill.md`, `programmer/programmer.skill.md`
   - UnSoccer v0.0.003 acceptance evidence:
     `programmer/checks/2026-07-01-unsoccer-v0.0.003-acceptance.md`

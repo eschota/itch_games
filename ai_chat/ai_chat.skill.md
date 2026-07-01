@@ -32,6 +32,14 @@ Use this file for work inside `/itch_games/ai_chat`.
 - Keep commit history visible in the service menu, separate from chat messages.
 - Keep webhook autodeploy protected by the server-only
   `AI_CHAT_WEBHOOK_SECRET`; never commit it.
+- Keep Telegram bridge credentials protected by the server-only
+  `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, and `TELEGRAM_WEBHOOK_SECRET`;
+  never commit them.
+- Telegram messages from real users must enter the shared chat as
+  `Продюсер: <text>`.
+- Telegram must call `/ai_chat/api/telegram-webhook` with
+  `X-Telegram-Bot-Api-Secret-Token`; do not use polling when the webhook is
+  active.
 - Keep `itch-games-autodeploy.timer` disabled after webhook deploy is active.
 - When changing this service, post start/change/result messages to the live chat
   once the service is available.

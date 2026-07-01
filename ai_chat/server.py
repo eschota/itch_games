@@ -18,6 +18,7 @@ import uuid
 from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib import request as urlrequest
 from urllib.parse import parse_qs, urlparse
 
 
@@ -26,6 +27,7 @@ APP_DIR = pathlib.Path(__file__).resolve().parent
 STATIC_DIR = APP_DIR / "static"
 DATA_DIR = pathlib.Path(os.environ.get("AI_CHAT_DATA_DIR", APP_DIR / "data"))
 MESSAGES_FILE = DATA_DIR / "messages.jsonl"
+TELEGRAM_SEEN_FILE = DATA_DIR / "telegram_seen_updates.txt"
 MAX_MESSAGE_CHARS = 4000
 MAX_ROLE_CHARS = 80
 WRITE_LOCK = threading.Lock()
@@ -89,7 +91,7 @@ def read_messages(limit: int) -> list[dict]:
     return rows[-limit:]
 
 
-def append_message(role: str, text: str) -> dict:
+def append_message(role: str, text: str, source: str = "web", mirror_telegram: bool = True) -> dict:
     role = " ".join(role.strip().split())[:MAX_ROLE_CHARS] or "Agent"
     text = text.strip()[:MAX_MESSAGE_CHARS]
     if not text:
@@ -104,13 +106,148 @@ def append_message(role: str, text: str) -> dict:
         "branch": context["branch"],
         "commit": context["commit"],
         "dirty": context["dirty"],
+        "source": source,
     }
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     with WRITE_LOCK:
         with MESSAGES_FILE.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")))
             handle.write("\n")
+    if mirror_telegram and source != "telegram":
+        mirror_record_to_telegram(record)
     return record
+
+
+def telegram_config() -> dict:
+    token = (os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("AI_CHAT_TELEGRAM_TOKEN") or "").strip()
+    chat_id = (os.environ.get("TELEGRAM_CHAT_ID") or os.environ.get("AI_CHAT_TELEGRAM_CHAT_ID") or "").strip()
+    secret = (
+        os.environ.get("TELEGRAM_WEBHOOK_SECRET")
+        or os.environ.get("AI_CHAT_TELEGRAM_SECRET_TOKEN")
+        or ""
+    ).strip()
+    return {
+        "enabled": bool(token and chat_id),
+        "token": token,
+        "chat_id": chat_id,
+        "secret": secret,
+    }
+
+
+def telegram_api(method: str, payload: dict, timeout: int = 35) -> dict:
+    config = telegram_config()
+    if not config["enabled"]:
+        raise RuntimeError("Telegram bridge is not configured")
+    url = f"https://api.telegram.org/bot{config['token']}/{method}"
+    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    req = urlrequest.Request(url, data=data, headers={"Content-Type": "application/json"})
+    with urlrequest.urlopen(req, timeout=timeout) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def telegram_text(record: dict) -> str:
+    role = str(record.get("role") or "Agent")
+    message = str(record.get("message") or "")
+    version = str(record.get("project_version") or "version unknown")
+    branch = str(record.get("branch") or "branch unknown")
+    commit = str(record.get("commit") or "commit unknown")
+    dirty = " dirty" if record.get("dirty") else ""
+    text = f"{role}: {message}\n\n{version} - {branch} @ {commit}{dirty}"
+    if len(text) > 3900:
+        text = text[:3890].rstrip() + "\n...[truncated]"
+    return text
+
+
+def send_telegram_message(text: str) -> None:
+    config = telegram_config()
+    if not config["enabled"]:
+        return
+    try:
+        telegram_api(
+            "sendMessage",
+            {
+                "chat_id": config["chat_id"],
+                "text": text[:4096],
+                "disable_web_page_preview": True,
+            },
+        )
+    except Exception as exc:
+        print(f"telegram send failed: {exc}")
+
+
+def mirror_record_to_telegram(record: dict) -> None:
+    if not telegram_config()["enabled"]:
+        return
+    thread = threading.Thread(target=send_telegram_message, args=(telegram_text(record),), daemon=True)
+    thread.start()
+
+
+def telegram_update_seen(update_id: int) -> bool:
+    if update_id <= 0:
+        return False
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with WRITE_LOCK:
+        seen: set[int] = set()
+        if TELEGRAM_SEEN_FILE.exists():
+            for line in TELEGRAM_SEEN_FILE.read_text(encoding="utf-8").splitlines():
+                try:
+                    seen.add(int(line.strip()))
+                except ValueError:
+                    continue
+        if update_id in seen:
+            return True
+        seen.add(update_id)
+        recent = sorted(seen)[-1000:]
+        TELEGRAM_SEEN_FILE.write_text("\n".join(str(item) for item in recent), encoding="utf-8")
+    return False
+
+
+def telegram_sender_name(message: dict) -> str:
+    sender = message.get("from") or {}
+    parts = [str(sender.get("first_name") or "").strip(), str(sender.get("last_name") or "").strip()]
+    full_name = " ".join(part for part in parts if part)
+    return full_name or str(sender.get("username") or "Telegram user")
+
+
+def telegram_message_text(message: dict) -> str:
+    text = message.get("text")
+    if text is None:
+        text = message.get("caption")
+    return str(text or "").strip()
+
+
+def process_telegram_update(update: dict) -> bool:
+    update_id = int(update.get("update_id", 0) or 0)
+    if telegram_update_seen(update_id):
+        return False
+    message = update.get("message") or update.get("edited_message") or {}
+    chat = message.get("chat") or {}
+    config = telegram_config()
+    if str(chat.get("id")) != str(config["chat_id"]):
+        return False
+    sender = message.get("from") or {}
+    if sender.get("is_bot"):
+        return False
+    text = telegram_message_text(message)
+    if not text:
+        return False
+    producer_text = f"Продюсер: {text}"
+    source_note = telegram_sender_name(message)
+    if source_note:
+        producer_text = f"{producer_text}\n\nTelegram user: {source_note}"
+    append_message("Продюсер", producer_text, source="telegram", mirror_telegram=False)
+    return True
+
+
+def verify_telegram_secret(headers) -> tuple[bool, str]:
+    config = telegram_config()
+    secret = config.get("secret") or ""
+    if not secret:
+        return False, "Telegram webhook secret is not configured"
+    received = headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+    if not hmac.compare_digest(received, secret):
+        return False, "invalid Telegram webhook secret"
+    return True, "ok"
 
 
 def recent_commits(limit: int = 80) -> dict:
@@ -245,6 +382,7 @@ class Handler(BaseHTTPRequestHandler):
                     "time": now_iso(),
                     "project_version": project_version(),
                     "git": git_context(),
+                    "telegram": {"enabled": telegram_config()["enabled"]},
                 }
             )
             return
@@ -266,6 +404,7 @@ class Handler(BaseHTTPRequestHandler):
                     "project_version": project_version(),
                     "git": git_context(),
                     "message_count": len(read_messages(100000)),
+                    "telegram": {"enabled": telegram_config()["enabled"]},
                 }
             )
             return
@@ -275,6 +414,9 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/api/deploy-webhook":
             self._handle_deploy_webhook()
+            return
+        if parsed.path == "/api/telegram-webhook":
+            self._handle_telegram_webhook()
             return
         if parsed.path != "/api/messages":
             self._send_error_json("not found", HTTPStatus.NOT_FOUND)
@@ -331,6 +473,30 @@ class Handler(BaseHTTPRequestHandler):
         start_deploy_thread(payload)
         self._send_json({"ok": True, "accepted": True, "event": event, "ref": ref}, HTTPStatus.ACCEPTED)
 
+    def _handle_telegram_webhook(self) -> None:
+        ok, reason = verify_telegram_secret(self.headers)
+        if not ok:
+            self._send_error_json(reason, HTTPStatus.FORBIDDEN)
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            length = 0
+        if length <= 0 or length > 262144:
+            self._send_error_json("invalid request size", HTTPStatus.BAD_REQUEST)
+            return
+        try:
+            payload = json.loads(self.rfile.read(length).decode("utf-8"))
+        except json.JSONDecodeError:
+            self._send_error_json("invalid json", HTTPStatus.BAD_REQUEST)
+            return
+        try:
+            accepted = process_telegram_update(payload)
+        except Exception as exc:
+            self._send_error_json(f"telegram update failed: {html.escape(str(exc))}", HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+        self._send_json({"ok": True, "accepted": accepted})
+
     def _send_static(self, path: str) -> None:
         if path in {"", "/"}:
             target = STATIC_DIR / "index.html"
@@ -361,6 +527,7 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=int(os.environ.get("AI_CHAT_PORT", "8765")))
     args = parser.parse_args()
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    print(f"telegram bridge {'enabled' if telegram_config()['enabled'] else 'disabled'}")
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"ai_chat listening on http://{args.host}:{args.port}")
     try:

@@ -4,6 +4,7 @@ const roleInput = document.querySelector("#roleInput");
 const messageInput = document.querySelector("#messageInput");
 const versionEl = document.querySelector("#version");
 const gitEl = document.querySelector("#git");
+const telegramEl = document.querySelector("#telegram");
 const branchesEl = document.querySelector("#branches");
 const commitsEl = document.querySelector("#commits");
 const refreshButton = document.querySelector("#refreshButton");
@@ -44,6 +45,8 @@ async function loadStatus() {
   versionEl.textContent = status.project_version || "version unknown";
   const git = status.git || {};
   gitEl.textContent = `${git.branch || "unknown"} @ ${git.commit || "unknown"}${git.dirty ? " dirty" : ""}`;
+  const telegram = status.telegram || {};
+  telegramEl.textContent = `telegram ${telegram.enabled ? "on" : "off"}`;
 }
 
 async function loadMessages() {

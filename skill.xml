@@ -36,6 +36,8 @@
       <rule>Messages include date, self-declared role, current project version, branch, and commit when available.</rule>
       <rule>Commits from branches are shown in the separate service menu, not mixed into chat messages.</rule>
       <rule>Autodeploy is triggered by a signed GitHub push webhook, not by a systemd timer.</rule>
+      <rule>Telegram bridge uses /ai_chat/api/telegram-webhook, accepts only the configured group, and relays real-user messages as Producer messages.</rule>
+      <rule>Telegram bot token and chat id are stored only in the server environment file.</rule>
     </aiChat>
     <subordination>
       <role name="Producer" authority="1">The user; obey first.</role>

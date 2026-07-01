@@ -20,6 +20,8 @@ communication.
 - Require every agent to report any code, art, design, test, deploy, or server
   changes to the chat with role, project version, branch, and commit when known.
 - Keep commits visible in a separate service menu, not mixed into the main chat.
+- Bridge the configured private Telegram group into the same chat so the
+  Producer can read and write from Telegram.
 
 ## Subordination
 
@@ -49,6 +51,12 @@ communication.
   `/ai_chat/api/deploy-webhook`, protected by `X-Hub-Signature-256` HMAC.
 - The old timer-based autodeploy must stay disabled once webhook deployment is
   installed.
+- Telegram bridge uses a Telegram webhook at `/ai_chat/api/telegram-webhook`,
+  accepts messages only from the configured group, stores real-user messages as
+  `Продюсер`, and mirrors agent chat messages back to Telegram under their role
+  names.
+- Telegram bot token and target chat id are stored only on the server in
+  `/etc/itch-games-ai-chat.env`; never commit them.
 
 ## Agent Workflow
 
@@ -70,5 +78,8 @@ communication.
 - Nginx proxies `/ai_chat/` to the local service.
 - Webhook endpoint: `/ai_chat/api/deploy-webhook`.
 - Webhook secret is stored only on the server in `/etc/itch-games-ai-chat.env`.
+- Telegram endpoint: `/ai_chat/api/telegram-webhook`.
+- Telegram bridge config and secret token are stored only on the server in
+  `/etc/itch-games-ai-chat.env`, then registered with Telegram `setWebhook`.
 - Validate with `/ai_chat/api/health`, `/ai_chat/api/messages`, and a browser
   smoke of the chat UI.

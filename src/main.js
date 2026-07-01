@@ -4,8 +4,10 @@ const canvas = document.querySelector("#game-canvas");
 const scoreEl = document.querySelector("#score");
 const livesEl = document.querySelector("#lives");
 const bestEl = document.querySelector("#best");
+const versionEl = document.querySelector("#game-version");
 const overlay = document.querySelector("#overlay");
 const startButton = document.querySelector("#start-button");
+const gameVersion = "v0.0.002";
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -100,8 +102,10 @@ const state = {
 const input = { left: false, right: false, pointer: false, target: 0 };
 const hazards = [];
 const cores = [];
+let lastControlStartAt = 0;
 
 bestEl.textContent = String(state.best);
+versionEl.textContent = gameVersion;
 
 function resize() {
   const width = innerWidth;
@@ -113,6 +117,7 @@ function resize() {
 
 function setOverlay(visible, title = "Orbital Courier", message = "Collect energy cores, dodge debris, and keep the courier alive.") {
   overlay.classList.toggle("visible", visible);
+  overlay.setAttribute("aria-hidden", String(!visible));
   overlay.querySelector("h1").textContent = title;
   overlay.querySelector("p").textContent = message;
   startButton.textContent = state.score > 0 ? "Restart Run" : "Start Run";
@@ -132,6 +137,14 @@ function clear(list) {
   list.length = 0;
 }
 
+function focusCanvas() {
+  try {
+    canvas.focus({ preventScroll: true });
+  } catch {
+    canvas.focus();
+  }
+}
+
 function startGame() {
   clear(hazards);
   clear(cores);
@@ -145,8 +158,10 @@ function startGame() {
     grace: 1.2,
     time: 0
   });
+  Object.assign(input, { left: false, right: false, pointer: false, target: 0 });
   player.position.x = 0;
   setOverlay(false);
+  focusCanvas();
   hud();
 }
 
@@ -262,7 +277,31 @@ function frame(now) {
 }
 
 function lane(clientX) {
-  return ((clientX / Math.max(innerWidth, 1)) * 2 - 1) * laneLimit;
+  const rect = canvas.getBoundingClientRect();
+  const x = (clientX - rect.left) / Math.max(rect.width, 1);
+  return (THREE.MathUtils.clamp(x, 0, 1) * 2 - 1) * laneLimit;
+}
+
+function capturePointer(event) {
+  if (!canvas.setPointerCapture) return;
+  try {
+    canvas.setPointerCapture(event.pointerId);
+  } catch {
+    // Some iframe hosts reject capture if the pointer was retargeted.
+  }
+}
+
+function stopPointerControl() {
+  input.pointer = false;
+}
+
+function startFromControl(event) {
+  event?.preventDefault();
+  event?.stopPropagation();
+  const now = performance.now();
+  if (now - lastControlStartAt < 250) return;
+  lastControlStartAt = now;
+  startGame();
 }
 
 addEventListener("resize", resize);
@@ -278,22 +317,24 @@ addEventListener("keyup", (event) => {
   if (event.code === "ArrowLeft" || event.code === "KeyA") input.left = false;
   if (event.code === "ArrowRight" || event.code === "KeyD") input.right = false;
 });
-addEventListener("pointerdown", (event) => {
+canvas.addEventListener("pointerdown", (event) => {
+  if (!state.running) return;
+  event.preventDefault();
   input.pointer = true;
   input.target = lane(event.clientX);
-  canvas.setPointerCapture?.(event.pointerId);
+  focusCanvas();
+  capturePointer(event);
 });
-addEventListener("pointermove", (event) => {
+canvas.addEventListener("pointermove", (event) => {
+  event.preventDefault();
   if (input.pointer) input.target = lane(event.clientX);
 });
-addEventListener("pointerup", () => {
-  input.pointer = false;
-});
-addEventListener("pointercancel", () => {
-  input.pointer = false;
-});
-startButton.addEventListener("click", startGame);
+canvas.addEventListener("pointerup", stopPointerControl);
+canvas.addEventListener("pointercancel", stopPointerControl);
+startButton.addEventListener("pointerup", startFromControl);
+startButton.addEventListener("click", startFromControl);
 
 resize();
 hud();
 requestAnimationFrame(frame);
+startGame();

@@ -28,6 +28,10 @@ canvas {
   font: inherit;
 }
 
+canvas:focus {
+  outline: none;
+}
+
 #game-shell {
   position: fixed;
   inset: 0;
@@ -139,6 +143,19 @@ canvas {
 #start-button:focus-visible {
   background: #7ff0ce;
   outline: none;
+}
+
+#game-version {
+  position: fixed;
+  left: 12px;
+  bottom: 10px;
+  z-index: 4;
+  color: rgba(218, 247, 255, 0.78);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.75);
 }
 
 @media (max-width: 520px) {

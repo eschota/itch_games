@@ -14,11 +14,22 @@ Use this file for work inside `/itch_games`.
 - `src/styles.css`: fullscreen game shell and HUD styling.
 - `tools/package_itch.py`: creates the upload zip in `dist/`.
 
+## Versioning
+
+- Current release: `v0.0.002`.
+- Game releases start at `v0.0.001` and every behavior change increments the
+  version.
+- The visible bottom-left badge, `package.json.gameVersion`, README, and skill
+  docs must stay synchronized.
+
 ## Validation
 
 1. Run `python3 -m http.server 8000`.
 2. Open the game from a browser, not directly from `file://`.
-3. Confirm the scene renders, controls move the courier, score changes, and no
-   console errors are present.
-4. Run `python3 tools/package_itch.py`.
-5. Confirm `dist/orbital-courier-itch.zip` contains `index.html` at archive root.
+3. Confirm the scene auto-starts on load and the bottom-left version badge shows
+   the current release.
+4. Confirm mouse/touch drag on the canvas moves the courier, `A`/`D` or arrow
+   keys still work, and `Space` plus the overlay `Start` button can restart
+   after game over.
+5. Run `python3 tools/package_itch.py`.
+6. Confirm `dist/orbital-courier-itch.zip` contains `index.html` at archive root.

@@ -8,11 +8,12 @@
       name="description"
       content="A small Three.js dodge-and-collect browser game packaged for itch.io."
     />
+    <link rel="icon" href="data:," />
     <link rel="stylesheet" href="./src/styles.css" />
   </head>
   <body>
     <main id="game-shell" aria-label="Orbital Courier game">
-      <canvas id="game-canvas"></canvas>
+      <canvas id="game-canvas" tabindex="0" aria-label="Orbital Courier play field"></canvas>
       <section id="hud" aria-live="polite">
         <div>
           <span class="label">Score</span>
@@ -32,6 +33,7 @@
         <p>Collect energy cores, dodge debris, and keep the courier alive.</p>
         <button id="start-button" type="button">Start Run</button>
       </section>
+      <div id="game-version" aria-label="Version">v0.0.002</div>
     </main>
     <script type="importmap">
       {

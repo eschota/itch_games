@@ -4,6 +4,7 @@
     <child path="itch_games.skill.md" role="directory" />
     <child path="skill.xml" role="machine-map" />
     <child path="index.html" role="runtime-entry" />
+    <child path="package.json" role="package-metadata" />
     <child path="src/main.js" role="game-code" />
     <child path="src/styles.css" role="game-style" />
     <child path="tools/package_itch.py" role="itch-package-helper" />

@@ -23,6 +23,19 @@ const seedTasksButton = document.querySelector("#seedTasksButton");
 
 const api = (path) => `api/${path}`;
 let taskOptionsReady = false;
+const ROLE_BADGES = [
+  { label: "Producer", icon: "👑", match: ["producer", "продюсер", "рџс"] },
+  { label: "Orchestrator", icon: "🧭", match: ["orchestrator"] },
+  { label: "Art", icon: "🎨", match: ["art director"] },
+  { label: "Game", icon: "🎲", match: ["game designer"] },
+  { label: "UI", icon: "🖼️", match: ["ui designer"] },
+  { label: "Code", icon: "💻", match: ["programmer", "developer", "engineer"] },
+  { label: "QA", icon: "🔍", match: ["tester", "qa"] },
+  { label: "Sound", icon: "🎧", match: ["sound designer", "audio"] },
+  { label: "Tasks", icon: "📋", match: ["task queue"] },
+  { label: "Deploy", icon: "🚀", match: ["deploy webhook", "deploy"] },
+  { label: "Telegram", icon: "💬", match: ["telegram"] },
+];
 
 function formatDate(value) {
   const date = new Date(value);
@@ -45,6 +58,28 @@ function escapeText(value) {
     '"': "&quot;",
     "'": "&#039;",
   })[char]);
+}
+
+function roleBadge(role, item = {}) {
+  if (item.role_badge && item.role_icon && item.role_label) {
+    return { icon: item.role_icon, label: item.role_label, text: item.role_badge };
+  }
+  const clean = String(role || "Agent").trim();
+  const key = clean.toLowerCase();
+  const badge = ROLE_BADGES.find((entry) => entry.match.some((part) => key.includes(part)));
+  if (badge) return { icon: badge.icon, label: badge.label, text: `${badge.icon} ${badge.label}` };
+  const fallback = clean.split(/[/:|-]/)[0].trim().split(/\s+/).slice(0, 2).join(" ") || "Agent";
+  return { icon: "🤖", label: fallback.slice(0, 18), text: `🤖 ${fallback.slice(0, 18)}` };
+}
+
+function renderRoleBadge(role, item = {}) {
+  const badge = roleBadge(role, item);
+  return `
+    <span class="role-badge" title="${escapeText(role || badge.label)}">
+      <span class="role-icon" aria-hidden="true">${escapeText(badge.icon)}</span>
+      <span>${escapeText(badge.label)}</span>
+    </span>
+  `;
 }
 
 async function getJson(path) {
@@ -81,7 +116,7 @@ async function loadMessages() {
   messagesEl.innerHTML = messages.map((item) => `
     <article class="message">
       <header>
-        <strong>${escapeText(item.role || "Agent")}</strong>
+        <strong>${renderRoleBadge(item.role || "Agent", item)}</strong>
         <span>${escapeText(formatDate(item.created_at))}</span>
       </header>
       <p>${escapeText(item.message || "")}</p>
@@ -98,8 +133,9 @@ function syncTaskOptions(payload) {
   if (taskOptionsReady) return;
   for (const role of payload.roles || []) {
     const option = document.createElement("option");
+    const badge = roleBadge(role);
     option.value = role;
-    option.textContent = role;
+    option.textContent = `${badge.icon} ${role}`;
     taskRoleFilter.append(option);
   }
   for (const status of payload.statuses || []) {
@@ -133,7 +169,7 @@ function renderComments(task) {
   return `
     <div class="task-comments">
       ${comments.map((comment) => `
-        <p><strong>${escapeText(comment.role || "Agent")}</strong>: ${escapeText(comment.text || "")}</p>
+        <p><strong>${renderRoleBadge(comment.role || "Agent")}</strong>: ${escapeText(comment.text || "")}</p>
       `).join("")}
     </div>
   `;
@@ -148,7 +184,7 @@ async function loadTasks() {
   tasksEl.innerHTML = tasks.map((task) => `
     <article class="task task-${escapeText(task.status || "new")}">
       <header>
-        <strong>${escapeText(task.role || "Role")}</strong>
+        <strong>${renderRoleBadge(task.role || "Role", task)}</strong>
         <span>${escapeText(taskMeta(task))}</span>
       </header>
       <h4>${escapeText(task.title || "")}</h4>

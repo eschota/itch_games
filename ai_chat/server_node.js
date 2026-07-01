@@ -30,6 +30,19 @@ const TASK_ROLES = [
   "Tester",
   "Sound Designer",
 ];
+const ROLE_BADGES = [
+  { label: "Producer", icon: "👑", match: ["producer", "продюсер", "рџс"] },
+  { label: "Orchestrator", icon: "🧭", match: ["orchestrator"] },
+  { label: "Art", icon: "🎨", match: ["art director"] },
+  { label: "Game", icon: "🎲", match: ["game designer"] },
+  { label: "UI", icon: "🖼️", match: ["ui designer"] },
+  { label: "Code", icon: "💻", match: ["programmer", "developer", "engineer"] },
+  { label: "QA", icon: "🔍", match: ["tester", "qa"] },
+  { label: "Sound", icon: "🎧", match: ["sound designer", "audio"] },
+  { label: "Tasks", icon: "📋", match: ["task queue"] },
+  { label: "Deploy", icon: "🚀", match: ["deploy webhook", "deploy"] },
+  { label: "Telegram", icon: "💬", match: ["telegram"] },
+];
 const TASK_STATUSES = ["new", "claimed", "in_progress", "blocked", "review", "done"];
 const TASK_PRIORITIES = ["low", "normal", "high", "urgent"];
 const DEFAULT_TASK_SEEDS = [
@@ -135,6 +148,15 @@ function randomId() {
   return crypto.randomBytes(16).toString("hex");
 }
 
+function roleBadge(role) {
+  const clean = String(role || "Agent").trim();
+  const key = clean.toLowerCase();
+  const badge = ROLE_BADGES.find((item) => item.match.some((part) => key.includes(part)));
+  if (badge) return { icon: badge.icon, label: badge.label, text: `${badge.icon} ${badge.label}` };
+  const fallback = clean.split(/[/:|-]/)[0].trim().split(/\s+/).slice(0, 2).join(" ") || "Agent";
+  return { icon: "🤖", label: fallback.slice(0, 18), text: `🤖 ${fallback.slice(0, 18)}` };
+}
+
 function readPackage() {
   try {
     return JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
@@ -189,10 +211,14 @@ function appendMessage(role, text, source, mirrorTelegram) {
   const cleanText = String(text || "").trim().slice(0, MAX_MESSAGE_CHARS);
   if (!cleanText) throw new Error("message is required");
   const context = gitContext();
+  const badge = roleBadge(cleanRole);
   const record = {
     id: randomId(),
     created_at: nowIso(),
     role: cleanRole,
+    role_icon: badge.icon,
+    role_label: badge.label,
+    role_badge: badge.text,
     message: cleanText,
     project_version: projectVersion(),
     branch: context.branch,
@@ -313,7 +339,11 @@ function validateTaskPayload(payload, existingTask) {
 }
 
 function taskForResponse(task) {
+  const badge = roleBadge(task.role || "Agent");
   return Object.assign({}, task, {
+    role_icon: badge.icon,
+    role_label: badge.label,
+    role_badge: badge.text,
     comments: Array.isArray(task.comments) ? task.comments.slice(-20) : [],
   });
 }
@@ -444,12 +474,13 @@ function telegramApi(method, payload, timeoutMs) {
 
 function telegramText(record) {
   const role = String(record.role || "Agent");
+  const badge = record.role_badge || roleBadge(role).text;
   const message = String(record.message || "");
   const version = String(record.project_version || "version unknown");
   const branch = String(record.branch || "branch unknown");
   const commit = String(record.commit || "commit unknown");
   const dirty = record.dirty ? " dirty" : "";
-  let text = `${role}: ${message}\n\n${version} - ${branch} @ ${commit}${dirty}`;
+  let text = `${badge}: ${message}\n\n${version} - ${branch} @ ${commit}${dirty}`;
   if (text.length > 3900) text = `${text.slice(0, 3890).trimEnd()}\n...[truncated]`;
   return text;
 }
@@ -511,11 +542,11 @@ function processTelegramUpdate(update) {
   if (sender.is_bot) return false;
   const text = telegramMessageText(message);
   if (!text) return false;
-  const senderName = telegramSenderName(message);
-  const producerText = senderName
-    ? `Продюсер: ${text}\n\nTelegram user: ${senderName}`
+  const telegramProducerName = telegramSenderName(message);
+  const telegramProducerText = telegramProducerName
+    ? `Продюсер: ${text}\n\nTelegram user: ${telegramProducerName}`
     : `Продюсер: ${text}`;
-  appendMessage("Продюсер", producerText, "telegram", false);
+  appendMessage("Продюсер", telegramProducerText, "telegram", false);
   return true;
 }
 

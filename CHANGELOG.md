@@ -10,6 +10,11 @@
 - Remove the artificial player clamp to the pitch rectangle; players can leave
   the marked field and are only pushed by explicit gameplay colliders such as
   snowbanks.
+- Ship the Art Director runtime pass: expanded residential courtyard models,
+  procedural animated footballer rigs, visible sun/moon/orbit marker, and
+  QA-readable 120-second day-cycle lighting datasets.
+- Keep server-authored audio events, interpolation, and static client packaging
+  aligned with the new release metadata.
 
 ## unsoccer v0.0.008
 

@@ -3,29 +3,94 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>unsoccer | Рэгдолл-футбол II</title>
+    <title>UnSoccer v0.0.009 | Ragdoll Soccer II</title>
     <meta
       name="description"
-      content="unsoccer v0.0.009: снег, лужи, сугробы и сетевой физический футбол."
+      content="UnSoccer v0.0.009: двор, анимированные игроки, солнце и сетевой физический футбол."
     />
     <link rel="icon" href="data:," />
   </head>
   <body>
-    <main id="app" aria-label="Игра unsoccer">
-      <canvas id="game-canvas" tabindex="0" aria-label="Игровое поле unsoccer"></canvas>
+    <main id="app" aria-label="UnSoccer">
+      <canvas id="game-canvas" tabindex="0" aria-label="UnSoccer play field"></canvas>
       <section id="hud" aria-live="polite">
-        <div class="score">
+        <div id="player-chip" class="hud-panel player-chip">
+          <span id="player-role" class="eyebrow">&#1055;&#1086;&#1076;&#1082;&#1083;&#1102;&#1095;&#1077;&#1085;&#1080;&#1077;</span>
+          <strong id="player-team">&#1047;&#1088;&#1080;&#1090;&#1077;&#1083;&#1100;</strong>
+          <small id="player-input-mode">Screen</small>
+        </div>
+        <div class="score hud-panel">
+          <span>&#1057;&#1080;&#1085;&#1080;&#1077;</span>
           <strong id="blue-score">0</strong>
-          <span>Синие</span>
           <b>:</b>
           <strong id="orange-score">0</strong>
-          <span>Оранжевые</span>
+          <span>&#1054;&#1088;&#1072;&#1085;&#1078;&#1077;&#1074;&#1099;&#1077;</span>
         </div>
-        <div id="weather">Погода: ожидание</div>
-        <div id="status">Подключение</div>
-        <div id="roster"></div>
+        <div id="network-panel" class="hud-panel network-panel">
+          <span id="transport-status">offline</span>
+          <span id="ping-status">-- ms</span>
+          <span id="snapshot-age">snapshot --</span>
+        </div>
+        <div id="event-feed" class="event-feed" aria-live="polite"></div>
+        <div id="status" class="hud-panel status-panel">&#1055;&#1086;&#1076;&#1082;&#1083;&#1102;&#1095;&#1077;&#1085;&#1080;&#1077;</div>
+        <div id="weather" class="hud-panel weather-panel">&#1055;&#1086;&#1075;&#1086;&#1076;&#1072;: &#1086;&#1078;&#1080;&#1076;&#1072;&#1085;&#1080;&#1077;</div>
+        <div id="roster" class="hud-panel roster-panel"></div>
       </section>
-      <div id="version-badge">v0.0.009 • 0.56 MB</div>
+      <div id="control-hints" class="control-hints" aria-live="polite"></div>
+      <div id="toolbar" class="toolbar" aria-label="UnSoccer controls">
+        <button id="settings-button" class="icon-button" type="button" title="Settings" aria-label="Settings">SET</button>
+        <button id="mute-button" class="icon-button" type="button" title="Mute" aria-label="Mute">AUD</button>
+        <button id="fullscreen-button" class="icon-button" type="button" title="Fullscreen" aria-label="Fullscreen">FS</button>
+        <button id="camera-reset-button" class="icon-button" type="button" title="Camera reset" aria-label="Camera reset">CAM</button>
+      </div>
+      <div id="version-badge">v0.0.009 / 0.61 MB</div>
+      <section id="settings-panel" class="settings-panel" aria-modal="true" role="dialog" aria-labelledby="settings-title" hidden>
+        <form id="settings-form" class="settings-shell">
+          <header class="settings-header">
+            <div>
+              <p class="eyebrow">UnSoccer</p>
+              <h1 id="settings-title">&#1053;&#1072;&#1089;&#1090;&#1088;&#1086;&#1081;&#1082;&#1080;</h1>
+            </div>
+            <div class="settings-actions">
+              <span id="settings-save-state">&#1089;&#1086;&#1093;&#1088;&#1072;&#1085;&#1077;&#1085;&#1086;</span>
+              <button id="settings-close-button" type="button">&#1048;&#1075;&#1088;&#1072;</button>
+            </div>
+          </header>
+          <nav class="settings-tabs" aria-label="Settings tabs">
+            <button type="button" data-settings-tab="controls" aria-selected="true">&#1050;&#1086;&#1085;&#1090;&#1088;&#1086;&#1083;&#1100;</button>
+            <button type="button" data-settings-tab="audio">&#1047;&#1074;&#1091;&#1082;</button>
+            <button type="button" data-settings-tab="graphics">&#1043;&#1088;&#1072;&#1092;&#1080;&#1082;&#1072;</button>
+            <button type="button" data-settings-tab="network">&#1057;&#1077;&#1090;&#1100;</button>
+            <button type="button" data-settings-tab="accessibility">&#1044;&#1086;&#1089;&#1090;&#1091;&#1087;</button>
+          </nav>
+          <div class="settings-body">
+            <section class="settings-tab-panel" data-settings-panel="controls">
+              <label><span>&#1056;&#1077;&#1078;&#1080;&#1084;</span><select id="setting-movement-mode"><option value="screen">Screen-relative</option><option value="team-goal">Team-goal relative</option><option value="camera">Camera-relative</option></select></label>
+              <div class="toggle-grid">
+                <label><input id="setting-invert-fb" type="checkbox" /> <span>&#1048;&#1085;&#1074;&#1077;&#1088;&#1090; &#1074;&#1087;&#1077;&#1088;&#1077;&#1076;/&#1085;&#1072;&#1079;&#1072;&#1076;</span></label>
+                <label><input id="setting-invert-lr" type="checkbox" /> <span>&#1048;&#1085;&#1074;&#1077;&#1088;&#1090; &#1083;&#1077;&#1074;&#1086;/&#1087;&#1088;&#1072;&#1074;&#1086;</span></label>
+                <label><input id="setting-mirror-team" type="checkbox" /> <span>&#1047;&#1077;&#1088;&#1082;&#1072;&#1083;&#1086; &#1089;&#1090;&#1086;&#1088;&#1086;&#1085;&#1099;</span></label>
+              </div>
+              <div class="input-test-pad" id="input-test-pad" aria-hidden="true"><span data-pad="moveForward">W</span><span data-pad="moveLeft">A</span><span data-pad="moveBack">S</span><span data-pad="moveRight">D</span><span data-pad="leftKick">L</span><span data-pad="rightKick">R</span><span data-pad="headHit">H</span></div>
+              <div class="binding-grid"><button type="button" data-rebind-action="moveForward"></button><button type="button" data-rebind-action="moveBack"></button><button type="button" data-rebind-action="moveLeft"></button><button type="button" data-rebind-action="moveRight"></button><button type="button" data-rebind-action="leftKick"></button><button type="button" data-rebind-action="rightKick"></button><button type="button" data-rebind-action="headHit"></button><button type="button" data-rebind-action="settings"></button><button type="button" data-rebind-action="cameraReset"></button><button type="button" data-rebind-action="muteAudio"></button></div>
+              <p id="binding-conflicts" class="settings-note"></p>
+            </section>
+            <section class="settings-tab-panel" data-settings-panel="audio" hidden>
+              <label><span>Master</span><input id="setting-audio-master" type="range" min="0" max="1" step="0.01" /></label><label><span>SFX</span><input id="setting-audio-sfx" type="range" min="0" max="1" step="0.01" /></label><label><span>Ambience</span><input id="setting-audio-ambience" type="range" min="0" max="1" step="0.01" /></label><label><span>Weather</span><input id="setting-audio-weather" type="range" min="0" max="1" step="0.01" /></label><label><span>UI</span><input id="setting-audio-ui" type="range" min="0" max="1" step="0.01" /></label>
+              <div class="toggle-grid"><label><input id="setting-audio-muted" type="checkbox" /> <span>Mute</span></label><label><input id="setting-audio-bg-muted" type="checkbox" /> <span>Mute in background</span></label></div>
+              <button id="test-sound-button" type="button">Test</button><p id="audio-state" class="settings-note"></p>
+            </section>
+            <section class="settings-tab-panel" data-settings-panel="graphics" hidden>
+              <label><span>Quality</span><select id="setting-quality"><option value="low">Low</option><option value="balanced">Balanced</option><option value="high">High</option></select></label><label><span>Resolution</span><select id="setting-resolution"><option value="0.6">60%</option><option value="0.75">75%</option><option value="1">100%</option></select></label>
+              <div class="toggle-grid"><label><input id="setting-shadows" type="checkbox" /> <span>Shadows</span></label><label><input id="setting-weather-particles" type="checkbox" /> <span>Weather</span></label><label><input id="setting-camera-shake" type="checkbox" /> <span>Camera shake</span></label><label><input id="setting-motion-interpolation" type="checkbox" /> <span>Interpolation</span></label><label><input id="setting-high-contrast-hud" type="checkbox" /> <span>High contrast HUD</span></label><label><input id="setting-reduce-effects" type="checkbox" /> <span>Reduce effects</span></label></div>
+              <label><span>Day cycle</span><select id="setting-day-cycle-mode"><option value="live">Live loop</option><option value="qa">QA scrub</option></select></label><label><span>QA time</span><input id="setting-qa-time" type="range" min="0" max="119.99" step="0.5" /></label><p id="graphics-state" class="settings-note"></p>
+            </section>
+            <section class="settings-tab-panel" data-settings-panel="network" hidden><div class="toggle-grid"><label><input id="setting-auto-reconnect" type="checkbox" /> <span>Auto reconnect</span></label><label><input id="setting-show-network-details" type="checkbox" /> <span>Network details</span></label></div><p id="network-state" class="settings-note"></p></section>
+            <section class="settings-tab-panel" data-settings-panel="accessibility" hidden><div class="toggle-grid"><label><input id="setting-larger-hud" type="checkbox" /> <span>Larger HUD</span></label><label><input id="setting-high-contrast-teams" type="checkbox" /> <span>Team patterns</span></label><label><input id="setting-reduce-motion" type="checkbox" /> <span>Reduce motion</span></label><label><input id="setting-captions" type="checkbox" /> <span>Captions</span></label><label><input id="setting-reduce-weather-opacity" type="checkbox" /> <span>Less weather</span></label></div></section>
+          </div>
+          <footer class="settings-footer"><button id="reset-tab-button" type="button">Reset tab</button><button id="reset-all-button" type="button">Reset all</button><button id="apply-settings-button" type="button">Apply</button></footer>
+        </form>
+      </section>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

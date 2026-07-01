@@ -33,6 +33,16 @@ export interface AudioRuntimeSnapshot {
   lastBlockedEvent: AudioEventKind | null;
 }
 
+export interface AudioVolumeSettings {
+  master: number;
+  sfx: number;
+  ambience: number;
+  weather: number;
+  ui: number;
+  muted: boolean;
+  muteWhenHidden: boolean;
+}
+
 const MIN_GAIN = 0.0001;
 type AudioEventKind = "connection" | "join" | "roster" | "kick" | "goal" | "countdown" | "weather" | "ui";
 
@@ -62,6 +72,22 @@ export class UnSoccerAudio {
   private blockedEvents = 0;
   private lastEvent: AudioEventKind | null = null;
   private lastBlockedEvent: AudioEventKind | null = null;
+  private volumes: AudioVolumeSettings = {
+    master: 0.72,
+    sfx: 0.86,
+    ambience: 0.42,
+    weather: 0.7,
+    ui: 0.8,
+    muted: false,
+    muteWhenHidden: true
+  };
+
+  setVolumes(settings: AudioVolumeSettings): void {
+    this.volumes = { ...settings };
+    if (this.masterGain) this.masterGain.gain.value = this.volumes.muted ? 0 : this.volumes.master;
+    if (this.sfxGain) this.sfxGain.gain.value = this.volumes.sfx;
+    if (this.ambienceGain) this.ambienceGain.gain.value = this.volumes.ambience;
+  }
 
   async unlock(): Promise<boolean> {
     const wasUnlocked = this.unlocked;
@@ -216,7 +242,7 @@ export class UnSoccerAudio {
     this.ensureAmbience();
     if (!this.rollGain || !this.rollFilter || !this.crowdGain || !this.crowdFilter || !this.weatherGain || !this.weatherFilter) return;
 
-    const visibility = document.visibilityState === "visible" ? 1 : 0.25;
+    const visibility = document.visibilityState === "visible" ? 1 : this.volumes.muteWhenHidden ? 0 : 0.25;
     const ballAmount = clamp(frame.ballSpeed / 12, 0, 1);
     const activeAmount = clamp(frame.activePlayers / 4, 0, 1);
     const nightAmount = 1 - clamp(frame.daylight, 0, 1);
@@ -225,18 +251,19 @@ export class UnSoccerAudio {
     const hazardAmount = clamp(frame.hazardDrag, 0, 1);
     const now = ctx.currentTime;
 
-    const rollTarget = visibility * connectedAmount * ballAmount * (0.018 + activeAmount * 0.014) * (1 - hazardAmount * 0.22);
+    const muted = this.volumes.muted || this.volumes.master <= 0;
+    const rollTarget = muted ? 0 : visibility * connectedAmount * ballAmount * (0.018 + activeAmount * 0.014) * (1 - hazardAmount * 0.22);
     const rollFrequency = 220 + ballAmount * 980 - hazardAmount * 110;
     this.rollGain.gain.setTargetAtTime(rollTarget, now, 0.08);
     this.rollFilter.frequency.setTargetAtTime(rollFrequency, now, 0.08);
     this.currentRollGain = rollTarget;
 
-    const crowdTarget = visibility * connectedAmount * (0.012 + activeAmount * 0.018 + nightAmount * 0.008);
+    const crowdTarget = muted ? 0 : visibility * connectedAmount * (0.012 + activeAmount * 0.018 + nightAmount * 0.008);
     this.crowdGain.gain.setTargetAtTime(crowdTarget, now, 0.65);
     this.crowdFilter.frequency.setTargetAtTime(260 + frame.daylight * 180, now, 0.65);
     this.currentCrowdGain = crowdTarget;
 
-    const weatherTarget = visibility * connectedAmount * weatherAmount * (0.008 + activeAmount * 0.008 + hazardAmount * 0.01);
+    const weatherTarget = muted ? 0 : visibility * connectedAmount * weatherAmount * (0.008 + activeAmount * 0.008 + hazardAmount * 0.01) * this.volumes.weather;
     this.weatherGain.gain.setTargetAtTime(weatherTarget, now, 0.8);
     this.weatherFilter.frequency.setTargetAtTime(880 - weatherAmount * 260 + hazardAmount * 160, now, 0.8);
     this.currentWeatherGain = weatherTarget;
@@ -272,9 +299,9 @@ export class UnSoccerAudio {
     const ambience = ctx.createGain();
     const compressor = ctx.createDynamicsCompressor();
 
-    master.gain.value = 0.72;
-    sfx.gain.value = 0.86;
-    ambience.gain.value = 0.42;
+    master.gain.value = this.volumes.muted ? 0 : this.volumes.master;
+    sfx.gain.value = this.volumes.sfx;
+    ambience.gain.value = this.volumes.ambience;
     compressor.threshold.value = -18;
     compressor.knee.value = 18;
     compressor.ratio.value = 3.2;
@@ -299,6 +326,7 @@ export class UnSoccerAudio {
   }
 
   private canPlay(kind: AudioEventKind): boolean {
+    if (this.volumes.muted || this.volumes.master <= 0) return false;
     if (this.readyContext()) return true;
     this.blockedEvents += 1;
     this.lastBlockedEvent = kind;
@@ -360,7 +388,7 @@ export class UnSoccerAudio {
   }
 
   private playUiConfirm(): void {
-    this.playTone({ frequency: 740, duration: 0.045, peak: 0.025, type: "sine", pan: 0 });
+    this.playTone({ frequency: 740, duration: 0.045, peak: 0.025 * this.volumes.ui, type: "sine", pan: 0 });
   }
 
   private playTone(options: {

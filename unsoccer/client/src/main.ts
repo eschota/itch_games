@@ -22,6 +22,21 @@ import {
   type WeatherSnapshot
 } from "@itch-games/unsoccer-shared";
 import { UnSoccerAudio, type AudioRuntimeSnapshot } from "./audio";
+import { actionPressed, codeForAction, resolveMovementInput } from "./input-map";
+import {
+  bindingConflicts,
+  cloneSettings,
+  DEFAULT_SETTINGS,
+  loadSettings,
+  resetSettingsTab,
+  saveSettings,
+  setActionBinding,
+  SETTINGS_STORAGE_KEY,
+  type InputAction,
+  type QualityPreset,
+  type SettingsTab,
+  type UnSoccerSettings
+} from "./settings";
 import { WeatherVisualLayer } from "./weather";
 import "./styles.css";
 
@@ -119,6 +134,21 @@ declare global {
         daylight: string;
         camera: { x: number; y: number; z: number };
         audio: AudioRuntimeSnapshot;
+        art: {
+          pass: string;
+          environment: string;
+          sunVisible: boolean;
+          moonVisible: boolean;
+          rig: string;
+        };
+        ui: {
+          settingsOpen: boolean;
+          activeTab: SettingsTab;
+          movementMode: string;
+          graphicsPreset: string;
+          transport: string;
+          bindingConflicts: number;
+        };
         interpolation: {
           bufferedStates: number;
           delayMs: number;
@@ -153,13 +183,39 @@ const orangeScoreEl = requireElement<HTMLElement>("#orange-score");
 const statusEl = requireElement<HTMLElement>("#status");
 const weatherEl = requireElement<HTMLElement>("#weather");
 const rosterEl = requireElement<HTMLElement>("#roster");
+const playerRoleEl = requireElement<HTMLElement>("#player-role");
+const playerTeamEl = requireElement<HTMLElement>("#player-team");
+const playerInputModeEl = requireElement<HTMLElement>("#player-input-mode");
+const transportStatusEl = requireElement<HTMLElement>("#transport-status");
+const pingStatusEl = requireElement<HTMLElement>("#ping-status");
+const snapshotAgeEl = requireElement<HTMLElement>("#snapshot-age");
+const eventFeedEl = requireElement<HTMLElement>("#event-feed");
+const controlHintsEl = requireElement<HTMLElement>("#control-hints");
+const settingsButton = requireElement<HTMLButtonElement>("#settings-button");
+const muteButton = requireElement<HTMLButtonElement>("#mute-button");
+const fullscreenButton = requireElement<HTMLButtonElement>("#fullscreen-button");
+const cameraResetButton = requireElement<HTMLButtonElement>("#camera-reset-button");
+const settingsPanel = requireElement<HTMLElement>("#settings-panel");
+const settingsForm = requireElement<HTMLFormElement>("#settings-form");
+const settingsSaveStateEl = requireElement<HTMLElement>("#settings-save-state");
+const settingsCloseButton = requireElement<HTMLButtonElement>("#settings-close-button");
+const resetTabButton = requireElement<HTMLButtonElement>("#reset-tab-button");
+const resetAllButton = requireElement<HTMLButtonElement>("#reset-all-button");
+const applySettingsButton = requireElement<HTMLButtonElement>("#apply-settings-button");
+const bindingConflictsEl = requireElement<HTMLElement>("#binding-conflicts");
+const audioStateEl = requireElement<HTMLElement>("#audio-state");
+const graphicsStateEl = requireElement<HTMLElement>("#graphics-state");
+const networkStateEl = requireElement<HTMLElement>("#network-state");
+const testSoundButton = requireElement<HTMLButtonElement>("#test-sound-button");
 const versionBadge = requireElement<HTMLElement>("#version-badge");
-const BUILD_WEIGHT_LABEL = "0.56 MB";
+const ART_PASS_VERSION = "v0.0.009";
+const BUILD_WEIGHT_LABEL = "0.61 MB";
 
-versionBadge.textContent = `${GAME_VERSION} • ${BUILD_WEIGHT_LABEL}`;
+versionBadge.textContent = `${GAME_VERSION} / ${BUILD_WEIGHT_LABEL}`;
 document.documentElement.dataset.gameVersion = GAME_VERSION;
 document.documentElement.dataset.gameWeightLabel = BUILD_WEIGHT_LABEL;
-document.documentElement.dataset.environment = "residential-courtyard";
+document.documentElement.dataset.artPass = ART_PASS_VERSION;
+document.documentElement.dataset.environment = "residential-courtyard-v009";
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -181,6 +237,7 @@ const snowFogColor = new THREE.Color(0xd9f3ff);
 const sunColor = new THREE.Color();
 const skyColor = new THREE.Color();
 const fogColor = new THREE.Color();
+const bounceColor = new THREE.Color();
 
 const camera = new THREE.PerspectiveCamera(56, 1, 0.1, 150);
 camera.position.set(0, 16, -16);
@@ -195,6 +252,11 @@ const cameraLookTarget = new THREE.Vector3();
 
 const hemi = new THREE.HemisphereLight(0xd8fff2, 0x172822, 1.5);
 scene.add(hemi);
+const ambientFill = new THREE.AmbientLight(0x92b7ad, 0.16);
+scene.add(ambientFill);
+const courtyardBounce = new THREE.PointLight(0x9fc7b3, 0.68, 42, 1.8);
+courtyardBounce.position.set(0, 4.6, 0);
+scene.add(courtyardBounce);
 const sun = new THREE.DirectionalLight(0xfff1d0, 1.8);
 sun.position.set(-12, 20, 10);
 sun.castShadow = true;
@@ -211,6 +273,36 @@ const sunMesh = new THREE.Mesh(
   new THREE.MeshBasicMaterial({ color: 0xfff1d0 })
 );
 scene.add(sunMesh);
+const sunGlowMaterial = new THREE.MeshBasicMaterial({
+  color: 0xfff0b8,
+  transparent: true,
+  opacity: 0.46,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  toneMapped: false
+});
+const sunGlow = new THREE.Mesh(new THREE.SphereGeometry(2.85, 32, 16), sunGlowMaterial);
+scene.add(sunGlow);
+const moonMaterial = new THREE.MeshBasicMaterial({
+  color: 0xbfd6ff,
+  transparent: true,
+  opacity: 0.82,
+  toneMapped: false
+});
+const moonMesh = new THREE.Mesh(new THREE.SphereGeometry(0.82, 20, 12), moonMaterial);
+scene.add(moonMesh);
+const sunPathMaterial = new THREE.LineBasicMaterial({ color: 0xfff0b8, transparent: true, opacity: 0.26 });
+const sunPath = new THREE.LineLoop(
+  new THREE.BufferGeometry().setFromPoints(
+    Array.from({ length: 96 }, (_, i) => {
+      const a = i / 96 * Math.PI * 2 - Math.PI * 0.22;
+      return new THREE.Vector3(Math.cos(a) * 40.8, Math.sin(a) * 40.8, Math.sin(a + 0.55) * 30.6);
+    })
+  ),
+  sunPathMaterial
+);
+sunPath.position.y = 0;
+scene.add(sunPath);
 
 const rimLight = new THREE.DirectionalLight(0x8bbcff, 0.55);
 rimLight.position.set(18, 10, -18);
@@ -339,6 +431,21 @@ const BALL_SNAP_DISTANCE = FIELD_LENGTH * 0.45;
 const LOCAL_PLAYER_PREDICTION_MAX_SECONDS = 0.12;
 const stateHistory: Array<{ state: ServerState; receivedAt: number }> = [];
 let localPredictionLeadMs = 0;
+let settings: UnSoccerSettings = loadSettings();
+let activeSettingsTab: SettingsTab = "controls";
+let settingsOpen = false;
+let pendingRebindAction: InputAction | null = null;
+let latestSnapshotReceivedAt = 0;
+const pressedCodes = new Set<string>();
+const eventFeedMessages: string[] = [];
+
+function inputEl(selector: string): HTMLInputElement {
+  return requireElement<HTMLInputElement>(selector);
+}
+
+function selectEl(selector: string): HTMLSelectElement {
+  return requireElement<HTMLSelectElement>(selector);
+}
 
 function readQaDayCycleSeconds(): number | null {
   const value = Number(new URLSearchParams(location.search).get("qaTime"));
@@ -367,6 +474,21 @@ window.unsoccerDebug = {
       z: Number(camera.position.z.toFixed(2))
     },
     audio: audio.snapshot(),
+    art: {
+      pass: ART_PASS_VERSION,
+      environment: document.documentElement.dataset.environment || "",
+      sunVisible: document.documentElement.dataset.sunVisible === "true",
+      moonVisible: document.documentElement.dataset.moonVisible === "true",
+      rig: document.documentElement.dataset.playerRig || ""
+    },
+    ui: {
+      settingsOpen,
+      activeTab: activeSettingsTab,
+      movementMode: settings.controls.movementMode,
+      graphicsPreset: settings.graphics.qualityPreset,
+      transport: transportMode,
+      bindingConflicts: bindingConflicts(settings.controls.bindings).length
+    },
     interpolation: {
       bufferedStates: stateHistory.length,
       delayMs: Math.round(STATE_INTERPOLATION_DELAY_SECONDS * 1000),
@@ -416,6 +538,247 @@ function audioUserActivationLabel(): string {
   if (!activation) return "unsupported";
   return `${activation.isActive ? "active" : "inactive"}:${activation.hasBeenActive ? "used" : "fresh"}`;
 }
+
+const ACTION_LABELS: Record<InputAction, string> = {
+  moveForward: "\u0412\u043f\u0435\u0440\u0435\u0434",
+  moveBack: "\u041d\u0430\u0437\u0430\u0434",
+  moveLeft: "\u0412\u043b\u0435\u0432\u043e",
+  moveRight: "\u0412\u043f\u0440\u0430\u0432\u043e",
+  leftKick: "\u041b\u0435\u0432\u0430\u044f \u043d\u043e\u0433\u0430",
+  rightKick: "\u041f\u0440\u0430\u0432\u0430\u044f \u043d\u043e\u0433\u0430",
+  headHit: "\u0413\u043e\u043b\u043e\u0432\u0430",
+  settings: "\u041c\u0435\u043d\u044e",
+  cameraReset: "\u041a\u0430\u043c\u0435\u0440\u0430",
+  muteAudio: "\u0417\u0432\u0443\u043a"
+};
+
+function syncSettingsUi(): void {
+  selectEl("#setting-movement-mode").value = settings.controls.movementMode;
+  inputEl("#setting-invert-fb").checked = settings.controls.invertForwardBack;
+  inputEl("#setting-invert-lr").checked = settings.controls.invertLeftRight;
+  inputEl("#setting-mirror-team").checked = settings.controls.mirrorOnTeamSide;
+  inputEl("#setting-audio-master").value = String(settings.audio.master);
+  inputEl("#setting-audio-sfx").value = String(settings.audio.sfx);
+  inputEl("#setting-audio-ambience").value = String(settings.audio.ambience);
+  inputEl("#setting-audio-weather").value = String(settings.audio.weather);
+  inputEl("#setting-audio-ui").value = String(settings.audio.ui);
+  inputEl("#setting-audio-muted").checked = settings.audio.muted;
+  inputEl("#setting-audio-bg-muted").checked = settings.audio.muteWhenHidden;
+  selectEl("#setting-quality").value = settings.graphics.qualityPreset;
+  selectEl("#setting-resolution").value = String(settings.graphics.resolutionScale);
+  inputEl("#setting-shadows").checked = settings.graphics.shadows;
+  inputEl("#setting-weather-particles").checked = settings.graphics.weatherParticles;
+  inputEl("#setting-camera-shake").checked = settings.graphics.cameraShake;
+  inputEl("#setting-motion-interpolation").checked = settings.graphics.motionInterpolation;
+  inputEl("#setting-high-contrast-hud").checked = settings.graphics.highContrastHud;
+  inputEl("#setting-reduce-effects").checked = settings.graphics.reduceEffects;
+  selectEl("#setting-day-cycle-mode").value = settings.graphics.dayCycleMode;
+  inputEl("#setting-qa-time").value = String(settings.graphics.qaDayCycleSeconds);
+  inputEl("#setting-auto-reconnect").checked = settings.network.autoReconnect;
+  inputEl("#setting-show-network-details").checked = settings.network.showDetails;
+  inputEl("#setting-larger-hud").checked = settings.accessibility.largerHud;
+  inputEl("#setting-high-contrast-teams").checked = settings.accessibility.highContrastTeams;
+  inputEl("#setting-reduce-motion").checked = settings.accessibility.reduceMotion;
+  inputEl("#setting-captions").checked = settings.accessibility.captions;
+  inputEl("#setting-reduce-weather-opacity").checked = settings.accessibility.reduceWeatherOpacity;
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-rebind-action]")) {
+    const action = button.dataset.rebindAction as InputAction;
+    button.innerHTML = `<span>${escapeHtml(ACTION_LABELS[action])}</span><strong>${escapeHtml(formatBinding(codeForAction(settings.controls, action)))}</strong>`;
+  }
+  setActiveSettingsTab(activeSettingsTab);
+  syncInputTestPad();
+  syncSettingsNotes();
+}
+
+function readSettingsFromForm(): void {
+  settings = {
+    ...settings,
+    controls: {
+      ...settings.controls,
+      movementMode: selectEl("#setting-movement-mode").value as UnSoccerSettings["controls"]["movementMode"],
+      invertForwardBack: inputEl("#setting-invert-fb").checked,
+      invertLeftRight: inputEl("#setting-invert-lr").checked,
+      mirrorOnTeamSide: inputEl("#setting-mirror-team").checked
+    },
+    audio: {
+      master: Number(inputEl("#setting-audio-master").value),
+      sfx: Number(inputEl("#setting-audio-sfx").value),
+      ambience: Number(inputEl("#setting-audio-ambience").value),
+      weather: Number(inputEl("#setting-audio-weather").value),
+      ui: Number(inputEl("#setting-audio-ui").value),
+      muted: inputEl("#setting-audio-muted").checked,
+      muteWhenHidden: inputEl("#setting-audio-bg-muted").checked
+    },
+    graphics: {
+      ...settings.graphics,
+      qualityPreset: selectEl("#setting-quality").value as QualityPreset,
+      resolutionScale: Number(selectEl("#setting-resolution").value) as UnSoccerSettings["graphics"]["resolutionScale"],
+      shadows: inputEl("#setting-shadows").checked,
+      weatherParticles: inputEl("#setting-weather-particles").checked,
+      cameraShake: inputEl("#setting-camera-shake").checked,
+      motionInterpolation: inputEl("#setting-motion-interpolation").checked,
+      highContrastHud: inputEl("#setting-high-contrast-hud").checked,
+      reduceEffects: inputEl("#setting-reduce-effects").checked,
+      dayCycleMode: selectEl("#setting-day-cycle-mode").value as UnSoccerSettings["graphics"]["dayCycleMode"],
+      qaDayCycleSeconds: Number(inputEl("#setting-qa-time").value)
+    },
+    network: {
+      autoReconnect: inputEl("#setting-auto-reconnect").checked,
+      showDetails: inputEl("#setting-show-network-details").checked
+    },
+    accessibility: {
+      largerHud: inputEl("#setting-larger-hud").checked,
+      highContrastTeams: inputEl("#setting-high-contrast-teams").checked,
+      reduceMotion: inputEl("#setting-reduce-motion").checked,
+      captions: inputEl("#setting-captions").checked,
+      reduceWeatherOpacity: inputEl("#setting-reduce-weather-opacity").checked
+    }
+  };
+  persistAndApplySettings();
+}
+
+function persistAndApplySettings(): void {
+  settingsSaveStateEl.textContent = saveSettings(settings) ? "\u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e" : "\u043d\u0435 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e";
+  applySettingsToRuntime();
+  syncSettingsUi();
+}
+
+function applySettingsToRuntime(): void {
+  const maxDpr: Record<QualityPreset, number> = { low: 1, balanced: 1.5, high: 2 };
+  renderer.setPixelRatio(Math.max(0.5, Math.min(window.devicePixelRatio || 1, maxDpr[settings.graphics.qualityPreset]) * settings.graphics.resolutionScale));
+  renderer.shadowMap.enabled = settings.graphics.shadows;
+  sun.castShadow = settings.graphics.shadows;
+  for (const flood of floodLights) flood.castShadow = settings.graphics.shadows;
+  audio.setVolumes(settings.audio);
+  weatherLayer.setOptions({
+    particlesEnabled: settings.graphics.weatherParticles && !settings.graphics.reduceEffects,
+    opacityScale: settings.accessibility.reduceWeatherOpacity ? 0.45 : 1
+  });
+  if (settings.graphics.dayCycleMode === "qa") setQaDayCycleSeconds(settings.graphics.qaDayCycleSeconds);
+  else if (!new URLSearchParams(location.search).has("qaTime")) setQaDayCycleSeconds(null);
+  document.documentElement.dataset.settingsStorageKey = SETTINGS_STORAGE_KEY;
+  document.documentElement.dataset.settingsOpen = String(settingsOpen);
+  document.documentElement.dataset.settingsTab = activeSettingsTab;
+  document.documentElement.dataset.movementMode = settings.controls.movementMode;
+  document.documentElement.dataset.invertForwardBack = String(settings.controls.invertForwardBack);
+  document.documentElement.dataset.invertLeftRight = String(settings.controls.invertLeftRight);
+  document.documentElement.dataset.bindingConflicts = String(bindingConflicts(settings.controls.bindings).length);
+  document.documentElement.dataset.graphicsPreset = settings.graphics.qualityPreset;
+  document.documentElement.dataset.resolutionScale = String(settings.graphics.resolutionScale);
+  document.documentElement.dataset.motionInterpolation = String(settings.graphics.motionInterpolation);
+  document.documentElement.dataset.audioMuted = String(settings.audio.muted);
+  document.documentElement.dataset.hudScale = settings.accessibility.largerHud ? "large" : "normal";
+  document.documentElement.dataset.hudContrast = settings.graphics.highContrastHud ? "high" : "normal";
+  document.documentElement.dataset.weatherOpacity = settings.accessibility.reduceWeatherOpacity ? "reduced" : "normal";
+  document.documentElement.dataset.ibl = "procedural-sky";
+  document.documentElement.dataset.visibleSun = String(sunMesh.visible);
+  muteButton.textContent = settings.audio.muted ? "MUT" : "AUD";
+  updateControlHints();
+  updatePlayerChip();
+  resize();
+}
+
+function setSettingsOpen(open: boolean): void {
+  settingsOpen = open;
+  settingsPanel.hidden = !open;
+  document.documentElement.dataset.settingsOpen = String(open);
+  if (open) {
+    pressedCodes.clear();
+    updateResolvedInput();
+    syncSettingsUi();
+    settingsPanel.querySelector<HTMLElement>("[data-settings-tab]")?.focus();
+  } else {
+    pendingRebindAction = null;
+    syncSettingsUi();
+    canvas.focus();
+  }
+}
+
+function setActiveSettingsTab(tab: SettingsTab): void {
+  activeSettingsTab = tab;
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-settings-tab]")) button.setAttribute("aria-selected", String(button.dataset.settingsTab === tab));
+  for (const panel of document.querySelectorAll<HTMLElement>("[data-settings-panel]")) panel.hidden = panel.dataset.settingsPanel !== tab;
+  document.documentElement.dataset.settingsTab = tab;
+}
+
+function bindAction(action: InputAction, code: string): void {
+  const bindings = { ...settings.controls.bindings };
+  for (const key of Object.keys(bindings) as InputAction[]) bindings[key] = bindings[key].filter((item) => item !== code);
+  settings = { ...settings, controls: { ...settings.controls, bindings: setActionBinding(bindings, action, code) } };
+  pendingRebindAction = null;
+  persistAndApplySettings();
+}
+
+function syncSettingsNotes(): void {
+  const conflicts = bindingConflicts(settings.controls.bindings);
+  bindingConflictsEl.textContent = pendingRebindAction
+    ? `${ACTION_LABELS[pendingRebindAction]}: \u043d\u0430\u0436\u043c\u0438\u0442\u0435 \u043a\u043b\u0430\u0432\u0438\u0448\u0443`
+    : conflicts.length ? `Conflicts: ${conflicts.map((item) => item.code).join(", ")}` : "\u0414\u0443\u0431\u043b\u0438 \u0437\u0430\u043c\u0435\u043d\u044f\u044e\u0442\u0441\u044f.";
+  const audioState = audio.snapshot();
+  audioStateEl.textContent = `Audio: ${audioState.contextState}, unlocked=${audioState.unlocked}`;
+  graphicsStateEl.textContent = `IBL=${document.documentElement.dataset.ibl || "procedural-sky"} / sun=${document.documentElement.dataset.visibleSun || "true"} / day=${document.documentElement.dataset.dayCycleSeconds || "0"}s`;
+  networkStateEl.textContent = `Transport=${transportMode}, snapshot=${latestSnapshotReceivedAt ? Math.round(performance.now() - latestSnapshotReceivedAt) : "--"}ms`;
+}
+
+function updateControlHints(): void {
+  const move = `${formatBinding(codeForAction(settings.controls, "moveForward"))}/${formatBinding(codeForAction(settings.controls, "moveLeft"))}/${formatBinding(codeForAction(settings.controls, "moveBack"))}/${formatBinding(codeForAction(settings.controls, "moveRight"))}`;
+  controlHintsEl.innerHTML = [
+    `<span>\u0425\u043e\u0434 ${escapeHtml(move)}</span>`,
+    `<span>\u0423\u0434\u0430\u0440 ${escapeHtml(formatBinding(codeForAction(settings.controls, "leftKick")))}/${escapeHtml(formatBinding(codeForAction(settings.controls, "rightKick")))}</span>`,
+    `<span>\u0413\u043e\u043b\u043e\u0432\u0430 ${escapeHtml(formatBinding(codeForAction(settings.controls, "headHit")))}</span>`,
+    `<span>\u041c\u0435\u043d\u044e ${escapeHtml(formatBinding(codeForAction(settings.controls, "settings")))}</span>`
+  ].join("");
+}
+
+function updatePlayerChip(): void {
+  playerRoleEl.textContent = connected ? (localJoin?.role === "player" ? "\u0418\u0433\u0440\u043e\u043a" : "\u0417\u0440\u0438\u0442\u0435\u043b\u044c") : "\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u0435";
+  playerTeamEl.textContent = localJoin ? teamNameLabel(localJoin.team) : "\u0417\u0440\u0438\u0442\u0435\u043b\u044c";
+  playerInputModeEl.textContent = settings.controls.movementMode === "team-goal" ? "Team-goal" : settings.controls.movementMode === "camera" ? "Camera" : "Screen";
+}
+
+function updateNetworkHud(now = performance.now()): void {
+  transportStatusEl.textContent = transportMode === "none" ? "offline" : transportMode;
+  const serverLag = latestState ? Math.max(0, Date.now() - latestState.serverTime) : null;
+  pingStatusEl.textContent = serverLag === null ? "-- ms" : `${Math.min(serverLag, 9999)} ms`;
+  snapshotAgeEl.textContent = latestSnapshotReceivedAt ? `${Math.round(now - latestSnapshotReceivedAt)} ms` : "snapshot --";
+  if (settingsOpen) syncSettingsNotes();
+}
+
+function pushEventFeed(message: string): void {
+  if (!message || eventFeedMessages[0] === message) return;
+  eventFeedMessages.unshift(message);
+  eventFeedMessages.splice(4);
+  eventFeedEl.innerHTML = eventFeedMessages.map((item) => `<p>${escapeHtml(item)}</p>`).join("");
+}
+
+function syncInputTestPad(): void {
+  for (const item of document.querySelectorAll<HTMLElement>("[data-pad]")) {
+    item.classList.toggle("is-active", actionPressed(settings.controls, item.dataset.pad as InputAction, pressedCodes));
+  }
+}
+
+function updateResolvedInput(): void {
+  input = resolveMovementInput(settings.controls, pressedCodes, localJoin?.team ?? null, input);
+  syncInputTestPad();
+}
+
+function formatBinding(code: string): string {
+  return code ? code.replace(/^Key/, "").replace(/^Digit/, "").replace("Arrow", "").replace("Mouse0", "LMB").replace("Mouse2", "RMB") : "--";
+}
+
+function resetCamera(): void {
+  cameraImpulse = 0;
+  cameraLookAt.set(0, 0, 0);
+  updateCamera(1 / 60);
+}
+
+function toggleMute(): void {
+  settings = { ...settings, audio: { ...settings.audio, muted: !settings.audio.muted } };
+  persistAndApplySettings();
+}
+
+applySettingsToRuntime();
+syncSettingsUi();
 
 function buildField(root: THREE.Group) {
   const turf = new THREE.Mesh(
@@ -531,6 +894,14 @@ function addStadiumFrame(root: THREE.Group) {
     addBench(root, x, z, rotation);
   }
 
+  addCourtyardPavementMarks(root);
+  addPlayground(root, -FIELD_WIDTH / 2 - 6.6, 10.4, Math.PI / 2);
+  addServiceKiosk(root, FIELD_WIDTH / 2 + 6.7, 9.6, -Math.PI / 2);
+  addClothesline(root, -8.8, FIELD_LENGTH / 2 + 4.9, 0);
+  addClothesline(root, 8.6, -FIELD_LENGTH / 2 - 4.9, Math.PI);
+  document.documentElement.dataset.environmentModels =
+    "apartments,cars,trees,benches,playground,kiosk,clotheslines,pavement";
+
   const mastMaterial = new THREE.MeshStandardMaterial({
     color: 0xaebbc4,
     roughness: 0.36,
@@ -598,6 +969,161 @@ function addApartmentBlock(
       root.add(windowMesh);
     }
   }
+
+  const balconyMaterial = new THREE.MeshStandardMaterial({ color: 0xcfd8d2, roughness: 0.64, metalness: 0.14 });
+  const railMaterial = new THREE.MeshStandardMaterial({ color: 0x253534, roughness: 0.54, metalness: 0.18 });
+  for (let column = 0; column < Math.max(2, Math.floor(width / 2)); column += 1) {
+    const balconyX = x - width / 2 + 1.0 + column * ((width - 2.0) / Math.max(1, Math.floor(width / 2) - 1));
+    const balcony = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.08, 0.36), balconyMaterial);
+    balcony.position.set(balconyX, Math.min(height - 0.8, 2.35 + (column % 3) * 1.45), facadeZ - side * 0.2);
+    balcony.castShadow = true;
+    balcony.receiveShadow = true;
+    root.add(balcony);
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.28, 0.045), railMaterial);
+    rail.position.set(balcony.position.x, balcony.position.y + 0.2, balcony.position.z - side * 0.16);
+    rail.castShadow = true;
+    root.add(rail);
+  }
+  const entry = new THREE.Mesh(
+    new THREE.BoxGeometry(Math.min(1.25, width * 0.22), 1.18, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0x263837, roughness: 0.58, metalness: 0.08 })
+  );
+  entry.position.set(x, 0.52, facadeZ - side * 0.045);
+  entry.castShadow = true;
+  root.add(entry);
+}
+
+function addCourtyardPavementMarks(root: THREE.Group): void {
+  const crackMaterial = new THREE.MeshBasicMaterial({ color: 0x21302d, transparent: true, opacity: 0.5 });
+  const paintMaterial = new THREE.MeshBasicMaterial({ color: 0xdfe7de, transparent: true, opacity: 0.52 });
+  for (const [x, z, width, rotation] of [
+    [-10.2, -12.0, 5.2, -0.18],
+    [10.4, -11.2, 4.3, 0.14],
+    [-11.0, 12.1, 4.8, 0.22],
+    [10.8, 12.0, 5.0, -0.12],
+    [0, FIELD_LENGTH / 2 + 2.2, 10.2, 0],
+    [0, -FIELD_LENGTH / 2 - 2.2, 10.2, 0]
+  ] as Array<[number, number, number, number]>) {
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(width, 0.018, 0.055), paintMaterial);
+    stripe.position.set(x, 0.012, z);
+    stripe.rotation.y = rotation;
+    root.add(stripe);
+  }
+  for (const [x, z, width, depth, rotation] of [
+    [-3.8, -FIELD_LENGTH / 2 - 5.0, 3.8, 0.035, 0.24],
+    [4.4, FIELD_LENGTH / 2 + 5.2, 4.1, 0.035, -0.19],
+    [-FIELD_WIDTH / 2 - 4.8, 1.6, 0.035, 7.2, 0.07],
+    [FIELD_WIDTH / 2 + 4.8, -1.8, 0.035, 7.6, -0.06]
+  ] as Array<[number, number, number, number, number]>) {
+    const crack = new THREE.Mesh(new THREE.BoxGeometry(width, 0.016, depth), crackMaterial);
+    crack.position.set(x, 0.018, z);
+    crack.rotation.y = rotation;
+    root.add(crack);
+  }
+}
+
+function addPlayground(root: THREE.Group, x: number, z: number, rotation: number): void {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = rotation;
+  const paint = new THREE.MeshStandardMaterial({ color: 0x4aa5a2, roughness: 0.48, metalness: 0.08 });
+  const accent = new THREE.MeshStandardMaterial({ color: 0xffc857, roughness: 0.5, metalness: 0.04 });
+  const rubber = new THREE.MeshStandardMaterial({ color: 0x27302f, roughness: 0.94 });
+  const base = new THREE.Mesh(new THREE.BoxGeometry(3.7, 0.04, 3.0), rubber);
+  base.position.y = -0.02;
+  base.receiveShadow = true;
+  group.add(base);
+  for (const px of [-1.35, 1.35]) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 1.7, 8), paint);
+    post.position.set(px, 0.85, -0.86);
+    post.castShadow = true;
+    group.add(post);
+  }
+  const topBar = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.08, 0.08), paint);
+  topBar.position.set(0, 1.68, -0.86);
+  topBar.castShadow = true;
+  group.add(topBar);
+  for (const px of [-0.45, 0.45]) {
+    const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.86, 6), accent);
+    rope.position.set(px, 1.16, -0.86);
+    rope.castShadow = true;
+    group.add(rope);
+  }
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.08, 0.38), accent);
+  seat.position.set(0, 0.72, -0.86);
+  seat.castShadow = true;
+  group.add(seat);
+  const slide = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.08, 2.15), new THREE.MeshStandardMaterial({ color: 0xe95f51, roughness: 0.42 }));
+  slide.position.set(0.95, 0.52, 0.45);
+  slide.rotation.x = -0.34;
+  slide.castShadow = true;
+  group.add(slide);
+  root.add(group);
+}
+
+function addServiceKiosk(root: THREE.Group, x: number, z: number, rotation: number): void {
+  const kiosk = new THREE.Group();
+  kiosk.position.set(x, 0, z);
+  kiosk.rotation.y = rotation;
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(2.4, 1.65, 1.7),
+    new THREE.MeshStandardMaterial({ color: 0x435b56, roughness: 0.7, metalness: 0.05 })
+  );
+  body.position.y = 0.82;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  kiosk.add(body);
+  const roof = new THREE.Mesh(
+    new THREE.BoxGeometry(2.75, 0.18, 2.02),
+    new THREE.MeshStandardMaterial({ color: 0xf0b84a, roughness: 0.52, metalness: 0.03 })
+  );
+  roof.position.y = 1.76;
+  roof.castShadow = true;
+  kiosk.add(roof);
+  const hatch = new THREE.Mesh(
+    new THREE.BoxGeometry(1.28, 0.58, 0.05),
+    new THREE.MeshBasicMaterial({ color: 0xf5e6a8, toneMapped: false })
+  );
+  hatch.position.set(0, 1.0, -0.88);
+  kiosk.add(hatch);
+  const sign = new THREE.Mesh(
+    new THREE.BoxGeometry(1.4, 0.28, 0.07),
+    new THREE.MeshBasicMaterial({ color: 0x7be0c3, toneMapped: false })
+  );
+  sign.position.set(0, 1.92, -0.98);
+  kiosk.add(sign);
+  root.add(kiosk);
+}
+
+function addClothesline(root: THREE.Group, x: number, z: number, rotation: number): void {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = rotation;
+  const poleMaterial = new THREE.MeshStandardMaterial({ color: 0xb4c0c4, roughness: 0.45, metalness: 0.32 });
+  const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xdde7e3 });
+  for (const px of [-1.8, 1.8]) {
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 1.75, 8), poleMaterial);
+    pole.position.set(px, 0.88, 0);
+    pole.castShadow = true;
+    group.add(pole);
+  }
+  for (const y of [1.25, 1.52]) {
+    const line = new THREE.Mesh(new THREE.BoxGeometry(3.7, 0.018, 0.018), lineMaterial);
+    line.position.y = y;
+    group.add(line);
+  }
+  const clothColors = [0xf1efe4, 0x58a8ff, 0xff9d42, 0x89c878];
+  for (let i = 0; i < clothColors.length; i += 1) {
+    const cloth = new THREE.Mesh(
+      new THREE.BoxGeometry(0.48, 0.62, 0.035),
+      new THREE.MeshStandardMaterial({ color: clothColors[i], roughness: 0.84 })
+    );
+    cloth.position.set(-1.2 + i * 0.76, 1.08 + (i % 2) * 0.25, 0.02);
+    cloth.rotation.z = (i % 2 === 0 ? 1 : -1) * 0.05;
+    cloth.castShadow = true;
+    group.add(cloth);
+  }
+  root.add(group);
 }
 
 function addParkedCar(root: THREE.Group, x: number, z: number, rotation: number, color: number): void {
@@ -695,10 +1221,20 @@ function addGoal(root: THREE.Group, side: -1 | 1) {
 
 class PlayerVisual {
   readonly root = new THREE.Group();
+  private readonly rig = new THREE.Group();
   private readonly body: THREE.Mesh;
+  private readonly chest: THREE.Mesh;
+  private readonly shorts: THREE.Mesh;
   private readonly head: THREE.Mesh;
+  private readonly hair: THREE.Mesh;
+  private readonly leftArm: THREE.Mesh;
+  private readonly rightArm: THREE.Mesh;
   private readonly leftLeg: THREE.Mesh;
   private readonly rightLeg: THREE.Mesh;
+  private readonly leftFoot: THREE.Mesh;
+  private readonly rightFoot: THREE.Mesh;
+  private readonly shadow: THREE.Mesh;
+  private readonly shadowMaterial: THREE.MeshBasicMaterial;
   private readonly label: THREE.Sprite;
   private readonly ring: THREE.Mesh;
   private readonly contactFlash: THREE.Mesh;
@@ -708,25 +1244,74 @@ class PlayerVisual {
     const color = teamColor(snapshot.team);
     const variant = snapshot.index % 4;
     const bodyMaterial = new THREE.MeshStandardMaterial({ color, roughness: 0.42, metalness: 0.05 });
-    const accent = new THREE.MeshStandardMaterial({ color: 0x101614, roughness: 0.5 });
+    const jerseyPanel = new THREE.MeshStandardMaterial({ color: snapshot.team === 1 ? 0xffd37a : 0xbfe5ff, roughness: 0.5 });
+    const clothDark = new THREE.MeshStandardMaterial({ color: 0x111817, roughness: 0.72 });
+    const skin = new THREE.MeshStandardMaterial({ color: 0xf1c7a7, roughness: 0.55 });
+    const hair = new THREE.MeshStandardMaterial({ color: variant === 1 ? 0x3a2419 : variant === 2 ? 0xd6b46b : 0x15100c, roughness: 0.64 });
+    const boots = new THREE.MeshStandardMaterial({ color: variant === 3 ? 0xf5f1d0 : 0x111111, roughness: 0.46, metalness: 0.08 });
 
-    this.body = new THREE.Mesh(new THREE.CapsuleGeometry(0.42 + variant * 0.025, 0.72, 6, 12), bodyMaterial);
-    this.body.position.y = 0.95;
+    this.root.add(this.rig);
+
+    this.shadowMaterial = new THREE.MeshBasicMaterial({
+      color: 0x020807,
+      transparent: true,
+      opacity: 0.3,
+      depthWrite: false
+    });
+    this.shadow = new THREE.Mesh(new THREE.CircleGeometry(0.66, 28), this.shadowMaterial);
+    this.shadow.rotation.x = -Math.PI / 2;
+    this.shadow.position.y = 0.022;
+    this.root.add(this.shadow);
+
+    this.body = new THREE.Mesh(new THREE.CapsuleGeometry(0.36 + variant * 0.018, 0.74, 6, 12), bodyMaterial);
+    this.body.position.y = 1.08;
     this.body.castShadow = true;
-    this.root.add(this.body);
+    this.rig.add(this.body);
 
-    this.head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 18, 12), new THREE.MeshStandardMaterial({ color: 0xf1c7a7 }));
-    this.head.position.y = 1.66;
+    this.chest = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.46, 0.045), jerseyPanel);
+    this.chest.position.set(0, 1.18, 0.365);
+    this.rig.add(this.chest);
+
+    this.shorts = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.28, 0.38), clothDark);
+    this.shorts.position.y = 0.68;
+    this.shorts.castShadow = true;
+    this.rig.add(this.shorts);
+
+    this.head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 18, 12), skin);
+    this.head.position.y = 1.75;
     this.head.castShadow = true;
-    this.root.add(this.head);
+    this.rig.add(this.head);
 
-    this.leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.62, 0.22), accent);
-    this.rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.62, 0.22), accent);
-    this.leftLeg.position.set(-0.18, 0.32, 0);
-    this.rightLeg.position.set(0.18, 0.32, 0);
+    this.hair = new THREE.Mesh(new THREE.SphereGeometry(0.255, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.52), hair);
+    this.hair.position.y = 1.85;
+    this.hair.castShadow = true;
+    this.rig.add(this.hair);
+
+    this.leftArm = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.56, 4, 8), skin);
+    this.rightArm = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.56, 4, 8), skin);
+    this.leftArm.position.set(-0.43, 1.14, 0.03);
+    this.rightArm.position.set(0.43, 1.14, 0.03);
+    this.leftArm.rotation.z = 0.18;
+    this.rightArm.rotation.z = -0.18;
+    this.leftArm.castShadow = true;
+    this.rightArm.castShadow = true;
+    this.rig.add(this.leftArm, this.rightArm);
+
+    this.leftLeg = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.55, 4, 8), clothDark);
+    this.rightLeg = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.55, 4, 8), clothDark);
+    this.leftLeg.position.set(-0.18, 0.38, 0);
+    this.rightLeg.position.set(0.18, 0.38, 0);
     this.leftLeg.castShadow = true;
     this.rightLeg.castShadow = true;
-    this.root.add(this.leftLeg, this.rightLeg);
+    this.rig.add(this.leftLeg, this.rightLeg);
+
+    this.leftFoot = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.12, 0.38), boots);
+    this.rightFoot = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.12, 0.38), boots);
+    this.leftFoot.position.set(-0.18, 0.08, 0.08);
+    this.rightFoot.position.set(0.18, 0.08, 0.08);
+    this.leftFoot.castShadow = true;
+    this.rightFoot.castShadow = true;
+    this.rig.add(this.leftFoot, this.rightFoot);
 
     this.ring = new THREE.Mesh(
       new THREE.TorusGeometry(0.72, 0.035, 8, 32),
@@ -745,7 +1330,7 @@ class PlayerVisual {
       toneMapped: false
     });
     this.contactFlash = new THREE.Mesh(new THREE.SphereGeometry(0.18, 14, 8), this.contactFlashMaterial);
-    this.root.add(this.contactFlash);
+    this.rig.add(this.contactFlash);
 
     this.label = makeLabel(snapshot.name);
     this.label.position.y = 2.15;
@@ -759,16 +1344,37 @@ class PlayerVisual {
     this.root.rotation.y = snapshot.yaw;
     this.root.visible = snapshot.role === "player";
     const speed = Math.hypot(snapshot.velocity.x, snapshot.velocity.z);
-    const swing = Math.sin(time * 8.5 + snapshot.index) * Math.min(0.65, speed * 0.08);
+    const stridePhase = time * (7.2 + Math.min(speed, 7) * 0.22) + snapshot.index * 0.7;
+    const swing = Math.sin(stridePhase) * Math.min(0.78, speed * 0.09);
+    const counterSwing = Math.sin(stridePhase + Math.PI) * Math.min(0.78, speed * 0.09);
+    const bob = Math.abs(Math.sin(stridePhase)) * Math.min(0.11, speed * 0.012);
     const actionAge = Math.max(0, Date.now() - snapshot.lastActionAt);
     const actionPulse = THREE.MathUtils.clamp(1 - actionAge / 260, 0, 1);
     const kickArc = Math.sin(actionPulse * Math.PI);
 
+    this.rig.position.y = bob;
+    this.body.position.set(0, 1.08, 0);
+    this.chest.position.set(0, 1.18, 0.365);
+    this.shorts.position.y = 0.68;
+    this.head.position.set(0, 1.75, 0);
+    this.hair.position.set(0, 1.85, 0);
+    this.leftArm.position.set(-0.43, 1.14, 0.03);
+    this.rightArm.position.set(0.43, 1.14, 0.03);
+    this.leftLeg.position.set(-0.18, 0.38, 0);
+    this.rightLeg.position.set(0.18, 0.38, 0);
+    this.leftFoot.position.set(-0.18, 0.08, 0.08);
+    this.rightFoot.position.set(0.18, 0.08, 0.08);
+
+    this.leftArm.rotation.set(-counterSwing * 0.68, 0, 0.22);
+    this.rightArm.rotation.set(-swing * 0.68, 0, -0.22);
     this.leftLeg.rotation.set(swing, 0, 0);
-    this.rightLeg.rotation.set(-swing, 0, 0);
+    this.rightLeg.rotation.set(counterSwing, 0, 0);
+    this.leftFoot.rotation.set(Math.max(0, -swing) * 0.38, 0, 0);
+    this.rightFoot.rotation.set(Math.max(0, -counterSwing) * 0.38, 0, 0);
     this.head.rotation.set(0, 0, 0);
+    this.hair.rotation.set(0, 0, 0);
     this.body.rotation.set(0, 0, 0);
-    this.body.position.z = 0;
+    this.chest.rotation.set(0, 0, 0);
     this.contactFlash.visible = actionPulse > 0;
     const telegraph = snapshot.lastAction ? ACTION_TELEGRAPH[snapshot.lastAction] : null;
     if (telegraph) {
@@ -786,27 +1392,42 @@ class PlayerVisual {
     }
 
     if (snapshot.lastAction === "left") {
-      this.leftLeg.rotation.x = -1.05 * kickArc;
+      this.leftLeg.rotation.x = -1.18 * kickArc;
       this.leftLeg.rotation.z = -0.32 * kickArc;
-      this.contactFlash.position.set(-0.4, 0.36, 0.34);
+      this.leftFoot.position.set(-0.31, 0.15, 0.36 + 0.34 * kickArc);
+      this.leftFoot.rotation.x = -0.52 * kickArc;
+      this.rightArm.rotation.x = -0.65 * kickArc;
+      this.contactFlash.position.set(-0.4, 0.36, 0.46);
     } else if (snapshot.lastAction === "right") {
-      this.rightLeg.rotation.x = -1.05 * kickArc;
+      this.rightLeg.rotation.x = -1.18 * kickArc;
       this.rightLeg.rotation.z = 0.32 * kickArc;
-      this.contactFlash.position.set(0.4, 0.36, 0.34);
+      this.rightFoot.position.set(0.31, 0.15, 0.36 + 0.34 * kickArc);
+      this.rightFoot.rotation.x = -0.52 * kickArc;
+      this.leftArm.rotation.x = -0.65 * kickArc;
+      this.contactFlash.position.set(0.4, 0.36, 0.46);
     } else if (snapshot.lastAction === "head") {
       this.head.rotation.x = -0.72 * kickArc;
-      this.contactFlash.position.set(0, 1.64, 0.36);
+      this.hair.rotation.x = -0.72 * kickArc;
+      this.head.position.z = 0.18 * kickArc;
+      this.hair.position.z = 0.18 * kickArc;
+      this.contactFlash.position.set(0, 1.64, 0.46);
     } else if (snapshot.lastAction === "body") {
       this.body.rotation.x = -0.28 * kickArc;
+      this.chest.rotation.x = -0.28 * kickArc;
       this.body.position.z = 0.16 * kickArc;
+      this.chest.position.z = 0.42 + 0.16 * kickArc;
+      this.head.position.z = 0.08 * kickArc;
+      this.hair.position.z = 0.08 * kickArc;
       this.contactFlash.position.set(0, 1.08, 0.42);
     } else {
       this.contactFlash.visible = false;
-      this.body.position.z = 0;
     }
 
     const actionScale = 1 + actionPulse * (snapshot.lastAction === "body" ? 0.24 : 0.14);
-    this.body.scale.setScalar(actionScale);
+    this.body.scale.set(actionScale, actionScale, actionScale);
+    this.chest.scale.set(actionScale, actionScale, actionScale);
+    this.shadowMaterial.opacity = 0.22 + Math.min(0.12, speed * 0.015);
+    this.shadow.scale.set(1 + speed * 0.018, 0.82 + speed * 0.01, 1);
     this.ring.scale.setScalar(1 + actionPulse * 0.18);
     this.label.material.opacity = snapshot.id === localJoin?.id ? 1 : 0.78;
   }
@@ -910,10 +1531,15 @@ function acceptJoin(join: JoinAccepted) {
   localJoin = join;
   if (!previous || previous.role !== join.role || previous.team !== join.team || previous.index !== join.index) {
     audio.playJoin(localJoin.role);
+    pushEventFeed(localJoin.role === "player"
+      ? `\u0412\u044b: ${teamNameLabel(localJoin.team)} #${localJoin.index + 1}`
+      : "\u0412\u044b: \u0437\u0440\u0438\u0442\u0435\u043b\u044c");
   }
   statusEl.textContent = localJoin.role === "player"
     ? `\u0412\u044b \u0432 \u043a\u043e\u043c\u0430\u043d\u0434\u0435 ${teamNameLabel(localJoin.team)} #${localJoin.index + 1}.`
     : "\u0420\u0435\u0436\u0438\u043c \u0437\u0440\u0438\u0442\u0435\u043b\u044f/\u0442\u0435\u0441\u0442\u0435\u0440\u0430.";
+  updatePlayerChip();
+  updateResolvedInput();
 }
 
 function connect() {
@@ -954,7 +1580,9 @@ function connectWebSocket(name: string) {
     connected = true;
     document.documentElement.dataset.transport = "websocket";
     audio.playConnection(true);
-    statusEl.textContent = "\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u043e. WASD - \u0434\u0432\u0438\u0436\u0435\u043d\u0438\u0435, \u041b\u041a\u041c/\u041f\u041a\u041c - \u0443\u0434\u0430\u0440 \u043d\u043e\u0433\u043e\u0439, \u043a\u043e\u043b\u0435\u0441\u043e - \u0443\u0434\u0430\u0440 \u0433\u043e\u043b\u043e\u0432\u043e\u0439.";
+    statusEl.textContent = "\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u043e.";
+    pushEventFeed("WebSocket online");
+    updateNetworkHud();
     wsChannel.emit("join", { name });
   });
   wsChannel.onDisconnect(() => {
@@ -967,12 +1595,16 @@ function connectWebSocket(name: string) {
     resetServerAudioCursor();
     resetStateInterpolation();
     statusEl.textContent = "\u041e\u0442\u043a\u043b\u044e\u0447\u0435\u043d\u043e. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0438\u0433\u0440\u043e\u0432\u043e\u0439 \u0441\u0435\u0440\u0432\u0435\u0440.";
+    pushEventFeed("\u041e\u0442\u043a\u043b\u044e\u0447\u0435\u043d\u043e");
+    updatePlayerChip();
+    updateNetworkHud();
   });
   wsChannel.on("joined", (data) => {
     acceptJoin(data as JoinAccepted);
   });
   wsChannel.on("server-full", () => {
     statusEl.textContent = "\u0421\u0435\u0440\u0432\u0435\u0440 \u0437\u0430\u043f\u043e\u043b\u043d\u0435\u043d.";
+    pushEventFeed("\u0421\u0435\u0440\u0432\u0435\u0440 \u0437\u0430\u043f\u043e\u043b\u043d\u0435\u043d");
   });
   wsChannel.on("state", (data) => {
     receiveState(data as ServerState);
@@ -988,6 +1620,7 @@ async function connectHttp(name: string, reason: string) {
   httpPollGeneration += 1;
   const generation = httpPollGeneration;
   statusEl.textContent = "\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u0435 HTTP fallback...";
+  pushEventFeed("HTTP fallback");
   try {
     const payload = await postJson<{ ok: boolean; joined: JoinAccepted; state: ServerState }>("join", { name });
     httpClientId = payload.joined.id;
@@ -996,11 +1629,14 @@ async function connectHttp(name: string, reason: string) {
     acceptJoin(payload.joined);
     receiveState(payload.state);
     document.documentElement.dataset.transport = `http:${reason}`;
+    updateNetworkHud();
     void pollHttpState(generation);
   } catch (error) {
     connected = false;
     transportMode = "none";
     statusEl.textContent = "\u041e\u0448\u0438\u0431\u043a\u0430 \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u044f. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0438\u0433\u0440\u043e\u0432\u043e\u0439 \u0441\u0435\u0440\u0432\u0435\u0440.";
+    pushEventFeed("\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u0435\u0442\u0438");
+    updateNetworkHud();
     console.warn("unsoccer http fallback failed", error);
   }
 }
@@ -1018,6 +1654,8 @@ async function pollHttpState(generation: number) {
       connected = false;
       audio.playConnection(false);
       statusEl.textContent = "\u041e\u0442\u043a\u043b\u044e\u0447\u0435\u043d\u043e. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0438\u0433\u0440\u043e\u0432\u043e\u0439 \u0441\u0435\u0440\u0432\u0435\u0440.";
+      pushEventFeed("\u041f\u043e\u0442\u0435\u0440\u044f\u043d HTTP snapshot");
+      updateNetworkHud();
       console.warn("unsoccer http poll failed", error);
       await wait(1000);
     }
@@ -1066,6 +1704,7 @@ function resetStateInterpolation(): void {
 
 function sendInput(force = false) {
   if (!connected) return;
+  updateResolvedInput();
   const now = performance.now();
   if (!force && now - lastSentAt < 34) return;
   lastSentAt = now;
@@ -1082,16 +1721,18 @@ function sendInput(force = false) {
 
 function receiveState(state: ServerState) {
   latestState = state;
-  stateHistory.push({ state, receivedAt: performance.now() * 0.001 });
+  latestSnapshotReceivedAt = performance.now();
+  stateHistory.push({ state, receivedAt: latestSnapshotReceivedAt * 0.001 });
   while (stateHistory.length > STATE_HISTORY_LIMIT) stateHistory.shift();
   observeAudioState(state);
+  updateNetworkHud(latestSnapshotReceivedAt);
 }
 
 function selectRenderState(nowSeconds: number): ServerState | null {
   localPredictionLeadMs = 0;
   if (!latestState) return null;
   let state: ServerState;
-  if (stateHistory.length < 2) {
+  if (!settings.graphics.motionInterpolation || stateHistory.length < 2) {
     interpolationAlpha = 1;
     interpolationRenderAgeMs = 0;
     state = latestState;
@@ -1234,8 +1875,11 @@ function updateHud(state: ServerState) {
   blueScoreEl.textContent = String(state.score.blue);
   orangeScoreEl.textContent = String(state.score.orange);
   updateWeatherHud(state.weather);
+  updatePlayerChip();
+  updateNetworkHud();
   const countdown = state.countdown > 0 ? ` \u0420\u043e\u0437\u044b\u0433\u0440\u044b\u0448 \u0447\u0435\u0440\u0435\u0437 ${(state.countdown / 1000).toFixed(1)}\u0441.` : "";
   const message = translateServerMessage(state.message);
+  if (settings.accessibility.captions && message) pushEventFeed(message);
   if (!localJoin || localJoin.role === "spectator") {
     statusEl.textContent = `${message}.${countdown || " \u041d\u0430\u0431\u043b\u044e\u0434\u0435\u043d\u0438\u0435."}`;
   } else if (message) {
@@ -1350,6 +1994,8 @@ function applyState(state: ServerState, time: number) {
       players.delete(id);
     }
   }
+  document.documentElement.dataset.playerRig = "procedural-animated-footballer";
+  document.documentElement.dataset.animatedPlayers = String([...players.values()].filter((visual) => visual.root.visible).length);
   weatherLayer.update(state.weather, time);
   observeWeatherAudio(state);
   updateHud(state);
@@ -1463,6 +2109,13 @@ function updateLighting(elapsedSeconds: number) {
   sun.position.set(Math.cos(angle) * 24, Math.max(2.2, Math.sin(angle) * 24), Math.sin(angle + 0.55) * 18);
   sun.target.position.set(0, 0, 0);
   sunMesh.position.copy(sun.position).multiplyScalar(1.7);
+  sunGlow.position.copy(sunMesh.position);
+  const moonAngle = angle + Math.PI;
+  moonMesh.position.set(
+    Math.cos(moonAngle) * 38,
+    Math.max(2.0, Math.sin(moonAngle) * 36),
+    Math.sin(moonAngle + 0.55) * 27
+  );
   sunColor.copy(dayColor).lerp(sunsetColor, sunset).lerp(nightColor, 1 - daylight);
   skyColor.copy(nightColor).lerp(dayColor, daylight).lerp(sunsetColor, sunset * 0.36);
   const snowIntensity = (renderedState ?? latestState)?.weather?.intensity ?? 0;
@@ -1470,6 +2123,11 @@ function updateLighting(elapsedSeconds: number) {
   sun.color.copy(sunColor);
   sun.intensity = 0.32 + daylight * 2.6 + sunset * 0.75;
   hemi.intensity = 0.38 + daylight * 1.45;
+  ambientFill.color.copy(fogColor);
+  ambientFill.intensity = 0.12 + daylight * 0.22 + (1 - daylight) * 0.1 + snowIntensity * 0.04;
+  bounceColor.set(0x9fc7b3).lerp(sunsetColor, sunset * 0.32).lerp(nightColor, (1 - daylight) * 0.22);
+  courtyardBounce.color.copy(bounceColor);
+  courtyardBounce.intensity = 0.2 + daylight * 0.62 + sunset * 0.38 + (1 - daylight) * 0.2;
   rimLight.color.copy(fogColor);
   rimLight.intensity = 0.28 + (1 - daylight) * 0.72 + sunset * 0.24;
   for (const flood of floodLights) {
@@ -1487,8 +2145,21 @@ function updateLighting(elapsedSeconds: number) {
   }
   (sunMesh.material as THREE.MeshBasicMaterial).color.copy(sunColor);
   sunMesh.scale.setScalar(0.82 + daylight * 0.34 + sunset * 0.28);
+  sunMesh.visible = daylight > 0.05 || sunset > 0.03;
+  sunGlow.visible = sunMesh.visible;
+  sunGlowMaterial.color.copy(sunColor);
+  sunGlowMaterial.opacity = (0.12 + daylight * 0.34 + sunset * 0.3) * (sunMesh.visible ? 1 : 0);
+  moonMesh.visible = daylight < 0.7;
+  moonMaterial.opacity = THREE.MathUtils.clamp((1 - daylight) * 0.78 + 0.08, 0, 0.86);
+  sunPathMaterial.opacity = 0.1 + daylight * 0.12 + sunset * 0.1;
+  sunPath.visible = true;
   document.documentElement.dataset.dayCycleSeconds = THREE.MathUtils.euclideanModulo(daySeconds, DAY_CYCLE_SECONDS).toFixed(2);
+  document.documentElement.dataset.dayCycleLengthSeconds = String(DAY_CYCLE_SECONDS);
   document.documentElement.dataset.daylight = daylight.toFixed(3);
+  document.documentElement.dataset.sunVisible = String(sunMesh.visible);
+  document.documentElement.dataset.moonVisible = String(moonMesh.visible);
+  document.documentElement.dataset.ambientFill = ambientFill.intensity.toFixed(3);
+  document.documentElement.dataset.courtyardBounce = courtyardBounce.intensity.toFixed(3);
   document.documentElement.dataset.sunX = sun.position.x.toFixed(2);
   document.documentElement.dataset.sunY = sun.position.y.toFixed(2);
   document.documentElement.dataset.sunZ = sun.position.z.toFixed(2);
@@ -1545,24 +2216,80 @@ function resize() {
   camera.updateProjectionMatrix();
 }
 
-function setKey(code: string, pressed: boolean) {
-  if (code === "KeyW" || code === "ArrowUp") input.up = pressed;
-  if (code === "KeyS" || code === "ArrowDown") input.down = pressed;
-  if (code === "KeyA" || code === "ArrowLeft") input.left = pressed;
-  if (code === "KeyD" || code === "ArrowRight") input.right = pressed;
-}
-
 addEventListener("keydown", (event) => {
   unlockAudio();
-  setKey(event.code, true);
+  if (pendingRebindAction) {
+    event.preventDefault();
+    if (event.code === "Escape") {
+      pendingRebindAction = null;
+      syncSettingsUi();
+      return;
+    }
+    bindAction(pendingRebindAction, event.code);
+    return;
+  }
+  if (actionPressed(settings.controls, "settings", new Set([event.code]))) {
+    event.preventDefault();
+    setSettingsOpen(!settingsOpen);
+    return;
+  }
+  if (settingsOpen) return;
+  pressedCodes.add(event.code);
+  if (!event.repeat) {
+    if (actionPressed(settings.controls, "leftKick", new Set([event.code]))) input.kickLeft += 1;
+    if (actionPressed(settings.controls, "rightKick", new Set([event.code]))) input.kickRight += 1;
+    if (actionPressed(settings.controls, "headHit", new Set([event.code]))) input.head += 1;
+    if (actionPressed(settings.controls, "muteAudio", new Set([event.code]))) toggleMute();
+    if (actionPressed(settings.controls, "cameraReset", new Set([event.code]))) resetCamera();
+  }
+  updateResolvedInput();
   sendInput(true);
 });
 
 addEventListener("keyup", (event) => {
   unlockAudio();
-  setKey(event.code, false);
+  pressedCodes.delete(event.code);
+  updateResolvedInput();
   sendInput(true);
 });
+
+settingsButton.addEventListener("click", () => setSettingsOpen(true));
+settingsCloseButton.addEventListener("click", () => setSettingsOpen(false));
+muteButton.addEventListener("click", toggleMute);
+cameraResetButton.addEventListener("click", resetCamera);
+fullscreenButton.addEventListener("click", () => {
+  if (document.fullscreenElement) void document.exitFullscreen();
+  else void document.documentElement.requestFullscreen();
+});
+settingsForm.addEventListener("submit", (event) => event.preventDefault());
+settingsForm.addEventListener("input", readSettingsFromForm);
+settingsForm.addEventListener("change", readSettingsFromForm);
+applySettingsButton.addEventListener("click", persistAndApplySettings);
+resetTabButton.addEventListener("click", () => {
+  settings = resetSettingsTab(settings, activeSettingsTab);
+  persistAndApplySettings();
+});
+resetAllButton.addEventListener("click", () => {
+  settings = cloneSettings(DEFAULT_SETTINGS);
+  persistAndApplySettings();
+});
+testSoundButton.addEventListener("click", () => {
+  unlockAudio();
+  audio.playConnection(true);
+  syncAudioDebugDataset();
+});
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-settings-tab]")) {
+  button.addEventListener("click", () => {
+    setActiveSettingsTab(button.dataset.settingsTab as SettingsTab);
+    syncSettingsUi();
+  });
+}
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-rebind-action]")) {
+  button.addEventListener("click", () => {
+    pendingRebindAction = button.dataset.rebindAction as InputAction;
+    syncSettingsUi();
+  });
+}
 
 canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 const audioUnlockOptions: AddEventListenerOptions = { capture: true, passive: true };
@@ -1571,6 +2298,7 @@ addEventListener("mousedown", unlockAudio, audioUnlockOptions);
 addEventListener("touchstart", unlockAudio, audioUnlockOptions);
 canvas.addEventListener("pointerdown", (event) => {
   canvas.focus();
+  if (settingsOpen) return;
   if (event.button === 0) input.kickLeft += 1;
   if (event.button === 2) input.kickRight += 1;
   sendInput(true);
@@ -1578,6 +2306,7 @@ canvas.addEventListener("pointerdown", (event) => {
 canvas.addEventListener("wheel", (event) => {
   unlockAudio();
   event.preventDefault();
+  if (settingsOpen) return;
   input.head += 1;
   sendInput(true);
 }, { passive: false });

@@ -23,6 +23,8 @@ export class WeatherVisualLayer {
   private readonly hazardGroups = new Map<string, THREE.Group>();
   private readonly fieldWidth: number;
   private readonly fieldLength: number;
+  private particlesEnabled = true;
+  private opacityScale = 1;
 
   constructor(options: WeatherVisualLayerOptions) {
     this.fieldWidth = options.fieldWidth;
@@ -63,6 +65,12 @@ export class WeatherVisualLayer {
     this.group.visible = true;
     this.syncHazards(weather.hazards, time);
     this.updateSnow(weather, time);
+  }
+
+  setOptions(options: { particlesEnabled: boolean; opacityScale: number }): void {
+    this.particlesEnabled = options.particlesEnabled;
+    this.opacityScale = THREE.MathUtils.clamp(options.opacityScale, 0.25, 1);
+    this.snow.visible = this.particlesEnabled;
   }
 
   private syncHazards(hazards: HazardSnapshot[], time: number): void {
@@ -149,7 +157,8 @@ export class WeatherVisualLayer {
     const halfWidth = this.fieldWidth / 2 + 9;
     const halfLength = this.fieldLength / 2 + 12;
     const intensity = THREE.MathUtils.clamp(weather.intensity, 0, 1);
-    (this.snow.material as THREE.PointsMaterial).opacity = 0.18 + intensity * 0.48;
+    this.snow.visible = this.particlesEnabled;
+    (this.snow.material as THREE.PointsMaterial).opacity = (0.18 + intensity * 0.48) * this.opacityScale;
     (this.snow.material as THREE.PointsMaterial).size = 0.045 + intensity * 0.06;
 
     for (let index = 0; index < SNOW_PARTICLE_COUNT; index += 1) {

@@ -1,0 +1,283 @@
+{
+  "ok": true,
+  "targetUrl": "http://127.0.0.1:5189/?name=ArtSmoke&qaTime=18",
+  "result": {
+    "title": "UnSoccer v0.0.009 | Ragdoll Soccer II",
+    "url": "http://127.0.0.1:5189/?name=ArtSmoke&qaTime=18",
+    "badge": "v0.0.009 / 0.61 MB",
+    "canvas": {
+      "width": 1348,
+      "height": 672,
+      "clientWidth": 1348,
+      "clientHeight": 672
+    },
+    "dataset": {
+      "gameVersion": "v0.0.009",
+      "gameWeightLabel": "0.61 MB",
+      "artPass": "v0.0.009",
+      "environment": "residential-courtyard-v009",
+      "environmentModels": "apartments,cars,trees,benches,playground,kiosk,clotheslines,pavement",
+      "playerRig": "procedural-animated-footballer",
+      "animatedPlayers": "3",
+      "sunVisible": "true",
+      "moonVisible": "true",
+      "dayCycleSeconds": "18.00",
+      "dayCycleLengthSeconds": "120",
+      "daylight": "0.442",
+      "ambientFill": "0.302",
+      "courtyardBounce": "0.648",
+      "transport": "websocket",
+      "interpolationBuffer": "12",
+      "audioServerPrimed": "true"
+    },
+    "debug": {
+      "version": "v0.0.009",
+      "connected": true,
+      "localJoin": {
+        "id": "ws-1782916003339-piyzf6qkmqq",
+        "role": "player",
+        "team": 0,
+        "index": 2,
+        "characterId": "6298507",
+        "version": "v0.0.009",
+        "maxActivePlayers": 4,
+        "maxRoomClients": 32
+      },
+      "latestState": {
+        "version": "v0.0.009",
+        "serverTime": 1782916007695,
+        "tick": 12297,
+        "players": [
+          {
+            "id": "ws-1782915898806-d3u2a5qbcgm",
+            "name": "AudioQA3",
+            "role": "player",
+            "team": 0,
+            "index": 0,
+            "characterId": "6299851",
+            "position": {
+              "x": -3.200000047683716,
+              "y": 0.875,
+              "z": -8.640000343322754
+            },
+            "velocity": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "yaw": 0,
+            "lastAction": null,
+            "lastActionAt": 0
+          },
+          {
+            "id": "ws-1782915898817-keki5m6nvko",
+            "name": "ArtDirectorVisual",
+            "role": "player",
+            "team": 1,
+            "index": 1,
+            "characterId": "6270753",
+            "position": {
+              "x": -3.200000047683716,
+              "y": 0.875,
+              "z": 8.640000343322754
+            },
+            "velocity": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "yaw": 0,
+            "lastAction": null,
+            "lastActionAt": 0
+          },
+          {
+            "id": "ws-1782916003339-piyzf6qkmqq",
+            "name": "ArtSmoke",
+            "role": "player",
+            "team": 0,
+            "index": 2,
+            "characterId": "6298507",
+            "position": {
+              "x": 3.200000047683716,
+              "y": 0.875,
+              "z": -8.640000343322754
+            },
+            "velocity": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "yaw": 0,
+            "lastAction": null,
+            "lastActionAt": 0
+          }
+        ],
+        "ball": {
+          "position": {
+            "x": 4.134269714355469,
+            "y": 0.47999998927116394,
+            "z": -2.584261178970337
+          },
+          "velocity": {
+            "x": 0.015295975841581821,
+            "y": 0,
+            "z": -0.009559989906847477
+          }
+        },
+        "score": {
+          "blue": 0,
+          "orange": 0
+        },
+        "message": "ArtSmoke подключился к полю",
+        "countdown": 0,
+        "weather": {
+          "kind": "snow",
+          "label": "Снег, лужи и сугробы",
+          "intensity": 0.72,
+          "wind": {
+            "x": 0.16,
+            "y": 0,
+            "z": -0.1
+          },
+          "hazards": [
+            {
+              "id": "puddle-west-box",
+              "type": "puddle",
+              "position": {
+                "x": -6.4,
+                "y": 0.03,
+                "z": -7.2
+              },
+              "radius": 2.45,
+              "strength": 0.58
+            },
+            {
+              "id": "puddle-east-mid",
+              "type": "puddle",
+              "position": {
+                "x": 6.2,
+                "y": 0.03,
+                "z": 3.1
+              },
+              "radius": 2.1,
+              "strength": 0.52
+            },
+            {
+              "id": "slush-center-left",
+              "type": "slush",
+              "position": {
+                "x": -2.7,
+                "y": 0.04,
+                "z": 6.4
+              },
+              "radius": 2.8,
+              "strength": 0.38
+            },
+            {
+              "id": "slush-center-right",
+              "type": "slush",
+              "position": {
+                "x": 3.8,
+                "y": 0.04,
+                "z": -4.8
+              },
+              "radius": 2.6,
+              "strength": 0.34
+            },
+            {
+              "id": "snowbank-north",
+              "type": "snowbank",
+              "position": {
+                "x": -7.4,
+                "y": 0.28,
+                "z": 10.5
+              },
+              "radius": 1.25,
+              "strength": 0.92
+            },
+            {
+              "id": "snowbank-south",
+              "type": "snowbank",
+              "position": {
+                "x": 7.5,
+                "y": 0.28,
+                "z": -10.2
+              },
+              "radius": 1.3,
+              "strength": 0.92
+            }
+          ]
+        },
+        "audioEvents": [
+          {
+            "id": 19,
+            "serverTime": 1782916003699,
+            "tick": 12129,
+            "kind": "roster",
+            "change": "join",
+            "playerId": "ws-1782916003339-piyzf6qkmqq",
+            "role": "player"
+          }
+        ]
+      },
+      "dayCycleSeconds": "18.00",
+      "daylight": "0.442",
+      "camera": {
+        "x": 3.52,
+        "y": 14.5,
+        "z": -19.08
+      },
+      "audio": {
+        "supported": true,
+        "unlocked": false,
+        "contextState": "missing",
+        "ambienceReady": false,
+        "rollGain": 0,
+        "crowdGain": 0,
+        "weatherGain": 0,
+        "playedEvents": 0,
+        "blockedEvents": 2,
+        "lastEvent": null,
+        "lastBlockedEvent": "join"
+      },
+      "art": {
+        "pass": "v0.0.009",
+        "environment": "residential-courtyard-v009",
+        "sunVisible": true,
+        "moonVisible": true,
+        "rig": "procedural-animated-footballer"
+      },
+      "ui": {
+        "settingsOpen": false,
+        "activeTab": "controls",
+        "movementMode": "screen",
+        "graphicsPreset": "balanced",
+        "transport": "websocket",
+        "bindingConflicts": 0
+      },
+      "interpolation": {
+        "bufferedStates": 12,
+        "delayMs": 100,
+        "alpha": 0.628,
+        "renderAgeMs": 100,
+        "localPredictionMs": 0
+      },
+      "serverAudio": {
+        "lastEventId": 19,
+        "primed": true
+      },
+      "weather": {
+        "hazards": 6,
+        "localHazardId": null,
+        "ballHazardId": "slush-center-right",
+        "hazardAudioEvents": {
+          "puddle": 0,
+          "slush": 0,
+          "snowbank": 0
+        }
+      }
+    }
+  },
+  "logEvents": [],
+  "screenshot": "R:/itch_games/art_director/checks/2026-07-01-unsoccer-v0.0.009-art-smoke.png"
+}

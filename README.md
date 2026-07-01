@@ -21,7 +21,7 @@ Orbital Courier is a tiny browser game built with Three.js for itch.io HTML5 upl
 
 ## unsoccer / Ragdoll Soccer II
 
-`unsoccer` is currently `v0.0.008` as a physical multiplayer soccer prototype:
+`unsoccer` is currently `v0.0.009` as a physical multiplayer soccer prototype:
 
 - MavonEngine-style client/server split with a headless authoritative server.
 - Three.js client rendering, Rapier3D server physics, WebSocket transport, and
@@ -35,9 +35,11 @@ Orbital Courier is a tiny browser game built with Three.js for itch.io HTML5 upl
 - Procedural Web Audio follows authoritative server snapshots for contacts,
   goals, roster changes, ball rolling, and weather; debug fields expose played
   and blocked audio events for browser unlock QA.
+- The v0.0.009 client adds procedural animated footballer rigs, courtyard
+  props, visible sun/moon markers, and a 120-second timelapse lighting cycle.
 - The HUD keeps the release version and current client bundle weight visible.
 - The field is framed as a residential courtyard with procedural apartment
-  blocks, parked cars, trees, benches, and floodlights.
+  blocks, parked cars, trees, benches, playground props, kiosk, and floodlights.
 - Free3D character candidates are tracked in `unsoccer/assets/`, but runtime
   ships procedural placeholders until per-model provenance is confirmed.
 
@@ -50,7 +52,7 @@ and itch.io presentation guidance. The current source-of-truth brief is
 
 ## Version
 
-Current game release: `v0.0.008`.
+Current game release: `v0.0.009`.
 
 Game releases use `v0.0.001`-style semantic project versioning. The already
 published first build is treated as `v0.0.001`; this auto-start and input fix is
@@ -62,7 +64,10 @@ browser gesture unlock, engine ambience, gameplay SFX, and a network-ready
 audio event contract. The `v0.0.007` release realigns release metadata after
 the deploy/version drift report. The `v0.0.008` release adds the always-visible
 client bundle weight badge and starts the residential courtyard art pass. The
-game renders the release version in the bottom-left corner.
+`v0.0.009` release adds the animated art/runtime pass, 120-second day cycle,
+visible sun/moon lighting, team-relative movement, responsive local prediction,
+and free movement beyond the pitch rectangle. The game renders the release
+version in the bottom-left corner.
 
 ## Local Run
 

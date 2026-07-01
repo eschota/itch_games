@@ -61,7 +61,7 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
 - The qwertystock autodeploy must run `npm ci` with dev dependencies even when
   the service environment is production, delete generated UnSoccer dist folders
   before rebuilding, then verify `unsoccer/client/dist/index.html` against
-  `package.json.games.unsoccer.version`, the `0.56 MB` weight label, every
+  `package.json.games.unsoccer.version`, the `0.61 MB` weight label, every
   referenced asset path, at least one built JS asset, the
   `residential-courtyard` client marker inside built assets, and that the server
   bundle does not import geckos.io, `ws`, or `node-datachannel` before nginx

@@ -27,9 +27,18 @@ NODE
 )"
 echo "unsoccer expected version: ${expected_version}"
 echo "unsoccer expected weight: ${expected_weight}"
-stage "npm ci with dev dependencies"
+stage "npm dependencies"
 rm -rf node_modules/@geckos.io node_modules/node-datachannel node_modules/ws node_modules/@types/ws
-NODE_ENV=development npm ci --include=dev
+previous_head="$(git rev-parse HEAD@{1} 2>/dev/null || true)"
+package_changed=1
+if [ -n "$previous_head" ] && git diff --quiet "$previous_head" HEAD -- package.json package-lock.json unsoccer/shared/package.json unsoccer/server/package.json unsoccer/client/package.json; then
+  package_changed=0
+fi
+if [ "$package_changed" -eq 0 ] && [ -d node_modules ]; then
+  echo "package manifests unchanged since ${previous_head}; reusing existing node_modules"
+else
+  NODE_ENV=development npm ci --include=dev
+fi
 stage "dependency check"
 node --input-type=module -e "await import('@dimforge/rapier3d-compat'); await import('@itch-games/unsoccer-shared'); console.log('unsoccer required dependencies ok')"
 stage "build unsoccer"

@@ -1317,7 +1317,7 @@ function runDeployFromWebhook(payload) {
   const script = process.env.AI_CHAT_DEPLOY_SCRIPT || path.join(ROOT, "ai_chat", "deploy", "itch-games-autodeploy-qwertystock.sh");
   childProcess.execFile(script, {
     cwd: ROOT,
-    timeout: 300000,
+    timeout: 900000,
     maxBuffer: 1024 * 1024,
     encoding: "utf8",
   }, (error, stdout, stderr) => {

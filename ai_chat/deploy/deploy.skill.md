@@ -58,9 +58,12 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
 - The UnSoccer production dependency preflight must import
   `@dimforge/rapier3d-compat` and `@itch-games/unsoccer-shared`; it must not
   require `ws`, geckos.io, or `node-datachannel` for the WebSocket transport.
-- The qwertystock autodeploy must run `npm ci` with dev dependencies even when
-  the service environment is production, delete generated UnSoccer dist folders
-  before rebuilding, then verify `unsoccer/client/dist/index.html` against
+- The qwertystock autodeploy must run `npm ci` with dev dependencies when
+  package manifests changed or `node_modules` is absent, even when the service
+  environment is production. If package manifests are unchanged and
+  `node_modules` exists, it may reuse the current install to keep asset-only
+  deploys inside the webhook timeout. It must delete generated UnSoccer dist
+  folders before rebuilding, then verify `unsoccer/client/dist/index.html` against
   `package.json.games.unsoccer.version`, the `BUILD_WEIGHT_LABEL` from
   `unsoccer/client/src/main.ts` (currently `1.31 MB`), every referenced asset
   path, at least one built JS asset, the

@@ -15,16 +15,17 @@ Use this file for work inside `/itch_games/ai_chat`.
 - Keep service code separate from game runtime code while still versioning the
   service with the project.
 - Keep chat and task data on the server under `ai_chat/data/`; do not commit
-  messages, task snapshots, or task event logs.
+  messages, task snapshots, todo snapshots, or event logs.
 
 ## Structure
 
 - `server_node.js`: Node stdlib HTTP API, static file server, Telegram bridge,
-  deploy webhook, messages, commits, and Task Queue.
+  deploy webhook, messages, commits, Task Queue, and Todo List.
 - `server.py`: legacy Python stdlib HTTP API reference.
 - `static/`: browser UI for chat, status, and commit service menu.
 - `deploy/`: systemd and nginx reference files.
-- `data/`: server-only `messages.jsonl`, `tasks.json`, `tasks.jsonl`, and
+- `data/`: server-only `messages.jsonl`, `tasks.json`, `tasks.jsonl`,
+  `todos.json`, `todos.jsonl`, and
   Telegram update state, ignored by git.
 
 ## Rules
@@ -37,6 +38,15 @@ Use this file for work inside `/itch_games/ai_chat`.
 - Keep Task Queue as the source of truth for role work. The Orchestrator or
   Producer creates tasks; execution roles do not do non-read-only project work
   without an assigned or claimed task for their role.
+- Keep Todo List as the public backlog for Producer future ideas. The
+  Orchestrator must add Producer ideas there immediately. Todo items are
+  mandatory after all Task Queue items are `done`: promote the next open Todo
+  into a role-owned task or mark it `done`/`blocked` with a clear reason.
+- Do not treat Todo as permission to edit. A role still needs a Task Queue item
+  created from that Todo before non-read-only work starts.
+- Any agent may ask in chat or Todo/Task Queue for server, deployment, nginx,
+  webhook, domain, environment, Telegram bridge, or public-static availability
+  fixes when that infrastructure blocks or degrades their work.
 - Task records must include role, priority, title, description, status, scope,
   dependencies, acceptance, owner/claim, comments, and validation ownership when
   applicable.

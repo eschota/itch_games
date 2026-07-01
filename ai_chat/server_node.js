@@ -15,6 +15,8 @@ const DATA_DIR = process.env.AI_CHAT_DATA_DIR || path.join(__dirname, "data");
 const MESSAGES_FILE = path.join(DATA_DIR, "messages.jsonl");
 const TASKS_FILE = path.join(DATA_DIR, "tasks.json");
 const TASK_EVENTS_FILE = path.join(DATA_DIR, "tasks.jsonl");
+const TODOS_FILE = path.join(DATA_DIR, "todos.json");
+const TODO_EVENTS_FILE = path.join(DATA_DIR, "todos.jsonl");
 const MEDIA_DIR = path.join(DATA_DIR, "media");
 const TELEGRAM_SEEN_FILE = path.join(DATA_DIR, "telegram_seen_updates.txt");
 const MAX_MESSAGE_CHARS = 4000;
@@ -54,6 +56,7 @@ const ROLE_BADGES = [
 ];
 const TASK_STATUSES = ["new", "claimed", "in_progress", "blocked", "review", "done"];
 const TASK_PRIORITIES = ["low", "normal", "high", "urgent"];
+const TODO_STATUSES = ["open", "promoted", "done", "blocked"];
 const DEFAULT_TASK_SEEDS = [
   {
     seed_key: "orchestrator-parallel-plan",
@@ -503,6 +506,24 @@ function writeTasks(tasks) {
   fs.renameSync(tempFile, TASKS_FILE);
 }
 
+function readTodos() {
+  if (!fs.existsSync(TODOS_FILE)) return [];
+  try {
+    const parsed = JSON.parse(fs.readFileSync(TODOS_FILE, "utf8"));
+    return Array.isArray(parsed.todos) ? parsed.todos : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function writeTodos(todos) {
+  ensureDataDir();
+  const payload = JSON.stringify({ updated_at: nowIso(), todos }, null, 2) + os.EOL;
+  const tempFile = `${TODOS_FILE}.tmp`;
+  fs.writeFileSync(tempFile, payload, "utf8");
+  fs.renameSync(tempFile, TODOS_FILE);
+}
+
 function appendTaskEvent(action, task, actorRole, payload) {
   const context = gitContext();
   const record = {
@@ -524,12 +545,36 @@ function appendTaskEvent(action, task, actorRole, payload) {
   return record;
 }
 
+function appendTodoEvent(action, todo, actorRole, payload) {
+  const context = gitContext();
+  const record = {
+    id: randomId(),
+    created_at: nowIso(),
+    action,
+    todo_id: todo.id,
+    todo_status: todo.status,
+    actor_role: cleanRole(actorRole || "Agent"),
+    project_version: projectVersion(),
+    branch: context.branch,
+    commit: context.commit,
+    dirty: context.dirty,
+    payload: payload || {},
+  };
+  ensureDataDir();
+  fs.appendFileSync(TODO_EVENTS_FILE, JSON.stringify(record) + os.EOL, "utf8");
+  return record;
+}
+
 function taskIdFromSeed(seedKey) {
   return `task_${String(seedKey || "").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").toLowerCase()}`;
 }
 
 function newTaskId() {
   return `task_${Date.now().toString(36)}_${randomId().slice(0, 6)}`;
+}
+
+function newTodoId() {
+  return `todo_${Date.now().toString(36)}_${randomId().slice(0, 6)}`;
 }
 
 function validateTaskPayload(payload, existingTask) {
@@ -554,6 +599,22 @@ function validateTaskPayload(payload, existingTask) {
   };
 }
 
+function validateTodoPayload(payload, existingTodo) {
+  const title = cleanText(payload.title || existingTodo?.title, 200);
+  if (!title) throw new Error("todo title is required");
+  const priority = TASK_PRIORITIES.includes(payload.priority) ? payload.priority : (existingTodo?.priority || "normal");
+  const status = TODO_STATUSES.includes(payload.status) ? payload.status : (existingTodo?.status || "open");
+  return {
+    title,
+    priority,
+    status,
+    description: cleanText(payload.description || existingTodo?.description || "", MAX_TASK_TEXT_CHARS),
+    acceptance: cleanText(payload.acceptance || existingTodo?.acceptance || "", MAX_TASK_TEXT_CHARS),
+    source: cleanText(payload.source || existingTodo?.source || "producer-idea", 120),
+    tags: normalizeList(payload.tags !== undefined ? payload.tags : existingTodo?.tags, 20),
+  };
+}
+
 function taskForResponse(task) {
   const badge = roleBadge(task.role || "Agent");
   return Object.assign({}, task, {
@@ -561,6 +622,13 @@ function taskForResponse(task) {
     role_label: badge.label,
     role_badge: badge.text,
     comments: Array.isArray(task.comments) ? task.comments.slice(-20) : [],
+  });
+}
+
+function todoForResponse(todo) {
+  return Object.assign({}, todo, {
+    mandatory_when_idle: todo.status === "open",
+    comments: Array.isArray(todo.comments) ? todo.comments.slice(-20) : [],
   });
 }
 
@@ -589,10 +657,38 @@ function createTask(payload, seed) {
   return task;
 }
 
+function createTodo(payload) {
+  const actorRole = cleanRole(payload.created_by_role || payload.actor_role || "Orchestrator");
+  if (!isProducerOrOrchestrator(actorRole)) {
+    throw new Error("only Producer or Orchestrator can create todos");
+  }
+  const normalized = validateTodoPayload(payload);
+  const context = gitContext();
+  return Object.assign({
+    id: newTodoId(),
+    created_at: nowIso(),
+    updated_at: nowIso(),
+    created_by_role: actorRole,
+    created_by: cleanText(payload.created_by || actorRole, 120),
+    owner_role: "Orchestrator",
+    promoted_task_id: "",
+    comments: [],
+    project_version: projectVersion(),
+    branch_context: context.branch,
+    commit_context: context.commit,
+  }, normalized);
+}
+
 function appendTaskMessage(action, task, actorRole, extra) {
   const actor = actorRole ? `${actorRole}: ` : "";
   const suffix = extra ? `\n${extra}` : "";
   appendMessage("Task Queue", `${actor}${action} \`${task.id}\` for ${task.role}: ${task.title}${suffix}`);
+}
+
+function appendTodoMessage(action, todo, actorRole, extra) {
+  const actor = actorRole ? `${actorRole}: ` : "";
+  const suffix = extra ? `\n${extra}` : "";
+  appendMessage("Todo List", `${actor}${action} \`${todo.id}\`: ${todo.title}${suffix}`);
 }
 
 function pushTaskComment(task, actorRole, text) {
@@ -606,6 +702,19 @@ function pushTaskComment(task, actorRole, text) {
     text: clean,
   });
   task.comments = comments.slice(-100);
+}
+
+function pushTodoComment(todo, actorRole, text) {
+  const clean = cleanText(text, MAX_TASK_TEXT_CHARS);
+  if (!clean) return;
+  const comments = Array.isArray(todo.comments) ? todo.comments : [];
+  comments.push({
+    id: randomId(),
+    created_at: nowIso(),
+    role: cleanRole(actorRole),
+    text: clean,
+  });
+  todo.comments = comments.slice(-100);
 }
 
 function seedDefaultTasks(actorRole) {
@@ -641,6 +750,19 @@ function updateTask(id, updater) {
   next.updated_at = nowIso();
   tasks[index] = next;
   writeTasks(tasks);
+  return next;
+}
+
+function updateTodo(id, updater) {
+  const todos = readTodos();
+  const index = todos.findIndex((todo) => todo.id === id);
+  if (index < 0) throw new Error("todo not found");
+  const next = updater(Object.assign({}, todos[index], {
+    comments: Array.isArray(todos[index].comments) ? todos[index].comments.slice() : [],
+  }));
+  next.updated_at = nowIso();
+  todos[index] = next;
+  writeTodos(todos);
   return next;
 }
 
@@ -1050,8 +1172,53 @@ function filteredTasks(query) {
     .map(taskForResponse);
 }
 
+function activeTasksRemaining() {
+  return readTasks().filter((task) => task.status !== "done").length;
+}
+
+function filteredTodos(query) {
+  let todos = readTodos();
+  const status = cleanText(query.status || "", 40);
+  if (status && status !== "all") {
+    todos = todos.filter((todo) => todo.status === status);
+  }
+  const statusOrder = new Map(TODO_STATUSES.map((value, index) => [value, index]));
+  const priorityOrder = new Map(TASK_PRIORITIES.map((value, index) => [value, index]));
+  return todos
+    .slice()
+    .sort((a, b) => {
+      const statusDiff = (statusOrder.get(a.status) || 99) - (statusOrder.get(b.status) || 99);
+      if (statusDiff) return statusDiff;
+      const priorityDiff = (priorityOrder.get(b.priority) || 0) - (priorityOrder.get(a.priority) || 0);
+      if (priorityDiff) return priorityDiff;
+      return String(a.created_at || "").localeCompare(String(b.created_at || ""));
+    })
+    .map(todoForResponse);
+}
+
+function mandatoryNextTodo() {
+  if (activeTasksRemaining() > 0) return null;
+  const openTodos = filteredTodos({ status: "open" });
+  return openTodos[0] || null;
+}
+
+function todoGate() {
+  const activeTaskCount = activeTasksRemaining();
+  const openTodos = readTodos().filter((todo) => todo.status === "open").length;
+  return {
+    active_task_count: activeTaskCount,
+    open_todo_count: openTodos,
+    required: activeTaskCount === 0 && openTodos > 0,
+    mandatory_next_todo: mandatoryNextTodo(),
+  };
+}
+
 function taskById(id) {
   return readTasks().find((task) => task.id === id);
+}
+
+function todoById(id) {
+  return readTodos().find((todo) => todo.id === id);
 }
 
 function assertTaskActor(actorRole, task) {
@@ -1221,7 +1388,7 @@ async function deployHealthSnapshot() {
   const dependencyCheck = await execFileReport(process.execPath, [
     "--input-type=module",
     "-e",
-    "await import('@dimforge/rapier3d-compat'); await import('@geckos.io/server'); await import('@itch-games/unsoccer-shared'); console.log('unsoccer dependencies ok')",
+    "await import('@dimforge/rapier3d-compat'); await import('ws'); await import('@itch-games/unsoccer-shared'); console.log('unsoccer required dependencies ok')",
   ], 5000);
   const hasBuiltHtml = /(?:src|href)="\.\/assets\/index-[^"]+\.(?:js|css)"/.test(distHtml);
   const hasJsAsset = distAssets.some((asset) => asset.exists && /\.js$/i.test(asset.path));
@@ -1521,6 +1688,7 @@ async function handleGet(req, res, parsed) {
       statuses: TASK_STATUSES,
       priorities: TASK_PRIORITIES,
       tasks: filteredTasks(parsed.query),
+      todo_gate: todoGate(),
     });
     return;
   }
@@ -1534,6 +1702,26 @@ async function handleGet(req, res, parsed) {
     jsonResponse(res, 200, { ok: true, task: taskForResponse(task) });
     return;
   }
+  if (pathname === "/api/todos") {
+    jsonResponse(res, 200, {
+      ok: true,
+      statuses: TODO_STATUSES,
+      priorities: TASK_PRIORITIES,
+      todos: filteredTodos(parsed.query),
+      gate: todoGate(),
+    });
+    return;
+  }
+  if (pathname.startsWith("/api/todos/")) {
+    const id = decodeURIComponent(pathname.slice("/api/todos/".length).split("/")[0] || "");
+    const todo = todoById(id);
+    if (!todo) {
+      errorJson(res, 404, "todo not found");
+      return;
+    }
+    jsonResponse(res, 200, { ok: true, todo: todoForResponse(todo), gate: todoGate() });
+    return;
+  }
   if (pathname === "/api/commits") {
     jsonResponse(res, 200, Object.assign({ ok: true }, recentCommits(80)));
     return;
@@ -1545,6 +1733,8 @@ async function handleGet(req, res, parsed) {
       git: gitContext(),
       message_count: readMessages(100000).length,
       task_count: readTasks().length,
+      todo_count: readTodos().length,
+      todo_gate: todoGate(),
       telegram: { enabled: telegramConfig().enabled },
     });
     return;
@@ -1623,6 +1813,95 @@ async function handlePost(req, res, parsed) {
       jsonResponse(res, 201, { ok: true, attachments });
     } catch (error) {
       errorJson(res, 400, error.message);
+    }
+    return;
+  }
+
+  if (pathname === "/api/todos") {
+    try {
+      const payload = await readJsonPayload(req, 32768);
+      const todo = createTodo(payload);
+      const todos = readTodos();
+      todos.push(todo);
+      writeTodos(todos);
+      appendTodoEvent("create", todo, todo.created_by_role, { title: todo.title });
+      appendTodoMessage("Added future idea", todo, todo.created_by_role, todo.description ? `Description: ${todo.description}` : "");
+      jsonResponse(res, 201, { ok: true, todo: todoForResponse(todo), gate: todoGate() });
+    } catch (error) {
+      errorJson(res, 400, error.message);
+    }
+    return;
+  }
+
+  if (pathname.startsWith("/api/todos/")) {
+    const parts = pathname.split("/").filter(Boolean);
+    const todoId = decodeURIComponent(parts[2] || "");
+    const action = parts[3] || "";
+    try {
+      const payload = await readJsonPayload(req, 32768);
+      const actorRole = cleanRole(payload.actor_role || payload.created_by_role || payload.role);
+      if (!isProducerOrOrchestrator(actorRole)) throw new Error("only Producer or Orchestrator can change todos");
+      if (action === "promote") {
+        const activeCount = activeTasksRemaining();
+        if (activeCount > 0) throw new Error(`cannot promote todo while ${activeCount} active task(s) remain`);
+        let promotedTask = null;
+        const todo = updateTodo(todoId, (current) => {
+          if (current.status !== "open") throw new Error("only open todos can be promoted");
+          const taskPayload = {
+            created_by_role: actorRole,
+            created_by: actorRole,
+            role: payload.role || "Orchestrator",
+            priority: payload.priority || current.priority,
+            title: payload.title || current.title,
+            description: [current.description, payload.description].filter(Boolean).join("\n\n"),
+            scope: payload.scope || [],
+            acceptance: payload.acceptance || current.acceptance,
+            depends_on: payload.depends_on || [],
+            validation_owner: payload.validation_owner || "",
+          };
+          promotedTask = createTask(taskPayload);
+          promotedTask.source_todo_id = current.id;
+          current.status = "promoted";
+          current.promoted_task_id = promotedTask.id;
+          pushTodoComment(current, actorRole, payload.note || `Promoted to task ${promotedTask.id}.`);
+          return current;
+        });
+        const tasks = readTasks();
+        tasks.push(promotedTask);
+        writeTasks(tasks);
+        appendTodoEvent("promote", todo, actorRole, { task_id: promotedTask.id });
+        appendTaskEvent("create_from_todo", promotedTask, actorRole, { todo_id: todo.id });
+        appendTodoMessage("Promoted future idea", todo, actorRole, `Created task \`${promotedTask.id}\` for ${promotedTask.role}.`);
+        appendTaskMessage("Created task from Todo", promotedTask, actorRole, `Source Todo: ${todo.id}`);
+        jsonResponse(res, 200, { ok: true, todo: todoForResponse(todo), task: taskForResponse(promotedTask), gate: todoGate() });
+        return;
+      }
+      if (action === "status") {
+        const nextStatus = cleanText(payload.status, 40);
+        if (!TODO_STATUSES.includes(nextStatus)) throw new Error("valid todo status is required");
+        const todo = updateTodo(todoId, (current) => {
+          current.status = nextStatus;
+          pushTodoComment(current, actorRole, payload.note || payload.comment || "");
+          return current;
+        });
+        appendTodoEvent("status", todo, actorRole, { status: todo.status });
+        appendTodoMessage("Updated future idea", todo, actorRole, `Status: ${todo.status}`);
+        jsonResponse(res, 200, { ok: true, todo: todoForResponse(todo), gate: todoGate() });
+        return;
+      }
+      if (action === "comment") {
+        const todo = updateTodo(todoId, (current) => {
+          pushTodoComment(current, actorRole, payload.comment || payload.note || payload.message);
+          return current;
+        });
+        appendTodoEvent("comment", todo, actorRole, {});
+        jsonResponse(res, 200, { ok: true, todo: todoForResponse(todo), gate: todoGate() });
+        return;
+      }
+      throw new Error("unknown todo action");
+    } catch (error) {
+      const status = error.message === "todo not found" ? 404 : 400;
+      errorJson(res, status, error.message);
     }
     return;
   }

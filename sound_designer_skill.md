@@ -32,6 +32,9 @@ integration in this game.
   has created a Task Queue item for Sound Designer work and it is assigned or
   claimed; reading, questions, and concise `Idea:` messages are allowed.
 - For non-trivial, multi-role, or shared-file work, participate in a
+- The Sound Designer may ask in chat or Todo/Task Queue for server, deployment,
+  nginx, webhook, domain, environment, Telegram bridge, or public-static
+  availability fixes when infrastructure blocks audio delivery.
   `Parallel Plan:` agreement in chat before editing: workstreams, owners, file
   scopes, dependencies, and validation owner. Do not edit outside the agreed
   Sound Designer scope until the Orchestrator, Producer, or affected roles have

@@ -19,9 +19,16 @@ communication.
 - Require every agent to post that it has started work before making changes.
 - Require the Orchestrator or Producer to create clear Task Queue items before
   role implementation starts.
+- Require the Orchestrator to add Producer future ideas to the public Todo List
+  immediately. Todo items are mandatory backlog: when the Task Queue has no
+  non-`done` tasks, the Orchestrator must promote the next open Todo into a
+  Task Queue item or mark it `done`/`blocked` with a clear reason.
 - Block execution roles from non-read-only project changes unless they have an
   assigned or claimed task for their role; reading, questions, blockers, and
   concise `Idea:` messages remain allowed without a claim.
+- Allow any agent to ask in chat or Todo/Task Queue for server, deployment,
+  nginx, webhook, domain, environment, Telegram bridge, or public-static
+  availability fixes when that infrastructure blocks or degrades their work.
 - Require agents to agree a `Parallel Plan:` in chat before non-trivial,
   multi-role, or shared-file work. The plan must define workstreams, owners,
   exact file scopes, branch/task id, dependencies, merge order, and validation
@@ -60,9 +67,13 @@ communication.
   commits from local and remote branches.
 - The service must expose a Task Queue with role assignment, claim/lease,
   status, comments, scope, dependencies, acceptance, and validation ownership.
+- The service must expose a public Todo List for Producer future ideas. Todo is
+  separate from Task Queue; work still begins only after a Todo is promoted into
+  a role-owned task.
 - Data storage lives in `ai_chat/data/messages.jsonl`,
-  `ai_chat/data/tasks.json`, and `ai_chat/data/tasks.jsonl` on the server and
-  is ignored by git.
+  `ai_chat/data/tasks.json`, `ai_chat/data/tasks.jsonl`,
+  `ai_chat/data/todos.json`, and `ai_chat/data/todos.jsonl` on the server and is
+  ignored by git.
 - Service code uses Node.js standard library only on the qwertystock target to
   avoid runtime dependency drift.
 - Autodeploy uses a GitHub push webhook at
@@ -93,14 +104,17 @@ communication.
 4. If doing non-read-only work, find an assigned task or claim a task for your
    role in the Task Queue. If no task exists, ask the Orchestrator or Producer
    to create one instead of editing files.
-5. For non-trivial, multi-role, or shared-file work, wait for a `Parallel Plan:`
+5. When the Producer writes an idea for later, the Orchestrator records it in
+   the public Todo List immediately. If all Task Queue items are `done`, the
+   Orchestrator must process the next open Todo before inventing unrelated work.
+6. For non-trivial, multi-role, or shared-file work, wait for a `Parallel Plan:`
    agreement before editing. The agreement must assign workstreams, owners,
    file scopes, branch/task id, dependencies, merge order, and validation owner.
-6. Before or immediately after any meaningful change, post what changed and what
+7. Before or immediately after any meaningful change, post what changed and what
    validation is planned.
-7. When a concrete improvement opportunity appears, optionally post one
+8. When a concrete improvement opportunity appears, optionally post one
    concise `Idea:` message; keep it actionable and avoid repeating ideas.
-8. After validation or deployment, post the result, URL, command, or residual
+9. After validation or deployment, post the result, URL, command, or residual
    risk.
 
 ## Deployment

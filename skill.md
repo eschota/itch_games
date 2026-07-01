@@ -145,8 +145,15 @@ Use this root skill when changing, packaging, validating, or publishing the
 - The Orchestrator or Producer must create clear Task Queue items before roles
   do non-read-only work. Execution roles must not edit project files, deploy,
   or create runtime assets without an assigned or claimed task for their role.
+- The Orchestrator must record Producer future ideas in the public Todo List
+  immediately. Todo List items are mandatory backlog: once every Task Queue item
+  is `done`, the Orchestrator must promote the next open Todo into a Task Queue
+  item or close it as `done`/`blocked` with a clear reason.
 - Agents may read, ask clarifying questions, report blockers, and post concise
   `Idea:` messages without claiming a task; implementation waits for a task.
+- Any agent may ask in chat or Todo/Task Queue for server, deployment, nginx,
+  webhook, domain, environment, Telegram bridge, or public-static availability
+  fixes when that infrastructure blocks or degrades their work.
 - Before non-trivial, multi-role, or shared-file work, agents must agree a
   `Parallel Plan:` in chat: workstreams, owners, exact file scopes, branch or
   task id, dependencies, merge order, and validation owner. No agent may edit
@@ -155,6 +162,8 @@ Use this root skill when changing, packaging, validating, or publishing the
 - The Task Queue must name role, priority, title, description, file scope,
   dependencies, acceptance, owner/claim, status, and validation owner when
   applicable.
+- Todo List does not replace Task Queue authority. It stores future ideas; work
+  starts only after a Todo is promoted into a role-owned task.
 - Every development agent must report meaningful code, art, design, test,
   deploy, audio, or server changes to chat with validation status.
 - Every role should occasionally propose concise, actionable `Idea:` messages
@@ -187,12 +196,15 @@ Use this root skill when changing, packaging, validating, or publishing the
 
 - Current game release: `v0.0.006`.
 - `unsoccer` current prototype release: `v0.0.003`.
-- `unsoccer` uses a headless authoritative Node server with Rapier3D physics
-  and geckos.io transport; the itch package is static client-only and needs the
-  live game server for multiplayer.
+- `unsoccer` uses a headless authoritative Node server with Rapier3D physics,
+  plain WebSocket transport, and HTTP polling fallback; the itch package is
+  static client-only and needs the live game server for multiplayer.
 - Production `https://io-games.mecharulez.com/unsoccer/` serves
   `unsoccer/client/dist`; `/unsoccer/api/` and `/unsoccer/socket/` are nginx
   proxies to the authoritative server on `127.0.0.1:8787`.
+- The Qwertystock production host must keep UnSoccer transport WebSocket-based.
+  Do not make geckos.io a required runtime there because its native
+  `node-datachannel` addon is not compatible with the target system glibc.
 - The game starts automatically when the page opens.
 - `unsoccer` v0.0.002 has a client-only procedural Web Audio layer driven by
   authoritative server snapshots for kicks, body contacts, goals, countdown,

@@ -20,6 +20,9 @@ Use this file for work inside `/itch_games/game_designer`.
   and post that the Game Designer has started work.
 - Do not make non-read-only changes without an assigned or claimed Game
   Designer task created by the Orchestrator or Producer in the Task Queue.
+- The Game Designer may ask in chat or Todo/Task Queue for server, deployment,
+  nginx, webhook, domain, environment, Telegram bridge, or public-static
+  availability fixes when infrastructure blocks design validation.
 - For non-trivial, multi-role, or shared-file work, agree a `Parallel Plan:`
   in chat before editing: workstreams, owners, file scopes, dependencies, and
   validation owner.

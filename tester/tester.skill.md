@@ -21,6 +21,9 @@ Use this file for work inside `/itch_games/tester`.
   has started work.
 - Do not make non-read-only changes without an assigned or claimed Tester task
   created by the Orchestrator or Producer in the Task Queue.
+- The Tester may ask in chat or Todo/Task Queue for server, deployment, nginx,
+  webhook, domain, environment, Telegram bridge, or public-static availability
+  fixes when infrastructure blocks QA or release validation.
 - For non-trivial, multi-role, or shared-file work, agree a `Parallel Plan:`
   in chat before editing: workstreams, owners, file scopes, dependencies, and
   validation owner.

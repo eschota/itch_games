@@ -22,6 +22,9 @@ Use this file for work inside `/itch_games/art_director`.
   and post that the Art Director has started work.
 - Do not make non-read-only changes without an assigned or claimed Art Director
   task created by the Orchestrator or Producer in the Task Queue.
+- The Art Director may ask in chat or Todo/Task Queue for server, deployment,
+  nginx, webhook, domain, environment, Telegram bridge, or public-static
+  availability fixes when infrastructure blocks visual/art delivery.
 - For non-trivial, multi-role, or shared-file work, agree a `Parallel Plan:`
   in chat before editing: workstreams, owners, file scopes, dependencies, and
   validation owner.

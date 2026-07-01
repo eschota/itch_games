@@ -21,6 +21,9 @@ Use this file for work inside `/itch_games/sound_designer`.
   and post that the Sound Designer has started work.
 - Do not make non-read-only changes without an assigned or claimed Sound
   Designer task created by the Orchestrator or Producer in the Task Queue.
+- The Sound Designer may ask in chat or Todo/Task Queue for server, deployment,
+  nginx, webhook, domain, environment, Telegram bridge, or public-static
+  availability fixes when infrastructure blocks audio delivery.
 - For non-trivial, multi-role, or shared-file work, agree a `Parallel Plan:`
   in chat before editing: workstreams, owners, file scopes, dependencies, and
   validation owner.

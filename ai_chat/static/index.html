@@ -119,6 +119,49 @@
           </div>
           <div id="tasks" class="task-list"></div>
         </section>
+        <section class="todos-section">
+          <div class="section-heading">
+            <h3>Todo List</h3>
+            <span id="todoGate" class="todo-gate">loading ...</span>
+          </div>
+          <form id="todoForm" class="task-form">
+            <label>
+              <span>Actor</span>
+              <input id="todoActorInput" maxlength="80" value="Orchestrator" required>
+            </label>
+            <label>
+              <span>Priority</span>
+              <select id="todoPriorityInput">
+                <option value="normal">normal</option>
+                <option value="high">high</option>
+                <option value="urgent">urgent</option>
+                <option value="low">low</option>
+              </select>
+            </label>
+            <label class="wide">
+              <span>Future idea</span>
+              <input id="todoTitleInput" maxlength="200" required>
+            </label>
+            <label class="wide">
+              <span>Description</span>
+              <textarea id="todoDescriptionInput" maxlength="2000"></textarea>
+            </label>
+            <label class="wide">
+              <span>Acceptance</span>
+              <textarea id="todoAcceptanceInput" maxlength="2000"></textarea>
+            </label>
+            <button type="submit">Add Todo</button>
+          </form>
+          <div class="task-filter">
+            <label>
+              <span>Status</span>
+              <select id="todoStatusFilter">
+                <option value="all">all statuses</option>
+              </select>
+            </label>
+          </div>
+          <div id="todos" class="task-list"></div>
+        </section>
         <section>
           <h3>Branches</h3>
           <div id="branches" class="branch-list"></div>

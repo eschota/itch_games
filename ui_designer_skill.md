@@ -45,6 +45,9 @@ this browser game.
   acknowledged the split.
 - Report every meaningful UI, HUD, menu, prompt, layout, copy, accessibility,
   review, or validation change to the chat with validation status.
+- The UI Designer may ask in chat or Todo/Task Queue for server, deployment,
+  nginx, webhook, domain, environment, Telegram bridge, or public-static
+  availability fixes when infrastructure blocks UI/public-page validation.
 - When a concrete project-development opportunity appears, occasionally post a
   concise `Idea:` to chat; do not spam, repeat yourself, or post more than one
   idea per substantial work block unless the Producer asks.

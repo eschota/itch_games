@@ -32,6 +32,9 @@ ideas for this game.
 - Do not make non-read-only project changes until the Orchestrator or Producer
   has created a Task Queue item for Game Designer work and it is assigned or
   claimed; reading, questions, and concise `Idea:` messages are allowed.
+- The Game Designer may ask in chat or Todo/Task Queue for server, deployment,
+  nginx, webhook, domain, environment, Telegram bridge, or public-static
+  availability fixes when infrastructure blocks design validation.
 - For non-trivial, multi-role, or shared-file work, participate in a
   `Parallel Plan:` agreement in chat before editing: workstreams, owners, file
   scopes, dependencies, and validation owner. Do not edit outside the agreed

@@ -21,9 +21,19 @@ const taskAcceptanceInput = document.querySelector("#taskAcceptanceInput");
 const taskRoleFilter = document.querySelector("#taskRoleFilter");
 const taskStatusFilter = document.querySelector("#taskStatusFilter");
 const seedTasksButton = document.querySelector("#seedTasksButton");
+const todosEl = document.querySelector("#todos");
+const todoForm = document.querySelector("#todoForm");
+const todoActorInput = document.querySelector("#todoActorInput");
+const todoPriorityInput = document.querySelector("#todoPriorityInput");
+const todoTitleInput = document.querySelector("#todoTitleInput");
+const todoDescriptionInput = document.querySelector("#todoDescriptionInput");
+const todoAcceptanceInput = document.querySelector("#todoAcceptanceInput");
+const todoStatusFilter = document.querySelector("#todoStatusFilter");
+const todoGateEl = document.querySelector("#todoGate");
 
 const api = (path) => `api/${path}`;
 let taskOptionsReady = false;
+let todoOptionsReady = false;
 const ROLE_BADGES = [
   { label: "Producer", icon: "👑", match: ["producer", "продюсер"] },
   { label: "Orchestrator", icon: "🧭", match: ["orchestrator"] },
@@ -173,6 +183,7 @@ async function loadStatus() {
   gitEl.textContent = `${git.branch || "unknown"} @ ${git.commit || "unknown"}${git.dirty ? " dirty" : ""}`;
   const telegram = status.telegram || {};
   telegramEl.textContent = `telegram ${telegram.enabled ? "on" : "off"}`;
+  renderTodoGate(status.todo_gate || {});
 }
 
 async function loadMessages() {
@@ -213,6 +224,17 @@ function syncTaskOptions(payload) {
   taskOptionsReady = true;
 }
 
+function syncTodoOptions(payload) {
+  if (todoOptionsReady) return;
+  for (const status of payload.statuses || []) {
+    const option = document.createElement("option");
+    option.value = status;
+    option.textContent = status;
+    todoStatusFilter.append(option);
+  }
+  todoOptionsReady = true;
+}
+
 function listText(values) {
   if (!Array.isArray(values) || !values.length) return "";
   return values.join(", ");
@@ -229,8 +251,42 @@ function taskMeta(task) {
   return parts.join(" · ");
 }
 
+function todoMeta(todo) {
+  const parts = [
+    todo.id,
+    todo.priority || "normal",
+    todo.status || "open",
+    todo.promoted_task_id ? `task ${todo.promoted_task_id}` : "",
+  ].filter(Boolean);
+  return parts.join(" В· ");
+}
+
+function renderTodoGate(gate) {
+  if (!todoGateEl) return;
+  const active = Number(gate.active_task_count || 0);
+  const open = Number(gate.open_todo_count || 0);
+  todoGateEl.classList.toggle("todo-gate-required", Boolean(gate.required));
+  if (gate.required && gate.mandatory_next_todo) {
+    todoGateEl.textContent = `mandatory next: ${gate.mandatory_next_todo.title}`;
+    return;
+  }
+  todoGateEl.textContent = `${active} active tasks, ${open} open todos`;
+}
+
 function renderComments(task) {
   const comments = Array.isArray(task.comments) ? task.comments.slice(-2) : [];
+  if (!comments.length) return "";
+  return `
+    <div class="task-comments">
+      ${comments.map((comment) => `
+        <p><strong>${renderRoleBadge(comment.role || "Agent")}</strong>: ${escapeText(comment.text || "")}</p>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderTodoComments(todo) {
+  const comments = Array.isArray(todo.comments) ? todo.comments.slice(-2) : [];
   if (!comments.length) return "";
   return `
     <div class="task-comments">
@@ -271,6 +327,37 @@ async function loadTasks() {
   `).join("") || `<p class="empty">No tasks match this filter.</p>`;
 }
 
+async function loadTodos() {
+  const status = encodeURIComponent(todoStatusFilter.value || "all");
+  const payload = await getJson(`todos?status=${status}`);
+  syncTodoOptions(payload);
+  renderTodoGate(payload.gate || {});
+  const gate = payload.gate || {};
+  const mandatoryId = gate.mandatory_next_todo ? gate.mandatory_next_todo.id : "";
+  const todos = payload.todos || [];
+  todosEl.innerHTML = todos.map((todo) => `
+    <article class="task todo todo-${escapeText(todo.status || "open")} ${mandatoryId === todo.id ? "todo-mandatory" : ""}">
+      <header>
+        <strong>Todo</strong>
+        <span>${escapeText(todoMeta(todo))}</span>
+      </header>
+      <h4>${escapeText(todo.title || "")}</h4>
+      ${todo.description ? `<p>${escapeText(todo.description)}</p>` : ""}
+      ${todo.acceptance ? `<small>Acceptance: ${escapeText(todo.acceptance)}</small>` : ""}
+      ${todo.tags && todo.tags.length ? `<small>Tags: ${escapeText(listText(todo.tags))}</small>` : ""}
+      ${todo.created_by_role ? `<small>Created by: ${escapeText(todo.created_by_role)}</small>` : ""}
+      ${renderTodoComments(todo)}
+      <div class="task-actions">
+        <button type="button" data-todo-action="promote" data-todo-id="${escapeText(todo.id)}" ${todo.status !== "open" || !gate.required ? "disabled" : ""}>Promote</button>
+        <button type="button" data-todo-action="status" data-status="done" data-todo-id="${escapeText(todo.id)}">Done</button>
+        <button type="button" data-todo-action="status" data-status="blocked" data-todo-id="${escapeText(todo.id)}">Blocked</button>
+        <button type="button" data-todo-action="status" data-status="open" data-todo-id="${escapeText(todo.id)}">Reopen</button>
+        <button type="button" data-todo-action="comment" data-todo-id="${escapeText(todo.id)}">Note</button>
+      </div>
+    </article>
+  `).join("") || `<p class="empty">No todos match this filter.</p>`;
+}
+
 async function loadCommits() {
   const payload = await getJson("commits");
   const branches = payload.branches || [];
@@ -294,7 +381,7 @@ async function loadCommits() {
 }
 
 async function refreshAll() {
-  await Promise.all([loadStatus(), loadMessages(), loadTasks(), loadCommits()]);
+  await Promise.all([loadStatus(), loadMessages(), loadTasks(), loadTodos(), loadCommits()]);
 }
 
 formEl.addEventListener("submit", async (event) => {
@@ -362,6 +449,26 @@ seedTasksButton.addEventListener("click", async () => {
   }
 });
 
+todoForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await postJson("todos", {
+      created_by_role: todoActorInput.value.trim() || taskActorInput.value.trim() || "Orchestrator",
+      created_by: todoActorInput.value.trim() || taskActorInput.value.trim() || "Orchestrator",
+      priority: todoPriorityInput.value,
+      title: todoTitleInput.value.trim(),
+      description: todoDescriptionInput.value.trim(),
+      acceptance: todoAcceptanceInput.value.trim(),
+    });
+    todoTitleInput.value = "";
+    todoDescriptionInput.value = "";
+    todoAcceptanceInput.value = "";
+    await refreshAll();
+  } catch (error) {
+    alert(`Todo failed: ${error.message}`);
+  }
+});
+
 tasksEl.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-task-action]");
   if (!button) return;
@@ -397,8 +504,47 @@ tasksEl.addEventListener("click", async (event) => {
   }
 });
 
+todosEl.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-todo-action]");
+  if (!button || button.disabled) return;
+  const id = button.dataset.todoId;
+  const action = button.dataset.todoAction;
+  const actor = todoActorInput.value.trim() || taskActorInput.value.trim() || "Orchestrator";
+  try {
+    if (action === "promote") {
+      const role = prompt("Task role?", taskRoleInput.value || "Orchestrator") || "";
+      if (!role) return;
+      const scope = prompt("Task file scope?", "") || "";
+      await postJson(`todos/${encodeURIComponent(id)}/promote`, {
+        actor_role: actor,
+        role,
+        scope,
+      });
+    } else if (action === "status") {
+      const status = button.dataset.status;
+      const note = status === "blocked" ? prompt("Blocker note?") || "" : "";
+      await postJson(`todos/${encodeURIComponent(id)}/status`, {
+        actor_role: actor,
+        status,
+        note,
+      });
+    } else if (action === "comment") {
+      const comment = prompt("Todo note");
+      if (!comment) return;
+      await postJson(`todos/${encodeURIComponent(id)}/comment`, {
+        actor_role: actor,
+        comment,
+      });
+    }
+    await refreshAll();
+  } catch (error) {
+    alert(`Todo action failed: ${error.message}`);
+  }
+});
+
 taskRoleFilter.addEventListener("change", () => loadTasks().catch(() => {}));
 taskStatusFilter.addEventListener("change", () => loadTasks().catch(() => {}));
+todoStatusFilter.addEventListener("change", () => loadTodos().catch(() => {}));
 refreshButton.addEventListener("click", refreshAll);
 refreshAll().catch((error) => {
   messagesEl.innerHTML = `<article class="message error"><p>${escapeText(error.message)}</p></article>`;
@@ -407,4 +553,5 @@ setInterval(() => {
   loadMessages().catch(() => {});
   loadStatus().catch(() => {});
   loadTasks().catch(() => {});
+  loadTodos().catch(() => {});
 }, 10000);

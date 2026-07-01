@@ -257,6 +257,11 @@ button {
   min-height: 42px;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .service-panel {
   overflow: auto;
 }
@@ -360,6 +365,37 @@ button {
 .task-done {
   border-left: 3px solid var(--good);
   opacity: 0.78;
+}
+
+.todo-open {
+  border-left: 3px solid #f2c94c;
+}
+
+.todo-promoted {
+  border-left: 3px solid #c792ea;
+}
+
+.todo-blocked {
+  border-left: 3px solid #ff8d8d;
+}
+
+.todo-done {
+  border-left: 3px solid var(--good);
+  opacity: 0.78;
+}
+
+.todo-mandatory {
+  box-shadow: 0 0 0 1px rgba(242, 201, 76, 0.55);
+}
+
+.todo-gate {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+.todo-gate-required {
+  color: #f2c94c;
 }
 
 .task-comments {

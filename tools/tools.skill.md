@@ -15,11 +15,12 @@ Use this file for work inside `/itch_games/tools`.
 
 ## Files
 
-- `package_itch.py`: creates the player-facing Orbital Courier HTML5 upload zip
-  under `dist/`.
+- `package_itch.py`: creates player-facing HTML5 upload zips under `dist/`.
+  For UnSoccer it packages the already built client dist; the npm
+  `package:unsoccer` script must rebuild before calling it.
 - `unsoccer_acceptance.mjs`: starts an isolated `UNSOCCER_TEST_MODE=1` server
-  and verifies authoritative spectator assignment, kick/body contacts, and
-  goal reset behavior.
+  and verifies authoritative spectator assignment, HTTP fallback join/input/
+  state, kick/body contacts, goal reset behavior, and server audioEvents.
 
 ## Rules
 
@@ -33,3 +34,5 @@ Use this file for work inside `/itch_games/tools`.
 - Generated output belongs under `dist/` and must not be committed.
 - `npm run test:unsoccer:acceptance` must use an isolated test server and must
   stop it before finishing.
+- `unsoccer_acceptance.mjs` derives the expected release from
+  `package.json.games.unsoccer.version`; keep version bumps centralized there.

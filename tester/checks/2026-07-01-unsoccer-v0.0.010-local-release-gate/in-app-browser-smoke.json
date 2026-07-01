@@ -1,0 +1,31 @@
+{
+  "checkedAt": "2026-07-01T15:00:42.137Z",
+  "ok": true,
+  "smoke": {
+    "animatedPlayers": 1,
+    "artPass": "v0.0.010",
+    "badge": "v0.0.010 / 0.61 MB",
+    "bodyOverflowX": 0,
+    "canvas": {
+      "clientHeight": 982,
+      "clientWidth": 1518,
+      "height": 1227,
+      "width": 1897
+    },
+    "dayCycleSeconds": "30.00",
+    "daylight": "0.994",
+    "debugConnected": false,
+    "documentOverflowX": 0,
+    "environment": "residential-courtyard-v010",
+    "gameVersion": "v0.0.010",
+    "gameWeightLabel": "0.61 MB",
+    "legacySettingsTabAttr": null,
+    "settingsActiveTab": "controls",
+    "sunFramed": "true",
+    "sunVisible": "true",
+    "title": "UnSoccer v0.0.010 | Ragdoll Soccer II",
+    "transport": "websocket",
+    "url": "http://127.0.0.1:5181/?server=http://127.0.0.1:8793&name=codex-iab-final-1782918039131&qaTime=30&bust=1782918039131"
+  },
+  "logs": []
+}

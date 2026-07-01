@@ -22,7 +22,7 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 
 ## Rules
 
-- Current release: `v0.0.009`.
+- Current release: `v0.0.010`.
 - Keep client and server separated; browser bundles must not import server-only
   modules.
 - The server is authoritative for room assignment, teams, player physics, ball
@@ -62,6 +62,23 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
   responsive with a small client-side prediction lead, and removes artificial
   pitch bounds from player movement so only explicit gameplay colliders block
   players.
+- `v0.0.009` also owns the player-facing UI/settings pass: HUD hierarchy,
+  event/status/network panels, bottom toolbar, settings modal tabs,
+  localStorage settings, remappable input, audio/graphics/network/accessibility
+  controls, and QA-readable UI datasets/debug snapshot state. Keep
+  `client/src/settings.ts`, `client/src/input-map.ts`, `client/src/main.ts`,
+  `client/src/styles.css`, `client/src/audio.ts`, and `client/src/weather.ts`
+  synchronized when changing this surface.
+- `v0.0.010` is the unified 0010 release build. It preserves the v0.0.009
+  runtime workstreams, frames the visible sun/moon marker for screenshots,
+  synchronizes the current release version across package, client, server,
+  shared, acceptance, public page, and skill surfaces, and keeps external
+  itch.io publication blocked until the URL/upload evidence is recorded.
+- `tools/unsoccer_acceptance.mjs` derives the expected version from
+  `package.json.games.unsoccer.version`; keep it that way so version bumps do
+  not require multiple acceptance edits.
+- `npm run package:unsoccer` rebuilds before creating `dist/unsoccer-itch.zip`;
+  do not replace it with a source-less zip step that can reuse stale dist.
 - Server-confirmed left-foot, right-foot, head, and body contacts must stay
   visually distinguishable in the client and expose QA-readable
   `data-last-action-*` fields on `document.documentElement`.

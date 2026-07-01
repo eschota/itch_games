@@ -3,12 +3,19 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>UnSoccer v0.0.009 | Ragdoll Soccer II</title>
+    <title>UnSoccer v0.0.010 | Ragdoll Soccer II</title>
     <meta
       name="description"
-      content="UnSoccer v0.0.009: двор, анимированные игроки, солнце и сетевой физический футбол."
+      content="UnSoccer v0.0.010: единый релизный билд с двором, анимированными игроками, солнцем, HUD/settings и сетевым физическим футболом."
     />
     <link rel="icon" href="data:," />
+    <style>
+      @media (max-width: 840px) {
+        html .toggle-grid label {
+          grid-template-columns: 20px minmax(0, 1fr);
+        }
+      }
+    </style>
   </head>
   <body>
     <main id="app" aria-label="UnSoccer">
@@ -43,7 +50,7 @@
         <button id="fullscreen-button" class="icon-button" type="button" title="Fullscreen" aria-label="Fullscreen">FS</button>
         <button id="camera-reset-button" class="icon-button" type="button" title="Camera reset" aria-label="Camera reset">CAM</button>
       </div>
-      <div id="version-badge">v0.0.009 / 0.61 MB</div>
+      <div id="version-badge">v0.0.010 / 0.61 MB</div>
       <section id="settings-panel" class="settings-panel" aria-modal="true" role="dialog" aria-labelledby="settings-title" hidden>
         <form id="settings-form" class="settings-shell">
           <header class="settings-header">

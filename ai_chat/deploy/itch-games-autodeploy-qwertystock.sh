@@ -17,7 +17,16 @@ stage "node and npm"
 echo "node: $(node -v)"
 echo "npm: $(npm -v)"
 expected_version="$(node -p "require('./package.json').games.unsoccer.version")"
+expected_weight="$(node <<'NODE'
+const fs = require("node:fs");
+const source = fs.readFileSync("unsoccer/client/src/main.ts", "utf8");
+const match = source.match(/BUILD_WEIGHT_LABEL\s*=\s*["'`]([^"'`]+)["'`]/);
+if (!match) throw new Error("BUILD_WEIGHT_LABEL not found in unsoccer/client/src/main.ts");
+console.log(match[1]);
+NODE
+)"
 echo "unsoccer expected version: ${expected_version}"
+echo "unsoccer expected weight: ${expected_weight}"
 stage "npm ci with dev dependencies"
 rm -rf node_modules/@geckos.io node_modules/node-datachannel node_modules/ws node_modules/@types/ws
 NODE_ENV=development npm ci --include=dev
@@ -31,16 +40,17 @@ dist_html="unsoccer/client/dist/index.html"
 dist_assets="unsoccer/client/dist/assets"
 test -s "$dist_html"
 test -d "$dist_assets"
-EXPECTED_VERSION="$expected_version" node <<'NODE'
+EXPECTED_VERSION="$expected_version" EXPECTED_WEIGHT="$expected_weight" node <<'NODE'
 const fs = require("node:fs");
 const path = require("node:path");
 
 const expectedVersion = process.env.EXPECTED_VERSION;
+const expectedWeight = process.env.EXPECTED_WEIGHT;
 const htmlPath = "unsoccer/client/dist/index.html";
 const assetsDir = "unsoccer/client/dist/assets";
 const html = fs.readFileSync(htmlPath, "utf8");
 if (!html.includes(expectedVersion)) throw new Error(`dist html missing ${expectedVersion}`);
-if (!html.includes("0.61 MB")) throw new Error("dist html missing 0.61 MB weight label");
+if (!html.includes(expectedWeight)) throw new Error(`dist html missing ${expectedWeight} weight label`);
 const versions = new Set(html.match(/v\d+\.\d+\.\d+/g) || []);
 if (versions.size !== 1 || !versions.has(expectedVersion)) {
   throw new Error(`dist html version markers mismatch: ${Array.from(versions).join(", ") || "none"}`);
@@ -55,7 +65,7 @@ for (const name of refs) {
 console.log(`dist html references ok: ${refs.join(", ")}`);
 NODE
 grep -R -q 'residential-courtyard' "$dist_assets"
-grep -R -q '0.61 MB' "$dist_assets"
+grep -R -q "$expected_weight" "$dist_assets"
 ! grep -Eq 'geckos|node-datachannel|@geckos.io|from ["'\'']ws["'\'']|import\(["'\'']ws["'\'']\)' unsoccer/server/dist/index.js
 stage "install service references"
 sudo -n install -m 0644 ai_chat/deploy/itch-games-io-games-qwertystock.conf /etc/nginx/sites-available/itch-games-io-games.conf
@@ -81,7 +91,7 @@ sudo -n systemctl reload nginx
 stage "public unsoccer smoke"
 public_html="$(curl -fsS https://io-games.mecharulez.com/unsoccer/)"
 grep -q "$expected_version" <<< "$public_html"
-grep -q '0.61 MB' <<< "$public_html"
+grep -q "$expected_weight" <<< "$public_html"
 api_health="$(curl -fsS https://io-games.mecharulez.com/unsoccer/api/health)"
 grep -q "\"version\":\"${expected_version}\"" <<< "$api_health"
 (sleep 2; sudo -n systemctl restart itch-games-ai-chat.service) >/dev/null 2>&1 &

@@ -1363,6 +1363,14 @@ function readTextFileSlice(parts, maxBytes) {
   }
 }
 
+function expectedUnsoccerWeightLabel(distHtml) {
+  const source = readTextFileSlice(["unsoccer", "client", "src", "main.ts"], 24000);
+  const sourceMatch = source.match(/BUILD_WEIGHT_LABEL\s*=\s*["'`]([^"'`]+)["'`]/);
+  if (sourceMatch) return sourceMatch[1];
+  const htmlMatch = String(distHtml || "").match(/\b\d+(?:\.\d+)?\s*(?:MB|KiB|KB)\b/i);
+  return htmlMatch ? htmlMatch[0] : "";
+}
+
 function unsoccerDistAssetReports(distHtml) {
   const matches = Array.from(distHtml.matchAll(/(?:src|href)="\.\/assets\/([^"]+)"/g))
     .map((match) => match[1])
@@ -1526,21 +1534,24 @@ async function deployHealthSnapshot() {
   const hasBuiltHtml = /(?:src|href)="\.\/assets\/index-[^"]+\.(?:js|css)"/.test(distHtml);
   const hasJsAsset = distAssets.some((asset) => asset.exists && /\.js$/i.test(asset.path));
   const expectedVersion = projectVersion();
+  const expectedWeightLabel = expectedUnsoccerWeightLabel(distHtml);
   const distHtmlVersionMatches = Boolean(expectedVersion && distHtml.includes(expectedVersion));
+  const distHtmlWeightMatches = Boolean(expectedWeightLabel && distHtml.includes(expectedWeightLabel));
   const localApiVersion = String(serverHealth.json?.version || "");
   const localApiVersionMatches = Boolean(localApiVersion && localApiVersion === expectedVersion);
   const publicHtmlVersionMatches = Boolean(publicGameHtml.ok && expectedVersion && publicGameHtml.body.includes(expectedVersion));
-  const publicHtmlWeightMatches = Boolean(publicGameHtml.ok && publicGameHtml.body.includes("0.56 MB"));
+  const publicHtmlWeightMatches = Boolean(publicGameHtml.ok && expectedWeightLabel && publicGameHtml.body.includes(expectedWeightLabel));
   const publicApiVersion = String(publicApiHealth.json?.version || "");
   const publicApiVersionMatches = Boolean(publicApiVersion && publicApiVersion === expectedVersion);
   const requiresSystemd = process.platform === "linux";
   return {
     ok: true,
     ready: Boolean(hasBuiltHtml && hasJsAsset && serverHealth.ok && distHtmlVersionMatches
-      && localApiVersionMatches && publicHtmlVersionMatches && publicHtmlWeightMatches
+      && distHtmlWeightMatches && localApiVersionMatches && publicHtmlVersionMatches && publicHtmlWeightMatches
       && publicApiVersionMatches),
     time: nowIso(),
     project_version: expectedVersion,
+    expected_weight_label: expectedWeightLabel,
     git: gitContext(),
     deploy_running: deployRunning,
     urls: {
@@ -1551,6 +1562,7 @@ async function deployHealthSnapshot() {
     unsoccer: {
       built_html_detected: hasBuiltHtml,
       dist_html_version_matches: distHtmlVersionMatches,
+      dist_html_weight_matches: distHtmlWeightMatches,
       local_api_version_matches: localApiVersionMatches,
       public_html_version_matches: publicHtmlVersionMatches,
       public_html_weight_matches: publicHtmlWeightMatches,

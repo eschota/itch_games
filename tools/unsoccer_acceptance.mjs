@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import net from "node:net";
 import path from "node:path";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const PACKAGE = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+const EXPECTED_GAME_VERSION = String(PACKAGE.games?.unsoccer?.version || PACKAGE.gameVersion || PACKAGE.version);
 const FIELD_WIDTH = 24;
 const FIELD_LENGTH = 36;
 const BALL_RADIUS = 0.48;
@@ -136,6 +139,39 @@ async function joinWebSocketAndReadState(baseUrl, name) {
   });
 }
 
+async function assertHttpFallback(api) {
+  await api("POST", "/api/test/players", { count: 0 });
+  await api("POST", "/api/test/reset", {});
+
+  const join = await api("POST", "/api/join", { name: "HttpFallback" });
+  assert.equal(join.ok, true, "http fallback join should return ok");
+  assert.equal(join.joined.version, EXPECTED_GAME_VERSION);
+  assert.ok(String(join.joined.id).startsWith("http-"), "http fallback join should return an http client id");
+
+  let state = (await api("GET", `/api/state?clientId=${encodeURIComponent(join.joined.id)}`)).state;
+  assert.ok(state.players.some((player) => player.id === join.joined.id), "http fallback state should include joined player");
+
+  await api("POST", `/api/test/player/${join.joined.index}`, {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    input: { up: false, down: false, left: false, right: false, kickLeft: 0, kickRight: 0, head: 0, yaw: 0 }
+  });
+  await api("POST", "/api/input", {
+    clientId: join.joined.id,
+    sequence: 1,
+    input: { up: true, down: false, left: false, right: false, kickLeft: 0, kickRight: 0, head: 0, yaw: 0 }
+  });
+
+  state = (await api("POST", "/api/test/tick", { frames: 6 })).state;
+  assert.ok(playerAt(state, join.joined.index).position.z > 0.5, "http fallback input should move blue player toward +Z");
+
+  state = (await api("GET", `/api/state?clientId=${encodeURIComponent(join.joined.id)}`)).state;
+  assert.ok(playerAt(state, join.joined.index).position.z > 0.5, "http fallback state should expose latest movement");
+
+  await api("POST", "/api/leave", { clientId: join.joined.id });
+  state = (await api("GET", "/api/test/state")).state;
+  assert.ok(!state.players.some((player) => player.id === join.joined.id), "http fallback leave should remove player");
+}
+
 async function main() {
   const port = await freePort();
   const baseUrl = `http://127.0.0.1:${port}`;
@@ -178,7 +214,7 @@ async function main() {
   try {
     const health = await waitForHealth(baseUrl, () => exitCode, stderrLines);
     assert.equal(health.ok, true);
-    assert.equal(health.version, "v0.0.009");
+    assert.equal(health.version, EXPECTED_GAME_VERSION);
 
     let state = (await api("GET", "/api/test/state")).state;
     const beforeProbeAudioId = maxAudioEventId(state);
@@ -193,13 +229,15 @@ async function main() {
 
     const beforeWebSocketJoinAudioId = maxAudioEventId(state);
     const wsJoin = await joinWebSocketAndReadState(baseUrl, "WsAudio");
-    assert.equal(wsJoin.joined.version, "v0.0.009");
+    assert.equal(wsJoin.joined.version, EXPECTED_GAME_VERSION);
     assertAudioEvent(
       wsJoin.state,
       beforeWebSocketJoinAudioId,
       (event) => event.kind === "roster" && event.change === "join" && event.playerId === wsJoin.joined.id,
       "websocket join"
     );
+
+    await assertHttpFallback(api);
 
     state = (await api("POST", "/api/test/players", { count: 5 })).state;
     assert.equal(state.players.filter((player) => player.role === "player").length, 4);
@@ -265,6 +303,7 @@ async function main() {
         "health",
         "websocket no-join has no phantom roster audio",
         "websocket join audioEvents",
+        "http fallback join/input/state",
         "5-client role assignment",
         "team-relative WASD movement",
         "player movement beyond pitch bounds",

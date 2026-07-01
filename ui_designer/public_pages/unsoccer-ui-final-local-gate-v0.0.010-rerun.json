@@ -1,0 +1,1084 @@
+{
+  "targetUrl": "http://127.0.0.1:5181/?server=http://127.0.0.1:8793&qaTime=30",
+  "generatedAt": "2026-07-01T15:08:54.117Z",
+  "results": [
+    {
+      "viewport": {
+        "name": "desktop-1440x900",
+        "width": 1440,
+        "height": 900,
+        "dpr": 1,
+        "mobile": false
+      },
+      "before": {
+        "href": "http://127.0.0.1:5181/?server=http://127.0.0.1:8793&qaTime=30",
+        "title": "UnSoccer v0.0.010 | Ragdoll Soccer II",
+        "viewport": {
+          "width": 1440,
+          "height": 900,
+          "dpr": 1
+        },
+        "scroll": {
+          "htmlClientWidth": 1440,
+          "htmlScrollWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "hasHorizontalOverflow": false
+        },
+        "dataset": {
+          "gameVersion": "v0.0.010",
+          "gameWeightLabel": "0.61 MB",
+          "settingsActiveTab": "controls",
+          "settingsTab": null,
+          "transport": "websocket"
+        },
+        "versionBadgeText": "v0.0.010 / 0.61 MB",
+        "versionBadgeRect": {
+          "left": 12,
+          "top": 874,
+          "right": 113,
+          "bottom": 890,
+          "width": 101,
+          "height": 16,
+          "visible": true
+        },
+        "hudRect": {
+          "left": 14,
+          "top": 14,
+          "right": 1426,
+          "bottom": 886,
+          "width": 1412,
+          "height": 872,
+          "visible": true
+        },
+        "scoreRect": {
+          "left": 575,
+          "top": 14,
+          "right": 865,
+          "bottom": 72,
+          "width": 290,
+          "height": 58,
+          "visible": true
+        },
+        "statusText": "Игрок 75 подключился к полю.",
+        "settingsButtonExists": true,
+        "settingsButtonRect": {
+          "left": 1234,
+          "top": 844,
+          "right": 1276,
+          "bottom": 886,
+          "width": 42,
+          "height": 42,
+          "visible": true
+        },
+        "settingsPanelExists": true,
+        "settingsPanelHidden": true,
+        "settingsPanelRect": {
+          "left": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "width": 0,
+          "height": 0,
+          "visible": false
+        },
+        "settingsShellRect": {
+          "left": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "width": 0,
+          "height": 0,
+          "visible": false
+        },
+        "settingsShellScrollWidth": 0,
+        "settingsShellClientWidth": 0,
+        "settingsBodyScrollWidth": 0,
+        "settingsBodyClientWidth": 0,
+        "selectedTabCount": 1,
+        "settingsTabButtonCount": 5,
+        "anySettingsTabAttrCount": 5,
+        "visibleOffenders": []
+      },
+      "openResult": {
+        "clicked": true,
+        "hiddenAfterClick": false
+      },
+      "afterOpen": {
+        "href": "http://127.0.0.1:5181/?server=http://127.0.0.1:8793&qaTime=30",
+        "title": "UnSoccer v0.0.010 | Ragdoll Soccer II",
+        "viewport": {
+          "width": 1440,
+          "height": 900,
+          "dpr": 1
+        },
+        "scroll": {
+          "htmlClientWidth": 1440,
+          "htmlScrollWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "hasHorizontalOverflow": false
+        },
+        "dataset": {
+          "gameVersion": "v0.0.010",
+          "gameWeightLabel": "0.61 MB",
+          "settingsActiveTab": "controls",
+          "settingsTab": null,
+          "transport": "websocket"
+        },
+        "versionBadgeText": "v0.0.010 / 0.61 MB",
+        "versionBadgeRect": {
+          "left": 12,
+          "top": 874,
+          "right": 113,
+          "bottom": 890,
+          "width": 101,
+          "height": 16,
+          "visible": true
+        },
+        "hudRect": {
+          "left": 14,
+          "top": 14,
+          "right": 1426,
+          "bottom": 886,
+          "width": 1412,
+          "height": 872,
+          "visible": true
+        },
+        "scoreRect": {
+          "left": 575,
+          "top": 14,
+          "right": 865,
+          "bottom": 72,
+          "width": 290,
+          "height": 58,
+          "visible": true
+        },
+        "statusText": "Игрок 75 подключился к полю.",
+        "settingsButtonExists": true,
+        "settingsButtonRect": {
+          "left": 1234,
+          "top": 844,
+          "right": 1276,
+          "bottom": 886,
+          "width": 42,
+          "height": 42,
+          "visible": true
+        },
+        "settingsPanelExists": true,
+        "settingsPanelHidden": false,
+        "settingsPanelRect": {
+          "left": 0,
+          "top": 0,
+          "right": 1440,
+          "bottom": 900,
+          "width": 1440,
+          "height": 900,
+          "visible": true
+        },
+        "settingsShellRect": {
+          "left": 230,
+          "top": 105,
+          "right": 1210,
+          "bottom": 795,
+          "width": 980,
+          "height": 690,
+          "visible": true
+        },
+        "settingsShellScrollWidth": 978,
+        "settingsShellClientWidth": 978,
+        "settingsBodyScrollWidth": 978,
+        "settingsBodyClientWidth": 978,
+        "selectedTabCount": 1,
+        "settingsTabButtonCount": 5,
+        "anySettingsTabAttrCount": 5,
+        "visibleOffenders": []
+      },
+      "tabChecks": [
+        {
+          "tab": "controls",
+          "clicked": true,
+          "selectedTabCount": 1,
+          "activeTab": "controls",
+          "legacySettingsTab": null,
+          "panelHidden": false,
+          "htmlScrollWidth": 1440,
+          "htmlClientWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "settingsShellScrollWidth": 978,
+          "settingsShellClientWidth": 978,
+          "settingsBodyScrollWidth": 978,
+          "settingsBodyClientWidth": 978
+        },
+        {
+          "tab": "audio",
+          "clicked": true,
+          "selectedTabCount": 1,
+          "activeTab": "audio",
+          "legacySettingsTab": null,
+          "panelHidden": false,
+          "htmlScrollWidth": 1440,
+          "htmlClientWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "settingsShellScrollWidth": 978,
+          "settingsShellClientWidth": 978,
+          "settingsBodyScrollWidth": 978,
+          "settingsBodyClientWidth": 978
+        },
+        {
+          "tab": "graphics",
+          "clicked": true,
+          "selectedTabCount": 1,
+          "activeTab": "graphics",
+          "legacySettingsTab": null,
+          "panelHidden": false,
+          "htmlScrollWidth": 1440,
+          "htmlClientWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "settingsShellScrollWidth": 978,
+          "settingsShellClientWidth": 978,
+          "settingsBodyScrollWidth": 978,
+          "settingsBodyClientWidth": 978
+        },
+        {
+          "tab": "network",
+          "clicked": true,
+          "selectedTabCount": 1,
+          "activeTab": "network",
+          "legacySettingsTab": null,
+          "panelHidden": false,
+          "htmlScrollWidth": 1440,
+          "htmlClientWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "settingsShellScrollWidth": 978,
+          "settingsShellClientWidth": 978,
+          "settingsBodyScrollWidth": 978,
+          "settingsBodyClientWidth": 978
+        },
+        {
+          "tab": "accessibility",
+          "clicked": true,
+          "selectedTabCount": 1,
+          "activeTab": "accessibility",
+          "legacySettingsTab": null,
+          "panelHidden": false,
+          "htmlScrollWidth": 1440,
+          "htmlClientWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "settingsShellScrollWidth": 978,
+          "settingsShellClientWidth": 978,
+          "settingsBodyScrollWidth": 978,
+          "settingsBodyClientWidth": 978
+        }
+      ],
+      "afterTabs": {
+        "href": "http://127.0.0.1:5181/?server=http://127.0.0.1:8793&qaTime=30",
+        "title": "UnSoccer v0.0.010 | Ragdoll Soccer II",
+        "viewport": {
+          "width": 1440,
+          "height": 900,
+          "dpr": 1
+        },
+        "scroll": {
+          "htmlClientWidth": 1440,
+          "htmlScrollWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "hasHorizontalOverflow": false
+        },
+        "dataset": {
+          "gameVersion": "v0.0.010",
+          "gameWeightLabel": "0.61 MB",
+          "settingsActiveTab": "accessibility",
+          "settingsTab": null,
+          "transport": "websocket"
+        },
+        "versionBadgeText": "v0.0.010 / 0.61 MB",
+        "versionBadgeRect": {
+          "left": 12,
+          "top": 874,
+          "right": 113,
+          "bottom": 890,
+          "width": 101,
+          "height": 16,
+          "visible": true
+        },
+        "hudRect": {
+          "left": 14,
+          "top": 14,
+          "right": 1426,
+          "bottom": 886,
+          "width": 1412,
+          "height": 872,
+          "visible": true
+        },
+        "scoreRect": {
+          "left": 575,
+          "top": 14,
+          "right": 865,
+          "bottom": 72,
+          "width": 290,
+          "height": 58,
+          "visible": true
+        },
+        "statusText": "Игрок 75 подключился к полю.",
+        "settingsButtonExists": true,
+        "settingsButtonRect": {
+          "left": 1234,
+          "top": 844,
+          "right": 1276,
+          "bottom": 886,
+          "width": 42,
+          "height": 42,
+          "visible": true
+        },
+        "settingsPanelExists": true,
+        "settingsPanelHidden": false,
+        "settingsPanelRect": {
+          "left": 0,
+          "top": 0,
+          "right": 1440,
+          "bottom": 900,
+          "width": 1440,
+          "height": 900,
+          "visible": true
+        },
+        "settingsShellRect": {
+          "left": 230,
+          "top": 283,
+          "right": 1210,
+          "bottom": 617,
+          "width": 980,
+          "height": 335,
+          "visible": true
+        },
+        "settingsShellScrollWidth": 978,
+        "settingsShellClientWidth": 978,
+        "settingsBodyScrollWidth": 978,
+        "settingsBodyClientWidth": 978,
+        "selectedTabCount": 1,
+        "settingsTabButtonCount": 5,
+        "anySettingsTabAttrCount": 5,
+        "visibleOffenders": []
+      },
+      "screenshot": "R:\\itch_games\\ui_designer\\public_pages\\unsoccer-ui-final-local-gate-v0.0.010-rerun-desktop-1440x900.png"
+    },
+    {
+      "viewport": {
+        "name": "mobile-390x844",
+        "width": 390,
+        "height": 844,
+        "dpr": 1,
+        "mobile": true
+      },
+      "before": {
+        "href": "http://127.0.0.1:5181/?server=http://127.0.0.1:8793&qaTime=30",
+        "title": "UnSoccer v0.0.010 | Ragdoll Soccer II",
+        "viewport": {
+          "width": 390,
+          "height": 844,
+          "dpr": 1
+        },
+        "scroll": {
+          "htmlClientWidth": 390,
+          "htmlScrollWidth": 390,
+          "bodyScrollWidth": 390,
+          "hasHorizontalOverflow": false
+        },
+        "dataset": {
+          "gameVersion": "v0.0.010",
+          "gameWeightLabel": "0.61 MB",
+          "settingsActiveTab": "controls",
+          "settingsTab": null,
+          "transport": "websocket"
+        },
+        "versionBadgeText": "v0.0.010 / 0.61 MB",
+        "versionBadgeRect": {
+          "left": 10,
+          "top": 812,
+          "right": 111,
+          "bottom": 828,
+          "width": 101,
+          "height": 16,
+          "visible": true
+        },
+        "hudRect": {
+          "left": 10,
+          "top": 10,
+          "right": 380,
+          "bottom": 834,
+          "width": 370,
+          "height": 824,
+          "visible": true
+        },
+        "scoreRect": {
+          "left": 10,
+          "top": 10,
+          "right": 380,
+          "bottom": 68,
+          "width": 370,
+          "height": 58,
+          "visible": true
+        },
+        "statusText": "Игрок 62 подключился к полю.",
+        "settingsButtonExists": true,
+        "settingsButtonRect": {
+          "left": 212,
+          "top": 798,
+          "right": 248,
+          "bottom": 834,
+          "width": 36,
+          "height": 36,
+          "visible": true
+        },
+        "settingsPanelExists": true,
+        "settingsPanelHidden": true,
+        "settingsPanelRect": {
+          "left": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "width": 0,
+          "height": 0,
+          "visible": false
+        },
+        "settingsShellRect": {
+          "left": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "width": 0,
+          "height": 0,
+          "visible": false
+        },
+        "settingsShellScrollWidth": 0,
+        "settingsShellClientWidth": 0,
+        "settingsBodyScrollWidth": 0,
+        "settingsBodyClientWidth": 0,
+        "selectedTabCount": 1,
+        "settingsTabButtonCount": 5,
+        "anySettingsTabAttrCount": 5,
+        "visibleOffenders": []
+      },
+      "openResult": {
+        "clicked": true,
+        "hiddenAfterClick": false
+      },
+      "afterOpen": {
+        "href": "http://127.0.0.1:5181/?server=http://127.0.0.1:8793&qaTime=30",
+        "title": "UnSoccer v0.0.010 | Ragdoll Soccer II",
+        "viewport": {
+          "width": 390,
+          "height": 844,
+          "dpr": 1
+        },
+        "scroll": {
+          "htmlClientWidth": 390,
+          "htmlScrollWidth": 390,
+          "bodyScrollWidth": 390,
+          "hasHorizontalOverflow": false
+        },
+        "dataset": {
+          "gameVersion": "v0.0.010",
+          "gameWeightLabel": "0.61 MB",
+          "settingsActiveTab": "controls",
+          "settingsTab": null,
+          "transport": "websocket"
+        },
+        "versionBadgeText": "v0.0.010 / 0.61 MB",
+        "versionBadgeRect": {
+          "left": 10,
+          "top": 812,
+          "right": 111,
+          "bottom": 828,
+          "width": 101,
+          "height": 16,
+          "visible": true
+        },
+        "hudRect": {
+          "left": 10,
+          "top": 10,
+          "right": 380,
+          "bottom": 834,
+          "width": 370,
+          "height": 824,
+          "visible": true
+        },
+        "scoreRect": {
+          "left": 10,
+          "top": 10,
+          "right": 380,
+          "bottom": 68,
+          "width": 370,
+          "height": 58,
+          "visible": true
+        },
+        "statusText": "Игрок 62 подключился к полю.",
+        "settingsButtonExists": true,
+        "settingsButtonRect": {
+          "left": 212,
+          "top": 798,
+          "right": 248,
+          "bottom": 834,
+          "width": 36,
+          "height": 36,
+          "visible": true
+        },
+        "settingsPanelExists": true,
+        "settingsPanelHidden": false,
+        "settingsPanelRect": {
+          "left": 0,
+          "top": 0,
+          "right": 390,
+          "bottom": 844,
+          "width": 390,
+          "height": 844,
+          "visible": true
+        },
+        "settingsShellRect": {
+          "left": 18,
+          "top": 42,
+          "right": 372,
+          "bottom": 802,
+          "width": 354,
+          "height": 760,
+          "visible": true
+        },
+        "settingsShellScrollWidth": 352,
+        "settingsShellClientWidth": 352,
+        "settingsBodyScrollWidth": 352,
+        "settingsBodyClientWidth": 352,
+        "selectedTabCount": 1,
+        "settingsTabButtonCount": 5,
+        "anySettingsTabAttrCount": 5,
+        "visibleOffenders": []
+      },
+      "tabChecks": [
+        {
+          "tab": "controls",
+          "clicked": true,
+          "selectedTabCount": 1,
+          "activeTab": "controls",
+          "legacySettingsTab": null,
+          "panelHidden": false,
+          "htmlScrollWidth": 390,
+          "htmlClientWidth": 390,
+          "bodyScrollWidth": 390,
+          "settingsShellScrollWidth": 352,
+          "settingsShellClientWidth": 352,
+          "settingsBodyScrollWidth": 352,
+          "settingsBodyClientWidth": 352
+        },
+        {
+          "tab": "audio",
+          "clicked": true,
+          "selectedTabCount": 1,
+          "activeTab": "audio",
+          "legacySettingsTab": null,
+          "panelHidden": false,
+          "htmlScrollWidth": 390,
+          "htmlClientWidth": 390,
+          "bodyScrollWidth": 390,
+          "settingsShellScrollWidth": 352,
+          "settingsShellClientWidth": 352,
+          "settingsBodyScrollWidth": 352,
+          "settingsBodyClientWidth": 352
+        },
+        {
+          "tab": "graphics",
+          "clicked": true,
+          "selectedTabCount": 1,
+          "activeTab": "graphics",
+          "legacySettingsTab": null,
+          "panelHidden": false,
+          "htmlScrollWidth": 390,
+          "htmlClientWidth": 390,
+          "bodyScrollWidth": 390,
+          "settingsShellScrollWidth": 352,
+          "settingsShellClientWidth": 352,
+          "settingsBodyScrollWidth": 352,
+          "settingsBodyClientWidth": 352
+        },
+        {
+          "tab": "network",
+          "clicked": true,
+          "selectedTabCount": 1,
+          "activeTab": "network",
+          "legacySettingsTab": null,
+          "panelHidden": false,
+          "htmlScrollWidth": 390,
+          "htmlClientWidth": 390,
+          "bodyScrollWidth": 390,
+          "settingsShellScrollWidth": 352,
+          "settingsShellClientWidth": 352,
+          "settingsBodyScrollWidth": 352,
+          "settingsBodyClientWidth": 352
+        },
+        {
+          "tab": "accessibility",
+          "clicked": true,
+          "selectedTabCount": 1,
+          "activeTab": "accessibility",
+          "legacySettingsTab": null,
+          "panelHidden": false,
+          "htmlScrollWidth": 390,
+          "htmlClientWidth": 390,
+          "bodyScrollWidth": 390,
+          "settingsShellScrollWidth": 352,
+          "settingsShellClientWidth": 352,
+          "settingsBodyScrollWidth": 352,
+          "settingsBodyClientWidth": 352
+        }
+      ],
+      "afterTabs": {
+        "href": "http://127.0.0.1:5181/?server=http://127.0.0.1:8793&qaTime=30",
+        "title": "UnSoccer v0.0.010 | Ragdoll Soccer II",
+        "viewport": {
+          "width": 390,
+          "height": 844,
+          "dpr": 1
+        },
+        "scroll": {
+          "htmlClientWidth": 390,
+          "htmlScrollWidth": 390,
+          "bodyScrollWidth": 390,
+          "hasHorizontalOverflow": false
+        },
+        "dataset": {
+          "gameVersion": "v0.0.010",
+          "gameWeightLabel": "0.61 MB",
+          "settingsActiveTab": "accessibility",
+          "settingsTab": null,
+          "transport": "websocket"
+        },
+        "versionBadgeText": "v0.0.010 / 0.61 MB",
+        "versionBadgeRect": {
+          "left": 10,
+          "top": 812,
+          "right": 111,
+          "bottom": 828,
+          "width": 101,
+          "height": 16,
+          "visible": true
+        },
+        "hudRect": {
+          "left": 10,
+          "top": 10,
+          "right": 380,
+          "bottom": 834,
+          "width": 370,
+          "height": 824,
+          "visible": true
+        },
+        "scoreRect": {
+          "left": 10,
+          "top": 10,
+          "right": 380,
+          "bottom": 68,
+          "width": 370,
+          "height": 58,
+          "visible": true
+        },
+        "statusText": "Игрок 62 подключился к полю.",
+        "settingsButtonExists": true,
+        "settingsButtonRect": {
+          "left": 212,
+          "top": 798,
+          "right": 248,
+          "bottom": 834,
+          "width": 36,
+          "height": 36,
+          "visible": true
+        },
+        "settingsPanelExists": true,
+        "settingsPanelHidden": false,
+        "settingsPanelRect": {
+          "left": 0,
+          "top": 0,
+          "right": 390,
+          "bottom": 844,
+          "width": 390,
+          "height": 844,
+          "visible": true
+        },
+        "settingsShellRect": {
+          "left": 18,
+          "top": 171,
+          "right": 372,
+          "bottom": 673,
+          "width": 354,
+          "height": 503,
+          "visible": true
+        },
+        "settingsShellScrollWidth": 352,
+        "settingsShellClientWidth": 352,
+        "settingsBodyScrollWidth": 352,
+        "settingsBodyClientWidth": 352,
+        "selectedTabCount": 1,
+        "settingsTabButtonCount": 5,
+        "anySettingsTabAttrCount": 5,
+        "visibleOffenders": []
+      },
+      "screenshot": "R:\\itch_games\\ui_designer\\public_pages\\unsoccer-ui-final-local-gate-v0.0.010-rerun-mobile-390x844.png"
+    },
+    {
+      "viewport": {
+        "name": "minimum-320x640",
+        "width": 320,
+        "height": 640,
+        "dpr": 1,
+        "mobile": true
+      },
+      "before": {
+        "href": "http://127.0.0.1:5181/?server=http://127.0.0.1:8793&qaTime=30",
+        "title": "UnSoccer v0.0.010 | Ragdoll Soccer II",
+        "viewport": {
+          "width": 320,
+          "height": 640,
+          "dpr": 1
+        },
+        "scroll": {
+          "htmlClientWidth": 320,
+          "htmlScrollWidth": 320,
+          "bodyScrollWidth": 320,
+          "hasHorizontalOverflow": false
+        },
+        "dataset": {
+          "gameVersion": "v0.0.010",
+          "gameWeightLabel": "0.61 MB",
+          "settingsActiveTab": "controls",
+          "settingsTab": null,
+          "transport": "websocket"
+        },
+        "versionBadgeText": "v0.0.010 / 0.61 MB",
+        "versionBadgeRect": {
+          "left": 10,
+          "top": 608,
+          "right": 111,
+          "bottom": 624,
+          "width": 101,
+          "height": 16,
+          "visible": true
+        },
+        "hudRect": {
+          "left": 10,
+          "top": 10,
+          "right": 310,
+          "bottom": 630,
+          "width": 300,
+          "height": 620,
+          "visible": true
+        },
+        "scoreRect": {
+          "left": 10,
+          "top": 10,
+          "right": 310,
+          "bottom": 68,
+          "width": 300,
+          "height": 58,
+          "visible": true
+        },
+        "statusText": "Игрок 24 подключился к полю.",
+        "settingsButtonExists": true,
+        "settingsButtonRect": {
+          "left": 142,
+          "top": 594,
+          "right": 178,
+          "bottom": 630,
+          "width": 36,
+          "height": 36,
+          "visible": true
+        },
+        "settingsPanelExists": true,
+        "settingsPanelHidden": true,
+        "settingsPanelRect": {
+          "left": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "width": 0,
+          "height": 0,
+          "visible": false
+        },
+        "settingsShellRect": {
+          "left": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "width": 0,
+          "height": 0,
+          "visible": false
+        },
+        "settingsShellScrollWidth": 0,
+        "settingsShellClientWidth": 0,
+        "settingsBodyScrollWidth": 0,
+        "settingsBodyClientWidth": 0,
+        "selectedTabCount": 1,
+        "settingsTabButtonCount": 5,
+        "anySettingsTabAttrCount": 5,
+        "visibleOffenders": []
+      },
+      "openResult": {
+        "clicked": true,
+        "hiddenAfterClick": false
+      },
+      "afterOpen": {
+        "href": "http://127.0.0.1:5181/?server=http://127.0.0.1:8793&qaTime=30",
+        "title": "UnSoccer v0.0.010 | Ragdoll Soccer II",
+        "viewport": {
+          "width": 320,
+          "height": 640,
+          "dpr": 1
+        },
+        "scroll": {
+          "htmlClientWidth": 320,
+          "htmlScrollWidth": 320,
+          "bodyScrollWidth": 320,
+          "hasHorizontalOverflow": false
+        },
+        "dataset": {
+          "gameVersion": "v0.0.010",
+          "gameWeightLabel": "0.61 MB",
+          "settingsActiveTab": "controls",
+          "settingsTab": null,
+          "transport": "websocket"
+        },
+        "versionBadgeText": "v0.0.010 / 0.61 MB",
+        "versionBadgeRect": {
+          "left": 10,
+          "top": 608,
+          "right": 111,
+          "bottom": 624,
+          "width": 101,
+          "height": 16,
+          "visible": true
+        },
+        "hudRect": {
+          "left": 10,
+          "top": 10,
+          "right": 310,
+          "bottom": 630,
+          "width": 300,
+          "height": 620,
+          "visible": true
+        },
+        "scoreRect": {
+          "left": 10,
+          "top": 10,
+          "right": 310,
+          "bottom": 68,
+          "width": 300,
+          "height": 58,
+          "visible": true
+        },
+        "statusText": "Игрок 24 подключился к полю.",
+        "settingsButtonExists": true,
+        "settingsButtonRect": {
+          "left": 142,
+          "top": 594,
+          "right": 178,
+          "bottom": 630,
+          "width": 36,
+          "height": 36,
+          "visible": true
+        },
+        "settingsPanelExists": true,
+        "settingsPanelHidden": false,
+        "settingsPanelRect": {
+          "left": 0,
+          "top": 0,
+          "right": 320,
+          "bottom": 640,
+          "width": 320,
+          "height": 640,
+          "visible": true
+        },
+        "settingsShellRect": {
+          "left": 18,
+          "top": 18,
+          "right": 302,
+          "bottom": 622,
+          "width": 284,
+          "height": 604,
+          "visible": true
+        },
+        "settingsShellScrollWidth": 295,
+        "settingsShellClientWidth": 282,
+        "settingsBodyScrollWidth": 295,
+        "settingsBodyClientWidth": 295,
+        "selectedTabCount": 1,
+        "settingsTabButtonCount": 5,
+        "anySettingsTabAttrCount": 5,
+        "visibleOffenders": []
+      },
+      "tabChecks": [
+        {
+          "tab": "controls",
+          "clicked": true,
+          "selectedTabCount": 1,
+          "activeTab": "controls",
+          "legacySettingsTab": null,
+          "panelHidden": false,
+          "htmlScrollWidth": 320,
+          "htmlClientWidth": 320,
+          "bodyScrollWidth": 320,
+          "settingsShellScrollWidth": 295,
+          "settingsShellClientWidth": 282,
+          "settingsBodyScrollWidth": 295,
+          "settingsBodyClientWidth": 295
+        },
+        {
+          "tab": "audio",
+          "clicked": true,
+          "selectedTabCount": 1,
+          "activeTab": "audio",
+          "legacySettingsTab": null,
+          "panelHidden": false,
+          "htmlScrollWidth": 320,
+          "htmlClientWidth": 320,
+          "bodyScrollWidth": 320,
+          "settingsShellScrollWidth": 295,
+          "settingsShellClientWidth": 282,
+          "settingsBodyScrollWidth": 295,
+          "settingsBodyClientWidth": 295
+        },
+        {
+          "tab": "graphics",
+          "clicked": true,
+          "selectedTabCount": 1,
+          "activeTab": "graphics",
+          "legacySettingsTab": null,
+          "panelHidden": false,
+          "htmlScrollWidth": 320,
+          "htmlClientWidth": 320,
+          "bodyScrollWidth": 320,
+          "settingsShellScrollWidth": 295,
+          "settingsShellClientWidth": 282,
+          "settingsBodyScrollWidth": 295,
+          "settingsBodyClientWidth": 295
+        },
+        {
+          "tab": "network",
+          "clicked": true,
+          "selectedTabCount": 1,
+          "activeTab": "network",
+          "legacySettingsTab": null,
+          "panelHidden": false,
+          "htmlScrollWidth": 320,
+          "htmlClientWidth": 320,
+          "bodyScrollWidth": 320,
+          "settingsShellScrollWidth": 295,
+          "settingsShellClientWidth": 282,
+          "settingsBodyScrollWidth": 295,
+          "settingsBodyClientWidth": 295
+        },
+        {
+          "tab": "accessibility",
+          "clicked": true,
+          "selectedTabCount": 1,
+          "activeTab": "accessibility",
+          "legacySettingsTab": null,
+          "panelHidden": false,
+          "htmlScrollWidth": 320,
+          "htmlClientWidth": 320,
+          "bodyScrollWidth": 320,
+          "settingsShellScrollWidth": 295,
+          "settingsShellClientWidth": 282,
+          "settingsBodyScrollWidth": 295,
+          "settingsBodyClientWidth": 295
+        }
+      ],
+      "afterTabs": {
+        "href": "http://127.0.0.1:5181/?server=http://127.0.0.1:8793&qaTime=30",
+        "title": "UnSoccer v0.0.010 | Ragdoll Soccer II",
+        "viewport": {
+          "width": 320,
+          "height": 640,
+          "dpr": 1
+        },
+        "scroll": {
+          "htmlClientWidth": 320,
+          "htmlScrollWidth": 320,
+          "bodyScrollWidth": 320,
+          "hasHorizontalOverflow": false
+        },
+        "dataset": {
+          "gameVersion": "v0.0.010",
+          "gameWeightLabel": "0.61 MB",
+          "settingsActiveTab": "accessibility",
+          "settingsTab": null,
+          "transport": "websocket"
+        },
+        "versionBadgeText": "v0.0.010 / 0.61 MB",
+        "versionBadgeRect": {
+          "left": 10,
+          "top": 608,
+          "right": 111,
+          "bottom": 624,
+          "width": 101,
+          "height": 16,
+          "visible": true
+        },
+        "hudRect": {
+          "left": 10,
+          "top": 10,
+          "right": 310,
+          "bottom": 630,
+          "width": 300,
+          "height": 620,
+          "visible": true
+        },
+        "scoreRect": {
+          "left": 10,
+          "top": 10,
+          "right": 310,
+          "bottom": 68,
+          "width": 300,
+          "height": 58,
+          "visible": true
+        },
+        "statusText": "Игрок 24 подключился к полю.",
+        "settingsButtonExists": true,
+        "settingsButtonRect": {
+          "left": 142,
+          "top": 594,
+          "right": 178,
+          "bottom": 630,
+          "width": 36,
+          "height": 36,
+          "visible": true
+        },
+        "settingsPanelExists": true,
+        "settingsPanelHidden": false,
+        "settingsPanelRect": {
+          "left": 0,
+          "top": 0,
+          "right": 320,
+          "bottom": 640,
+          "width": 320,
+          "height": 640,
+          "visible": true
+        },
+        "settingsShellRect": {
+          "left": 18,
+          "top": 58,
+          "right": 302,
+          "bottom": 582,
+          "width": 284,
+          "height": 524,
+          "visible": true
+        },
+        "settingsShellScrollWidth": 295,
+        "settingsShellClientWidth": 282,
+        "settingsBodyScrollWidth": 295,
+        "settingsBodyClientWidth": 295,
+        "selectedTabCount": 1,
+        "settingsTabButtonCount": 5,
+        "anySettingsTabAttrCount": 5,
+        "visibleOffenders": []
+      },
+      "screenshot": "R:\\itch_games\\ui_designer\\public_pages\\unsoccer-ui-final-local-gate-v0.0.010-rerun-minimum-320x640.png"
+    }
+  ],
+  "consoleEntries": [],
+  "logEntries": [],
+  "networkFailures": [],
+  "blockers": []
+}

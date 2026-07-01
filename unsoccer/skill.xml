@@ -4,7 +4,7 @@
   <parent path="../itch_games.skill.md" />
   <entry file="unsoccer.skill.md" />
   <runtime url="https://io-games.mecharulez.com/unsoccer/" />
-  <version current="v0.0.009" />
+  <version current="v0.0.010" />
   <publicSurface owner="UI Designer" localUrl="http://127.0.0.1:8000/unsoccer/" itchEntry="dist/index.html">
     <rule>unsoccer/index.html is the public static page for the local server and production route until the built client is deployed there.</rule>
     <rule>UI Designer owns public page hierarchy, prototype status copy, catalog continuity, and itch.io presentation fit.</rule>
@@ -13,7 +13,13 @@
   <files>
     <file path="index.html" role="public-page prototype-status" />
     <folder path="client" role="browser-client" />
+    <file path="client/index.html" role="client-entry hud-settings-dom" />
+    <file path="client/src/main.ts" role="three-runtime hud-settings-network-input" />
+    <file path="client/src/styles.css" role="hud-settings-responsive-css" />
+    <file path="client/src/settings.ts" role="ui-settings-persistence-validation" />
+    <file path="client/src/input-map.ts" role="input-remap-movement-resolution" />
     <file path="client/src/audio.ts" role="procedural-web-audio-runtime" />
+    <file path="client/src/weather.ts" role="weather-graphics-options" />
     <folder path="server" role="authoritative-server" />
     <folder path="shared" role="shared-protocol" />
     <folder path="assets" role="runtime-assets-and-provenance" />
@@ -27,11 +33,15 @@
     <rule>v0.0.008 audio uses a server-authored audioEvents ring buffer in ServerState so roster, kick/body, goal, and countdown cues synchronize across WebSocket and HTTP fallback clients by authoritative event id.</rule>
     <rule>v0.0.009 expands the runtime Art Director pass with courtyard models, procedural animated footballer rigs, visible sun/moon/orbit marker, ambient/bounce lighting, and QA-readable art/day-cycle datasets.</rule>
     <rule>v0.0.009 makes WASD team-relative, keeps local controlled movement responsive with a short client prediction lead, and removes artificial pitch bounds from player movement.</rule>
+    <rule>v0.0.009 ships the UI Designer runtime pass with redesigned HUD hierarchy, event/status/network panels, toolbar buttons, settings modal tabs, localStorage settings, remappable input, runtime audio/graphics/network/accessibility controls, and QA-readable UI debug datasets.</rule>
+    <rule>v0.0.010 is the unified 0010 release build with all current runtime workstreams, a camera-framed sun/moon marker, synchronized version surfaces, and repo-side publication evidence.</rule>
     <rule>Server-confirmed left-foot, right-foot, head, and body contacts must stay visually distinguishable and expose data-last-action-kind, data-last-action-player, and data-last-action-at for QA.</rule>
     <rule>Server owns physics, score, teams, and room assignment.</rule>
     <rule>Production transport is plain WebSocket JSON under /unsoccer/socket/ with HTTP polling fallback, implemented with built-in Node http/net/crypto primitives; do not require geckos.io, ws, or native node-datachannel on the Qwertystock host.</rule>
     <rule>UNSOCCER_TEST_MODE enables /api/test/* only for isolated local acceptance and must not be exposed in production.</rule>
-    <rule>npm run test:unsoccer:acceptance is the deterministic gate for spectator roles, team-relative WASD movement, pitch-bound freedom, kicks, body contact, goal reset, and server audioEvents.</rule>
+    <rule>npm run test:unsoccer:acceptance is the deterministic gate for spectator roles, team-relative WASD movement, HTTP fallback join/input/state, pitch-bound freedom, kicks, body contact, goal reset, and server audioEvents.</rule>
+    <rule>Acceptance derives the expected version from package.json.games.unsoccer.version and must not hard-code a release string.</rule>
+    <rule>npm run package:unsoccer rebuilds before creating dist/unsoccer-itch.zip so stale dist output is not published.</rule>
     <rule>Client audio is procedural Web Audio driven by authoritative ServerState audioEvents and weather state, not local input prediction.</rule>
     <rule>Audio QA must inspect data-audio-played-events, data-audio-blocked-events, data-audio-context, and data-audio-unlocked after a real trusted browser gesture.</rule>
     <rule>First 4 clients are players; clients 5-32 are spectators/testers.</rule>

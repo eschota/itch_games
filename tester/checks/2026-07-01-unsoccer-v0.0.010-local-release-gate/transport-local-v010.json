@@ -1,0 +1,771 @@
+{
+  "checkedAt": "2026-07-01T15:02:32.653Z",
+  "base": "http://127.0.0.1:8793",
+  "health": {
+    "url": "http://127.0.0.1:8793/api/health",
+    "status": 200,
+    "ok": true,
+    "elapsedMs": 22,
+    "json": {
+      "ok": true,
+      "version": "v0.0.010",
+      "activePlayers": 1,
+      "connectedClients": 1,
+      "maxActivePlayers": 4,
+      "maxRoomClients": 32,
+      "transports": {
+        "websocket": true,
+        "http": true
+      }
+    }
+  },
+  "websocket": {
+    "ok": true,
+    "url": "ws://127.0.0.1:8793/ws",
+    "joined": {
+      "id": "ws-1782918152597-luml1m4etcp",
+      "role": "player",
+      "team": 1,
+      "index": 1,
+      "characterId": "6270753",
+      "version": "v0.0.010",
+      "maxActivePlayers": 4,
+      "maxRoomClients": 32
+    },
+    "state": {
+      "version": "v0.0.010",
+      "serverTime": 1782918152645,
+      "tick": 20752,
+      "players": [
+        {
+          "id": "ws-1782918081997-iuxn6sz5oa",
+          "name": "codex-iab-final-17",
+          "role": "player",
+          "team": 0,
+          "index": 0,
+          "characterId": "6299851",
+          "position": {
+            "x": -3.200000047683716,
+            "y": 0.875,
+            "z": -8.640000343322754
+          },
+          "velocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "yaw": 0,
+          "lastAction": null,
+          "lastActionAt": 0
+        },
+        {
+          "id": "ws-1782918152597-luml1m4etcp",
+          "name": "WsGateV010",
+          "role": "player",
+          "team": 1,
+          "index": 1,
+          "characterId": "6270753",
+          "position": {
+            "x": -3.200000047683716,
+            "y": 0.875,
+            "z": 8.640000343322754
+          },
+          "velocity": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "yaw": 0,
+          "lastAction": null,
+          "lastActionAt": 0
+        }
+      ],
+      "ball": {
+        "position": {
+          "x": 6.186004161834717,
+          "y": 0.47999998927116394,
+          "z": -3.8666067123413086
+        },
+        "velocity": {
+          "x": 0.019897302612662315,
+          "y": 2.2976708036193116e-10,
+          "z": -0.01243581809103489
+        }
+      },
+      "score": {
+        "blue": 0,
+        "orange": 0
+      },
+      "message": "WsGateV010 подключился к полю",
+      "countdown": 0,
+      "weather": {
+        "kind": "snow",
+        "label": "Снег, лужи и сугробы",
+        "intensity": 0.72,
+        "wind": {
+          "x": 0.16,
+          "y": 0,
+          "z": -0.1
+        },
+        "hazards": [
+          {
+            "id": "puddle-west-box",
+            "type": "puddle",
+            "position": {
+              "x": -6.4,
+              "y": 0.03,
+              "z": -7.2
+            },
+            "radius": 2.45,
+            "strength": 0.58
+          },
+          {
+            "id": "puddle-east-mid",
+            "type": "puddle",
+            "position": {
+              "x": 6.2,
+              "y": 0.03,
+              "z": 3.1
+            },
+            "radius": 2.1,
+            "strength": 0.52
+          },
+          {
+            "id": "slush-center-left",
+            "type": "slush",
+            "position": {
+              "x": -2.7,
+              "y": 0.04,
+              "z": 6.4
+            },
+            "radius": 2.8,
+            "strength": 0.38
+          },
+          {
+            "id": "slush-center-right",
+            "type": "slush",
+            "position": {
+              "x": 3.8,
+              "y": 0.04,
+              "z": -4.8
+            },
+            "radius": 2.6,
+            "strength": 0.34
+          },
+          {
+            "id": "snowbank-north",
+            "type": "snowbank",
+            "position": {
+              "x": -7.4,
+              "y": 0.28,
+              "z": 10.5
+            },
+            "radius": 1.25,
+            "strength": 0.92
+          },
+          {
+            "id": "snowbank-south",
+            "type": "snowbank",
+            "position": {
+              "x": 7.5,
+              "y": 0.28,
+              "z": -10.2
+            },
+            "radius": 1.3,
+            "strength": 0.92
+          }
+        ]
+      },
+      "audioEvents": [
+        {
+          "id": 14,
+          "serverTime": 1782918152598,
+          "tick": 20750,
+          "kind": "roster",
+          "change": "join",
+          "playerId": "ws-1782918152597-luml1m4etcp",
+          "role": "player"
+        }
+      ]
+    },
+    "events": [
+      {
+        "event": "open"
+      },
+      {
+        "event": "joined",
+        "data": {
+          "id": "ws-1782918152597-luml1m4etcp",
+          "role": "player",
+          "team": 1,
+          "index": 1,
+          "characterId": "6270753",
+          "version": "v0.0.010",
+          "maxActivePlayers": 4,
+          "maxRoomClients": 32
+        }
+      },
+      {
+        "event": "state",
+        "data": {
+          "version": "v0.0.010",
+          "serverTime": 1782918152645,
+          "tick": 20752,
+          "players": [
+            {
+              "id": "ws-1782918081997-iuxn6sz5oa",
+              "name": "codex-iab-final-17",
+              "role": "player",
+              "team": 0,
+              "index": 0,
+              "characterId": "6299851",
+              "position": {
+                "x": -3.200000047683716,
+                "y": 0.875,
+                "z": -8.640000343322754
+              },
+              "velocity": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "yaw": 0,
+              "lastAction": null,
+              "lastActionAt": 0
+            },
+            {
+              "id": "ws-1782918152597-luml1m4etcp",
+              "name": "WsGateV010",
+              "role": "player",
+              "team": 1,
+              "index": 1,
+              "characterId": "6270753",
+              "position": {
+                "x": -3.200000047683716,
+                "y": 0.875,
+                "z": 8.640000343322754
+              },
+              "velocity": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "yaw": 0,
+              "lastAction": null,
+              "lastActionAt": 0
+            }
+          ],
+          "ball": {
+            "position": {
+              "x": 6.186004161834717,
+              "y": 0.47999998927116394,
+              "z": -3.8666067123413086
+            },
+            "velocity": {
+              "x": 0.019897302612662315,
+              "y": 2.2976708036193116e-10,
+              "z": -0.01243581809103489
+            }
+          },
+          "score": {
+            "blue": 0,
+            "orange": 0
+          },
+          "message": "WsGateV010 подключился к полю",
+          "countdown": 0,
+          "weather": {
+            "kind": "snow",
+            "label": "Снег, лужи и сугробы",
+            "intensity": 0.72,
+            "wind": {
+              "x": 0.16,
+              "y": 0,
+              "z": -0.1
+            },
+            "hazards": [
+              {
+                "id": "puddle-west-box",
+                "type": "puddle",
+                "position": {
+                  "x": -6.4,
+                  "y": 0.03,
+                  "z": -7.2
+                },
+                "radius": 2.45,
+                "strength": 0.58
+              },
+              {
+                "id": "puddle-east-mid",
+                "type": "puddle",
+                "position": {
+                  "x": 6.2,
+                  "y": 0.03,
+                  "z": 3.1
+                },
+                "radius": 2.1,
+                "strength": 0.52
+              },
+              {
+                "id": "slush-center-left",
+                "type": "slush",
+                "position": {
+                  "x": -2.7,
+                  "y": 0.04,
+                  "z": 6.4
+                },
+                "radius": 2.8,
+                "strength": 0.38
+              },
+              {
+                "id": "slush-center-right",
+                "type": "slush",
+                "position": {
+                  "x": 3.8,
+                  "y": 0.04,
+                  "z": -4.8
+                },
+                "radius": 2.6,
+                "strength": 0.34
+              },
+              {
+                "id": "snowbank-north",
+                "type": "snowbank",
+                "position": {
+                  "x": -7.4,
+                  "y": 0.28,
+                  "z": 10.5
+                },
+                "radius": 1.25,
+                "strength": 0.92
+              },
+              {
+                "id": "snowbank-south",
+                "type": "snowbank",
+                "position": {
+                  "x": 7.5,
+                  "y": 0.28,
+                  "z": -10.2
+                },
+                "radius": 1.3,
+                "strength": 0.92
+              }
+            ]
+          },
+          "audioEvents": [
+            {
+              "id": 14,
+              "serverTime": 1782918152598,
+              "tick": 20750,
+              "kind": "roster",
+              "change": "join",
+              "playerId": "ws-1782918152597-luml1m4etcp",
+              "role": "player"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "httpFallback": {
+    "join": {
+      "url": "http://127.0.0.1:8793/api/join",
+      "status": 200,
+      "ok": true,
+      "elapsedMs": 5,
+      "json": {
+        "ok": true,
+        "joined": {
+          "id": "http-1782918152648-0519kzp9mvci",
+          "role": "player",
+          "team": 1,
+          "index": 1,
+          "characterId": "6270753",
+          "version": "v0.0.010",
+          "maxActivePlayers": 4,
+          "maxRoomClients": 32
+        },
+        "state": {
+          "version": "v0.0.010",
+          "serverTime": 1782918152649,
+          "tick": 20752,
+          "players": [
+            {
+              "id": "ws-1782918081997-iuxn6sz5oa",
+              "name": "codex-iab-final-17",
+              "role": "player",
+              "team": 0,
+              "index": 0,
+              "characterId": "6299851",
+              "position": {
+                "x": -3.200000047683716,
+                "y": 0.875,
+                "z": -8.640000343322754
+              },
+              "velocity": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "yaw": 0,
+              "lastAction": null,
+              "lastActionAt": 0
+            },
+            {
+              "id": "http-1782918152648-0519kzp9mvci",
+              "name": "HttpGateV010",
+              "role": "player",
+              "team": 1,
+              "index": 1,
+              "characterId": "6270753",
+              "position": {
+                "x": -3.200000047683716,
+                "y": 0.875,
+                "z": 8.640000343322754
+              },
+              "velocity": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "yaw": 0,
+              "lastAction": null,
+              "lastActionAt": 0
+            }
+          ],
+          "ball": {
+            "position": {
+              "x": 6.186004161834717,
+              "y": 0.47999998927116394,
+              "z": -3.8666067123413086
+            },
+            "velocity": {
+              "x": 0.019897302612662315,
+              "y": 2.2976708036193116e-10,
+              "z": -0.01243581809103489
+            }
+          },
+          "score": {
+            "blue": 0,
+            "orange": 0
+          },
+          "message": "HttpGateV010 подключился к полю",
+          "countdown": 0,
+          "weather": {
+            "kind": "snow",
+            "label": "Снег, лужи и сугробы",
+            "intensity": 0.72,
+            "wind": {
+              "x": 0.16,
+              "y": 0,
+              "z": -0.1
+            },
+            "hazards": [
+              {
+                "id": "puddle-west-box",
+                "type": "puddle",
+                "position": {
+                  "x": -6.4,
+                  "y": 0.03,
+                  "z": -7.2
+                },
+                "radius": 2.45,
+                "strength": 0.58
+              },
+              {
+                "id": "puddle-east-mid",
+                "type": "puddle",
+                "position": {
+                  "x": 6.2,
+                  "y": 0.03,
+                  "z": 3.1
+                },
+                "radius": 2.1,
+                "strength": 0.52
+              },
+              {
+                "id": "slush-center-left",
+                "type": "slush",
+                "position": {
+                  "x": -2.7,
+                  "y": 0.04,
+                  "z": 6.4
+                },
+                "radius": 2.8,
+                "strength": 0.38
+              },
+              {
+                "id": "slush-center-right",
+                "type": "slush",
+                "position": {
+                  "x": 3.8,
+                  "y": 0.04,
+                  "z": -4.8
+                },
+                "radius": 2.6,
+                "strength": 0.34
+              },
+              {
+                "id": "snowbank-north",
+                "type": "snowbank",
+                "position": {
+                  "x": -7.4,
+                  "y": 0.28,
+                  "z": 10.5
+                },
+                "radius": 1.25,
+                "strength": 0.92
+              },
+              {
+                "id": "snowbank-south",
+                "type": "snowbank",
+                "position": {
+                  "x": 7.5,
+                  "y": 0.28,
+                  "z": -10.2
+                },
+                "radius": 1.3,
+                "strength": 0.92
+              }
+            ]
+          },
+          "audioEvents": [
+            {
+              "id": 14,
+              "serverTime": 1782918152598,
+              "tick": 20750,
+              "kind": "roster",
+              "change": "join",
+              "playerId": "ws-1782918152597-luml1m4etcp",
+              "role": "player"
+            },
+            {
+              "id": 15,
+              "serverTime": 1782918152646,
+              "tick": 20752,
+              "kind": "roster",
+              "change": "leave",
+              "playerId": "ws-1782918152597-luml1m4etcp",
+              "role": "player"
+            },
+            {
+              "id": 16,
+              "serverTime": 1782918152648,
+              "tick": 20752,
+              "kind": "roster",
+              "change": "join",
+              "playerId": "http-1782918152648-0519kzp9mvci",
+              "role": "player"
+            }
+          ]
+        }
+      }
+    },
+    "state": {
+      "url": "http://127.0.0.1:8793/api/state?clientId=http-1782918152648-0519kzp9mvci",
+      "status": 200,
+      "ok": true,
+      "elapsedMs": 3,
+      "json": {
+        "ok": true,
+        "joined": {
+          "id": "http-1782918152648-0519kzp9mvci",
+          "role": "player",
+          "team": 1,
+          "index": 1,
+          "characterId": "6270753",
+          "version": "v0.0.010",
+          "maxActivePlayers": 4,
+          "maxRoomClients": 32
+        },
+        "state": {
+          "version": "v0.0.010",
+          "serverTime": 1782918152652,
+          "tick": 20752,
+          "players": [
+            {
+              "id": "ws-1782918081997-iuxn6sz5oa",
+              "name": "codex-iab-final-17",
+              "role": "player",
+              "team": 0,
+              "index": 0,
+              "characterId": "6299851",
+              "position": {
+                "x": -3.200000047683716,
+                "y": 0.875,
+                "z": -8.640000343322754
+              },
+              "velocity": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "yaw": 0,
+              "lastAction": null,
+              "lastActionAt": 0
+            },
+            {
+              "id": "http-1782918152648-0519kzp9mvci",
+              "name": "HttpGateV010",
+              "role": "player",
+              "team": 1,
+              "index": 1,
+              "characterId": "6270753",
+              "position": {
+                "x": -3.200000047683716,
+                "y": 0.875,
+                "z": 8.640000343322754
+              },
+              "velocity": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "yaw": 0,
+              "lastAction": null,
+              "lastActionAt": 0
+            }
+          ],
+          "ball": {
+            "position": {
+              "x": 6.186004161834717,
+              "y": 0.47999998927116394,
+              "z": -3.8666067123413086
+            },
+            "velocity": {
+              "x": 0.019897302612662315,
+              "y": 2.2976708036193116e-10,
+              "z": -0.01243581809103489
+            }
+          },
+          "score": {
+            "blue": 0,
+            "orange": 0
+          },
+          "message": "HttpGateV010 подключился к полю",
+          "countdown": 0,
+          "weather": {
+            "kind": "snow",
+            "label": "Снег, лужи и сугробы",
+            "intensity": 0.72,
+            "wind": {
+              "x": 0.16,
+              "y": 0,
+              "z": -0.1
+            },
+            "hazards": [
+              {
+                "id": "puddle-west-box",
+                "type": "puddle",
+                "position": {
+                  "x": -6.4,
+                  "y": 0.03,
+                  "z": -7.2
+                },
+                "radius": 2.45,
+                "strength": 0.58
+              },
+              {
+                "id": "puddle-east-mid",
+                "type": "puddle",
+                "position": {
+                  "x": 6.2,
+                  "y": 0.03,
+                  "z": 3.1
+                },
+                "radius": 2.1,
+                "strength": 0.52
+              },
+              {
+                "id": "slush-center-left",
+                "type": "slush",
+                "position": {
+                  "x": -2.7,
+                  "y": 0.04,
+                  "z": 6.4
+                },
+                "radius": 2.8,
+                "strength": 0.38
+              },
+              {
+                "id": "slush-center-right",
+                "type": "slush",
+                "position": {
+                  "x": 3.8,
+                  "y": 0.04,
+                  "z": -4.8
+                },
+                "radius": 2.6,
+                "strength": 0.34
+              },
+              {
+                "id": "snowbank-north",
+                "type": "snowbank",
+                "position": {
+                  "x": -7.4,
+                  "y": 0.28,
+                  "z": 10.5
+                },
+                "radius": 1.25,
+                "strength": 0.92
+              },
+              {
+                "id": "snowbank-south",
+                "type": "snowbank",
+                "position": {
+                  "x": 7.5,
+                  "y": 0.28,
+                  "z": -10.2
+                },
+                "radius": 1.3,
+                "strength": 0.92
+              }
+            ]
+          },
+          "audioEvents": [
+            {
+              "id": 14,
+              "serverTime": 1782918152598,
+              "tick": 20750,
+              "kind": "roster",
+              "change": "join",
+              "playerId": "ws-1782918152597-luml1m4etcp",
+              "role": "player"
+            },
+            {
+              "id": 15,
+              "serverTime": 1782918152646,
+              "tick": 20752,
+              "kind": "roster",
+              "change": "leave",
+              "playerId": "ws-1782918152597-luml1m4etcp",
+              "role": "player"
+            },
+            {
+              "id": 16,
+              "serverTime": 1782918152648,
+              "tick": 20752,
+              "kind": "roster",
+              "change": "join",
+              "playerId": "http-1782918152648-0519kzp9mvci",
+              "role": "player"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "summary": {
+    "healthVersion": "v0.0.010",
+    "healthTransports": {
+      "websocket": true,
+      "http": true
+    },
+    "wsOk": true,
+    "wsJoinVersion": "v0.0.010",
+    "wsStateVersion": "v0.0.010",
+    "wsAudioEventsIsArray": true,
+    "httpJoinVersion": "v0.0.010",
+    "httpStateVersion": "v0.0.010",
+    "httpAudioEventsIsArray": true
+  }
+}

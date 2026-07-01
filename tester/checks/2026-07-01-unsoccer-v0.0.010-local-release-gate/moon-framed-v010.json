@@ -1,0 +1,32 @@
+{
+  "checkedAt": "2026-07-01T15:20:10.458Z",
+  "target": "http://127.0.0.1:5181/",
+  "server": "http://127.0.0.1:8793",
+  "day": {
+    "badge": "v0.0.010 / 0.61 MB",
+    "dayCycleSeconds": "30.00",
+    "gameVersion": "v0.0.010",
+    "moonFramed": "false",
+    "moonVisible": "false",
+    "snapshotArt": null,
+    "sunFramed": "true",
+    "sunVisible": "true",
+    "title": "UnSoccer v0.0.010 | Ragdoll Soccer II",
+    "transport": "websocket",
+    "weight": "0.61 MB"
+  },
+  "night": {
+    "badge": "v0.0.010 / 0.61 MB",
+    "dayCycleSeconds": "90.00",
+    "gameVersion": "v0.0.010",
+    "moonFramed": "true",
+    "moonVisible": "true",
+    "snapshotArt": null,
+    "sunFramed": "false",
+    "sunVisible": "false",
+    "title": "UnSoccer v0.0.010 | Ragdoll Soccer II",
+    "transport": "websocket",
+    "weight": "0.61 MB"
+  },
+  "ok": true
+}

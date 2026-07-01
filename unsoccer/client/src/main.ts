@@ -138,7 +138,9 @@ declare global {
           pass: string;
           environment: string;
           sunVisible: boolean;
+          sunFramed: boolean;
           moonVisible: boolean;
+          moonFramed: boolean;
           rig: string;
         };
         ui: {
@@ -208,14 +210,14 @@ const graphicsStateEl = requireElement<HTMLElement>("#graphics-state");
 const networkStateEl = requireElement<HTMLElement>("#network-state");
 const testSoundButton = requireElement<HTMLButtonElement>("#test-sound-button");
 const versionBadge = requireElement<HTMLElement>("#version-badge");
-const ART_PASS_VERSION = "v0.0.009";
+const ART_PASS_VERSION = "v0.0.010";
 const BUILD_WEIGHT_LABEL = "0.61 MB";
 
 versionBadge.textContent = `${GAME_VERSION} / ${BUILD_WEIGHT_LABEL}`;
 document.documentElement.dataset.gameVersion = GAME_VERSION;
 document.documentElement.dataset.gameWeightLabel = BUILD_WEIGHT_LABEL;
 document.documentElement.dataset.artPass = ART_PASS_VERSION;
-document.documentElement.dataset.environment = "residential-courtyard-v009";
+document.documentElement.dataset.environment = "residential-courtyard-v010";
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -270,27 +272,32 @@ sun.shadow.camera.bottom = -28;
 scene.add(sun);
 const sunMesh = new THREE.Mesh(
   new THREE.SphereGeometry(1.25, 24, 16),
-  new THREE.MeshBasicMaterial({ color: 0xfff1d0 })
+  new THREE.MeshBasicMaterial({ color: 0xfff1d0, depthTest: false, depthWrite: false, toneMapped: false })
 );
-scene.add(sunMesh);
+sunMesh.renderOrder = 30;
 const sunGlowMaterial = new THREE.MeshBasicMaterial({
   color: 0xfff0b8,
   transparent: true,
   opacity: 0.46,
   blending: THREE.AdditiveBlending,
+  depthTest: false,
   depthWrite: false,
   toneMapped: false
 });
 const sunGlow = new THREE.Mesh(new THREE.SphereGeometry(2.85, 32, 16), sunGlowMaterial);
-scene.add(sunGlow);
+sunGlow.renderOrder = 29;
 const moonMaterial = new THREE.MeshBasicMaterial({
   color: 0xbfd6ff,
   transparent: true,
   opacity: 0.82,
+  depthTest: false,
+  depthWrite: false,
   toneMapped: false
 });
 const moonMesh = new THREE.Mesh(new THREE.SphereGeometry(0.82, 20, 12), moonMaterial);
-scene.add(moonMesh);
+moonMesh.renderOrder = 28;
+camera.add(sunGlow, sunMesh, moonMesh);
+scene.add(camera);
 const sunPathMaterial = new THREE.LineBasicMaterial({ color: 0xfff0b8, transparent: true, opacity: 0.26 });
 const sunPath = new THREE.LineLoop(
   new THREE.BufferGeometry().setFromPoints(
@@ -478,7 +485,9 @@ window.unsoccerDebug = {
       pass: ART_PASS_VERSION,
       environment: document.documentElement.dataset.environment || "",
       sunVisible: document.documentElement.dataset.sunVisible === "true",
+      sunFramed: document.documentElement.dataset.sunFramed === "true",
       moonVisible: document.documentElement.dataset.moonVisible === "true",
+      moonFramed: document.documentElement.dataset.moonFramed === "true",
       rig: document.documentElement.dataset.playerRig || ""
     },
     ui: {
@@ -658,7 +667,7 @@ function applySettingsToRuntime(): void {
   else if (!new URLSearchParams(location.search).has("qaTime")) setQaDayCycleSeconds(null);
   document.documentElement.dataset.settingsStorageKey = SETTINGS_STORAGE_KEY;
   document.documentElement.dataset.settingsOpen = String(settingsOpen);
-  document.documentElement.dataset.settingsTab = activeSettingsTab;
+  document.documentElement.dataset.settingsActiveTab = activeSettingsTab;
   document.documentElement.dataset.movementMode = settings.controls.movementMode;
   document.documentElement.dataset.invertForwardBack = String(settings.controls.invertForwardBack);
   document.documentElement.dataset.invertLeftRight = String(settings.controls.invertLeftRight);
@@ -686,7 +695,7 @@ function setSettingsOpen(open: boolean): void {
     pressedCodes.clear();
     updateResolvedInput();
     syncSettingsUi();
-    settingsPanel.querySelector<HTMLElement>("[data-settings-tab]")?.focus();
+    settingsPanel.querySelector<HTMLElement>("button[data-settings-tab]")?.focus();
   } else {
     pendingRebindAction = null;
     syncSettingsUi();
@@ -696,9 +705,9 @@ function setSettingsOpen(open: boolean): void {
 
 function setActiveSettingsTab(tab: SettingsTab): void {
   activeSettingsTab = tab;
-  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-settings-tab]")) button.setAttribute("aria-selected", String(button.dataset.settingsTab === tab));
+  for (const button of document.querySelectorAll<HTMLButtonElement>("button[data-settings-tab]")) button.setAttribute("aria-selected", String(button.dataset.settingsTab === tab));
   for (const panel of document.querySelectorAll<HTMLElement>("[data-settings-panel]")) panel.hidden = panel.dataset.settingsPanel !== tab;
-  document.documentElement.dataset.settingsTab = tab;
+  document.documentElement.dataset.settingsActiveTab = tab;
 }
 
 function bindAction(action: InputAction, code: string): void {
@@ -2108,14 +2117,12 @@ function updateLighting(elapsedSeconds: number) {
   const sunset = Math.max(0, 1 - Math.abs(Math.sin(angle)) * 3.2) * (1 - daylight * 0.45);
   sun.position.set(Math.cos(angle) * 24, Math.max(2.2, Math.sin(angle) * 24), Math.sin(angle + 0.55) * 18);
   sun.target.position.set(0, 0, 0);
-  sunMesh.position.copy(sun.position).multiplyScalar(1.7);
+  const screenSunX = Math.cos(angle) * 6.8;
+  const screenSunY = 3.15 + Math.max(0, Math.sin(angle)) * 1.65 + sunset * 0.55;
+  sunMesh.position.set(screenSunX, screenSunY, -24);
   sunGlow.position.copy(sunMesh.position);
   const moonAngle = angle + Math.PI;
-  moonMesh.position.set(
-    Math.cos(moonAngle) * 38,
-    Math.max(2.0, Math.sin(moonAngle) * 36),
-    Math.sin(moonAngle + 0.55) * 27
-  );
+  moonMesh.position.set(Math.cos(moonAngle) * 6.1, 2.55 + Math.max(0, Math.sin(moonAngle)) * 1.2, -25);
   sunColor.copy(dayColor).lerp(sunsetColor, sunset).lerp(nightColor, 1 - daylight);
   skyColor.copy(nightColor).lerp(dayColor, daylight).lerp(sunsetColor, sunset * 0.36);
   const snowIntensity = (renderedState ?? latestState)?.weather?.intensity ?? 0;
@@ -2158,6 +2165,8 @@ function updateLighting(elapsedSeconds: number) {
   document.documentElement.dataset.daylight = daylight.toFixed(3);
   document.documentElement.dataset.sunVisible = String(sunMesh.visible);
   document.documentElement.dataset.moonVisible = String(moonMesh.visible);
+  document.documentElement.dataset.sunFramed = String(sunMesh.visible);
+  document.documentElement.dataset.moonFramed = String(moonMesh.visible);
   document.documentElement.dataset.ambientFill = ambientFill.intensity.toFixed(3);
   document.documentElement.dataset.courtyardBounce = courtyardBounce.intensity.toFixed(3);
   document.documentElement.dataset.sunX = sun.position.x.toFixed(2);
@@ -2278,7 +2287,7 @@ testSoundButton.addEventListener("click", () => {
   audio.playConnection(true);
   syncAudioDebugDataset();
 });
-for (const button of document.querySelectorAll<HTMLButtonElement>("[data-settings-tab]")) {
+for (const button of document.querySelectorAll<HTMLButtonElement>("button[data-settings-tab]")) {
   button.addEventListener("click", () => {
     setActiveSettingsTab(button.dataset.settingsTab as SettingsTab);
     syncSettingsUi();

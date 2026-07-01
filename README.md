@@ -21,7 +21,7 @@ Orbital Courier is a tiny browser game built with Three.js for itch.io HTML5 upl
 
 ## unsoccer / Ragdoll Soccer II
 
-`unsoccer` is currently `v0.0.009` as a physical multiplayer soccer prototype:
+`unsoccer` is currently `v0.0.010` as a physical multiplayer soccer prototype:
 
 - MavonEngine-style client/server split with a headless authoritative server.
 - Three.js client rendering, Rapier3D server physics, WebSocket transport, and
@@ -52,7 +52,7 @@ and itch.io presentation guidance. The current source-of-truth brief is
 
 ## Version
 
-Current game release: `v0.0.009`.
+Current game release: `v0.0.010`.
 
 Game releases use `v0.0.001`-style semantic project versioning. The already
 published first build is treated as `v0.0.001`; this auto-start and input fix is
@@ -66,8 +66,11 @@ the deploy/version drift report. The `v0.0.008` release adds the always-visible
 client bundle weight badge and starts the residential courtyard art pass. The
 `v0.0.009` release adds the animated art/runtime pass, 120-second day cycle,
 visible sun/moon lighting, team-relative movement, responsive local prediction,
-and free movement beyond the pitch rectangle. The game renders the release
-version in the bottom-left corner.
+and free movement beyond the pitch rectangle. The `v0.0.010` release cuts the
+single 0010 main build, keeps the sun/moon marker framed in screenshots, and
+synchronizes package metadata, public page text, acceptance gates, deploy
+checks, and publication ledger references. The game renders the release version
+in the bottom-left corner.
 
 ## Local Run
 

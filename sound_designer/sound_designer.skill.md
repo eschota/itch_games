@@ -58,6 +58,9 @@ Use this file for work inside `/itch_games/sound_designer`.
 - `implementation/unsoccer-audio-pass-v0.0.008.md`: current UnSoccer
   server-authored audioEvents ring buffer, client event-id cursor, acceptance
   evidence, and remaining trusted-activation risk.
+- `checks/2026-07-01-unsoccer-v0.0.010-final-audio-gate.md`: final local
+  v0.0.010 audio gate evidence tied to deterministic acceptance and browser
+  smoke.
 
 ## Rules
 

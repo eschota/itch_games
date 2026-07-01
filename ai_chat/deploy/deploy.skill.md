@@ -61,15 +61,17 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
 - The qwertystock autodeploy must run `npm ci` with dev dependencies even when
   the service environment is production, delete generated UnSoccer dist folders
   before rebuilding, then verify `unsoccer/client/dist/index.html` against
-  `package.json.games.unsoccer.version`, the `0.61 MB` weight label, every
-  referenced asset path, at least one built JS asset, the
+  `package.json.games.unsoccer.version`, the `BUILD_WEIGHT_LABEL` from
+  `unsoccer/client/src/main.ts` (currently `0.61 MB`), every referenced asset
+  path, at least one built JS asset, the
   `residential-courtyard` client marker inside built assets, and that the server
   bundle does not import geckos.io, `ws`, or `node-datachannel` before nginx
   reload.
 - After nginx reload, the qwertystock autodeploy must smoke the public
   `/unsoccer/` route for the same version and weight markers plus
   `/unsoccer/api/health` for the matching server version. `/api/deploy-health`
-  must not report ready when source, dist HTML, and local API versions diverge.
+  must not report ready when source, dist HTML, weight label, and local API
+  versions diverge.
 - The webhook child process must not synchronously restart
   `itch-games-ai-chat.service` before it exits. Schedule a delayed chat restart
   after local health checks so the parent process can append deploy

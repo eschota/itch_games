@@ -1,0 +1,158 @@
+{
+  "ok": true,
+  "targetUrl": "http://127.0.0.1:5173/?name=UISmoke&qaTime=18",
+  "before": {
+    "title": "UnSoccer v0.0.009 | Ragdoll Soccer II",
+    "url": "http://127.0.0.1:5173/?name=UISmoke&qaTime=18",
+    "badge": "v0.0.009 / 0.61 MB",
+    "hasCanvas": true,
+    "canvasClient": {
+      "width": 1422,
+      "height": 804
+    },
+    "settingsButton": true,
+    "settingsHidden": true,
+    "dataset": {
+      "gameVersion": "v0.0.009",
+      "gameWeightLabel": "0.61 MB",
+      "settingsStorageKey": "unsoccer.settings.v1",
+      "settingsTab": "controls",
+      "movementMode": "screen",
+      "graphicsPreset": "balanced",
+      "audioMuted": "false",
+      "hudScale": "normal",
+      "artPass": "v0.0.009",
+      "environment": "residential-courtyard-v009",
+      "visibleSun": "true",
+      "transport": "websocket"
+    },
+    "uiDebug": {
+      "settingsOpen": false,
+      "activeTab": "controls",
+      "movementMode": "screen",
+      "graphicsPreset": "balanced",
+      "transport": "websocket",
+      "bindingConflicts": 0
+    }
+  },
+  "after": {
+    "settingsOpen": "true",
+    "settingsTab": "controls",
+    "panelHidden": false,
+    "dialogTitle": "Настройки",
+    "audioMasterExists": true,
+    "graphicsQualityExists": true,
+    "remapForwardText": "ВпередW",
+    "controlsSelected": "true",
+    "uiDebug": {
+      "settingsOpen": true,
+      "activeTab": "controls",
+      "movementMode": "screen",
+      "graphicsPreset": "balanced",
+      "transport": "websocket",
+      "bindingConflicts": 0
+    }
+  },
+  "logs": [
+    {
+      "method": "Runtime.consoleAPICalled",
+      "params": {
+        "type": "debug",
+        "args": [
+          {
+            "type": "string",
+            "value": "[vite] connecting..."
+          }
+        ],
+        "executionContextId": 2,
+        "timestamp": 1782915738149.564,
+        "stackTrace": {
+          "callFrames": [
+            {
+              "functionName": "",
+              "scriptId": "5",
+              "url": "http://127.0.0.1:5173/@vite/client",
+              "lineNumber": 788,
+              "columnNumber": 8
+            }
+          ]
+        }
+      }
+    },
+    {
+      "method": "Runtime.consoleAPICalled",
+      "params": {
+        "type": "debug",
+        "args": [
+          {
+            "type": "string",
+            "value": "[vite] connected."
+          }
+        ],
+        "executionContextId": 2,
+        "timestamp": 1782915738158.728,
+        "stackTrace": {
+          "callFrames": [
+            {
+              "functionName": "handleMessage",
+              "scriptId": "5",
+              "url": "http://127.0.0.1:5173/@vite/client",
+              "lineNumber": 911,
+              "columnNumber": 14
+            },
+            {
+              "functionName": "",
+              "scriptId": "5",
+              "url": "http://127.0.0.1:5173/@vite/client",
+              "lineNumber": 489,
+              "columnNumber": 42
+            },
+            {
+              "functionName": "dequeue",
+              "scriptId": "5",
+              "url": "http://127.0.0.1:5173/@vite/client",
+              "lineNumber": 515,
+              "columnNumber": 9
+            },
+            {
+              "functionName": "",
+              "scriptId": "5",
+              "url": "http://127.0.0.1:5173/@vite/client",
+              "lineNumber": 503,
+              "columnNumber": 11
+            },
+            {
+              "functionName": "enqueue",
+              "scriptId": "5",
+              "url": "http://127.0.0.1:5173/@vite/client",
+              "lineNumber": 497,
+              "columnNumber": 11
+            },
+            {
+              "functionName": "",
+              "scriptId": "5",
+              "url": "http://127.0.0.1:5173/@vite/client",
+              "lineNumber": 489,
+              "columnNumber": 28
+            },
+            {
+              "functionName": "onMessage",
+              "scriptId": "5",
+              "url": "http://127.0.0.1:5173/@vite/client",
+              "lineNumber": 308,
+              "columnNumber": 10
+            },
+            {
+              "functionName": "",
+              "scriptId": "5",
+              "url": "http://127.0.0.1:5173/@vite/client",
+              "lineNumber": 438,
+              "columnNumber": 8
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "screenshot": "R:\\itch_games\\ui_designer\\public_pages\\unsoccer-ui-runtime-smoke-v0.0.009.png"
+}

@@ -35,6 +35,11 @@ Use this root skill when changing, packaging, validating, or publishing the
     `ui_designer/public_pages/unsoccer-itch-page-copy.md`,
     `ui_designer/public_pages/unsoccer-itch-publishing-checklist.md`,
     `ui_designer/public_pages/unsoccer-itch-assets/`
+  - UnSoccer UI/settings runtime evidence:
+    `ui_designer/public_pages/unsoccer-ui-settings-redesign-v0.0.008.md`,
+    `ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.json`,
+    `ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.png`,
+    `ui_designer/public_pages/unsoccer-ui-final-local-gate-v0.0.010-rerun.json`
 - Art Director: `art_director_skill.md`,
   `art_director/art_director.skill.md`
   - UnSoccer HDR/day-cycle/camera target:
@@ -59,6 +64,8 @@ Use this root skill when changing, packaging, validating, or publishing the
     `sound_designer/implementation/unsoccer-audio-pass-v0.0.003.md`
   - UnSoccer audio v0.0.008 evidence:
     `sound_designer/implementation/unsoccer-audio-pass-v0.0.008.md`
+  - UnSoccer audio v0.0.010 final local gate:
+    `sound_designer/checks/2026-07-01-unsoccer-v0.0.010-final-audio-gate.md`
 - AI chat service: `ai_chat_skill.md`, `ai_chat/ai_chat.skill.md`
   - Deploy references: `ai_chat/deploy/deploy.skill.md`
     - UnSoccer production service:
@@ -79,6 +86,12 @@ Use this root skill when changing, packaging, validating, or publishing the
   canonical displayed game release.
 - Multi-game metadata lives in `package.json.games`; each new game starts at
   `v0.0.001` and tracks its own displayed version.
+- `tools/unsoccer_acceptance.mjs` reads the expected UnSoccer version from
+  `package.json.games.unsoccer.version`; do not reintroduce hard-coded release
+  strings in the acceptance gate.
+- `npm run package:unsoccer` must rebuild UnSoccer before writing
+  `dist/unsoccer-itch.zip` so stale `unsoccer/*/dist` output cannot be
+  published.
 - Do not commit generated files under `dist/`.
 - Test through a local static server before upload.
 - Public game pages, game clients, and game assets must be a static-file bundle
@@ -198,8 +211,8 @@ Use this root skill when changing, packaging, validating, or publishing the
 
 ## Current Behavior
 
-- Current game release: `v0.0.009`.
-- `unsoccer` current prototype release: `v0.0.009`.
+- Current game release: `v0.0.010`.
+- `unsoccer` current prototype release: `v0.0.010`.
 - `unsoccer` uses a headless authoritative Node server with Rapier3D physics,
   plain WebSocket transport, and HTTP polling fallback; the itch package is
   static client-only and needs the live game server for multiplayer.
@@ -237,6 +250,21 @@ Use this root skill when changing, packaging, validating, or publishing the
 - `unsoccer` v0.0.009 fixes team-relative WASD movement, renders the local
   controlled player without the remote interpolation delay, and removes the
   artificial pitch-rectangle clamp from player movement.
+- `unsoccer` v0.0.009 also ships the UI Designer runtime pass: redesigned HUD
+  hierarchy, event/status panels, bottom toolbar, settings modal tabs,
+  localStorage-backed controls/audio/graphics/network/accessibility settings,
+  remappable input via `client/src/settings.ts` and `client/src/input-map.ts`,
+  and QA-readable UI datasets/debug state. Runtime smoke evidence lives under
+  `ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.*`.
+- `unsoccer` v0.0.010 is the unified 0010 release build: it keeps the v0.0.009
+  art/UI/input/audioEvents runtime work, frames the visible sun/moon marker for
+  screenshots, bumps every current version surface to `v0.0.010`, and treats
+  the prepared itch/publication ledger as repo-side evidence rather than
+  external itch.io publication proof. Local UI/Tester/Art/Sound gates passed
+  before publication, with final UI evidence under
+  `ui_designer/public_pages/unsoccer-ui-final-local-gate-v0.0.010-rerun.*` and
+  Tester evidence under
+  `tester/checks/2026-07-01-unsoccer-v0.0.010-local-release-gate/`.
 - `v0.0.006` adds procedural Web Audio feedback and exposes
   `window.orbitalCourierAudio` plus `orbital-courier:audio-event` so future
   network code can replicate semantic sound events instead of audio files.

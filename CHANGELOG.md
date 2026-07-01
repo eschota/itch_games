@@ -1,5 +1,32 @@
 # Changelog
 
+## unsoccer v0.0.010
+
+- Cut the 0010 release line as the single main build after the v0.0.009
+  workstreams: Art Director courtyard/rig/day-cycle runtime, UI Designer
+  HUD/settings runtime, Programmer input responsiveness, and server-authored
+  audioEvents.
+- Keep the sun/moon marker camera-framed in the 3D renderer so the visible sun
+  is present in screenshots, not only in lighting datasets.
+- Synchronize root/workspace package metadata, shared `GAME_VERSION`, client
+  badge/meta, public page text, and deterministic acceptance expectations on
+  `v0.0.010`.
+- Keep the client weight marker at `0.61 MB` for deploy-health checks and
+  package validation.
+- Make `package:unsoccer` rebuild before writing the itch zip, and make
+  acceptance derive the expected game version from `package.json` so stale
+  `dist` output cannot silently pass as a release.
+- Update deploy-health/autodeploy checks to read the expected weight from the
+  client source instead of a hard-coded old label.
+- Fix the settings tab QA selector collision by keeping the active-tab debug
+  state on `data-settings-active-tab` while controls use
+  `button[data-settings-tab]`.
+- Add repo-side Ragdoll Soccer II itch/publication copy, checklist, storefront
+  assets, and ledger references as prepared publication material while external
+  itch.io URL proof remains separate.
+- Ignore generated browser profile folders under tester/art evidence to keep
+  release staging focused on source, docs, and intentional QA artifacts.
+
 ## unsoccer v0.0.009
 
 - Fix team-relative WASD movement so forward moves toward the opponent goal

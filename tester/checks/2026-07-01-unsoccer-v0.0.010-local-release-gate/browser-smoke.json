@@ -1,0 +1,318 @@
+{
+  "checkedAt": "2026-07-01T15:00:10.092Z",
+  "baseUrl": "http://127.0.0.1:5181/",
+  "apiUrl": "http://127.0.0.1:8793/api/health",
+  "results": [
+    {
+      "label": "desktop-1440x900",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "ok": true,
+      "game": {
+        "title": "UnSoccer v0.0.010 | Ragdoll Soccer II",
+        "badge": "v0.0.010 / 0.61 MB",
+        "transport": "websocket",
+        "gameVersion": "v0.0.010",
+        "gameWeightLabel": "0.61 MB",
+        "artPass": "v0.0.010",
+        "environment": "residential-courtyard-v010",
+        "sunVisible": "true",
+        "sunFramed": "true",
+        "moonVisible": "false",
+        "dayCycleSeconds": "30.00",
+        "dayCycleLengthSeconds": "120",
+        "daylight": "0.994",
+        "animatedPlayers": 2,
+        "playerRig": "procedural-animated-footballer",
+        "interpolationBuffer": 12,
+        "localPredictionMs": 0,
+        "debugVersion": "v0.0.010",
+        "debugConnected": true,
+        "debugArt": {
+          "pass": "v0.0.010",
+          "environment": "residential-courtyard-v010",
+          "sunVisible": true,
+          "moonVisible": false,
+          "rig": "procedural-animated-footballer"
+        },
+        "settingsActiveTab": "controls",
+        "legacySettingsTabAttr": null,
+        "canvas": {
+          "width": 1440,
+          "height": 900,
+          "clientWidth": 1440,
+          "clientHeight": 900
+        },
+        "documentOverflowX": 0,
+        "bodyOverflowX": 0,
+        "pixel": {
+          "ok": true,
+          "sampled": 1296000,
+          "nonDark": 1288657,
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "settings": {
+        "hidden": false,
+        "panel": {
+          "left": 0,
+          "top": 0,
+          "right": 1440,
+          "bottom": 900,
+          "width": 1440,
+          "height": 900
+        },
+        "shell": {
+          "left": 230,
+          "top": 104.828125,
+          "right": 1210,
+          "bottom": 795.171875,
+          "width": 980,
+          "height": 690.34375
+        },
+        "body": {
+          "left": 231,
+          "top": 232.578125,
+          "right": 1209,
+          "bottom": 728.171875,
+          "width": 978,
+          "height": 495.59375
+        },
+        "footer": {
+          "left": 231,
+          "top": 728.171875,
+          "right": 1209,
+          "bottom": 794.171875,
+          "width": 978,
+          "height": 66
+        },
+        "tabs": [
+          {
+            "text": "Контроль",
+            "left": 243,
+            "top": 183.578125,
+            "right": 429,
+            "bottom": 221.578125,
+            "width": 186,
+            "height": 38,
+            "selected": true
+          },
+          {
+            "text": "Звук",
+            "left": 435,
+            "top": 183.578125,
+            "right": 621,
+            "bottom": 221.578125,
+            "width": 186,
+            "height": 38,
+            "selected": false
+          },
+          {
+            "text": "Графика",
+            "left": 627,
+            "top": 183.578125,
+            "right": 813,
+            "bottom": 221.578125,
+            "width": 186,
+            "height": 38,
+            "selected": false
+          },
+          {
+            "text": "Сеть",
+            "left": 819,
+            "top": 183.578125,
+            "right": 1005,
+            "bottom": 221.578125,
+            "width": 186,
+            "height": 38,
+            "selected": false
+          },
+          {
+            "text": "Доступ",
+            "left": 1011,
+            "top": 183.578125,
+            "right": 1197,
+            "bottom": 221.578125,
+            "width": 186,
+            "height": 38,
+            "selected": false
+          }
+        ],
+        "offenderCount": 0,
+        "offenders": [],
+        "documentOverflowX": 0,
+        "bodyOverflowX": 0,
+        "footerVisible": true,
+        "selectedTabs": 1,
+        "bindingConflicts": "0",
+        "activeTab": "controls",
+        "legacySettingsTabAttr": null
+      },
+      "failed": [],
+      "logs": [],
+      "screenshots": {
+        "game": "R:\\itch_games\\tester\\checks\\2026-07-01-unsoccer-v0.0.010-local-release-gate\\desktop-1440x900-game.png",
+        "settings": "R:\\itch_games\\tester\\checks\\2026-07-01-unsoccer-v0.0.010-local-release-gate\\desktop-1440x900-settings.png"
+      }
+    },
+    {
+      "label": "mobile-390x844",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "ok": true,
+      "game": {
+        "title": "UnSoccer v0.0.010 | Ragdoll Soccer II",
+        "badge": "v0.0.010 / 0.61 MB",
+        "transport": "websocket",
+        "gameVersion": "v0.0.010",
+        "gameWeightLabel": "0.61 MB",
+        "artPass": "v0.0.010",
+        "environment": "residential-courtyard-v010",
+        "sunVisible": "true",
+        "sunFramed": "true",
+        "moonVisible": "false",
+        "dayCycleSeconds": "30.00",
+        "dayCycleLengthSeconds": "120",
+        "daylight": "0.994",
+        "animatedPlayers": 2,
+        "playerRig": "procedural-animated-footballer",
+        "interpolationBuffer": 12,
+        "localPredictionMs": 0,
+        "debugVersion": "v0.0.010",
+        "debugConnected": true,
+        "debugArt": {
+          "pass": "v0.0.010",
+          "environment": "residential-courtyard-v010",
+          "sunVisible": true,
+          "moonVisible": false,
+          "rig": "procedural-animated-footballer"
+        },
+        "settingsActiveTab": "controls",
+        "legacySettingsTabAttr": null,
+        "canvas": {
+          "width": 390,
+          "height": 844,
+          "clientWidth": 390,
+          "clientHeight": 844
+        },
+        "documentOverflowX": 0,
+        "bodyOverflowX": 0,
+        "pixel": {
+          "ok": true,
+          "sampled": 329160,
+          "nonDark": 329125,
+          "width": 390,
+          "height": 844
+        }
+      },
+      "settings": {
+        "hidden": false,
+        "panel": {
+          "left": 0,
+          "top": 0,
+          "right": 390,
+          "bottom": 844,
+          "width": 390,
+          "height": 844
+        },
+        "shell": {
+          "left": 18,
+          "top": 42,
+          "right": 372,
+          "bottom": 802,
+          "width": 354,
+          "height": 760
+        },
+        "body": {
+          "left": 19,
+          "top": 257.75,
+          "right": 371,
+          "bottom": 735,
+          "width": 352,
+          "height": 477.25
+        },
+        "footer": {
+          "left": 19,
+          "top": 735,
+          "right": 371,
+          "bottom": 801,
+          "width": 352,
+          "height": 66
+        },
+        "tabs": [
+          {
+            "text": "Контроль",
+            "left": 31,
+            "top": 120.75,
+            "right": 192,
+            "bottom": 158.75,
+            "width": 161,
+            "height": 38,
+            "selected": true
+          },
+          {
+            "text": "Звук",
+            "left": 198,
+            "top": 120.75,
+            "right": 359,
+            "bottom": 158.75,
+            "width": 161,
+            "height": 38,
+            "selected": false
+          },
+          {
+            "text": "Графика",
+            "left": 31,
+            "top": 164.75,
+            "right": 192,
+            "bottom": 202.75,
+            "width": 161,
+            "height": 38,
+            "selected": false
+          },
+          {
+            "text": "Сеть",
+            "left": 198,
+            "top": 164.75,
+            "right": 359,
+            "bottom": 202.75,
+            "width": 161,
+            "height": 38,
+            "selected": false
+          },
+          {
+            "text": "Доступ",
+            "left": 31,
+            "top": 208.75,
+            "right": 192,
+            "bottom": 246.75,
+            "width": 161,
+            "height": 38,
+            "selected": false
+          }
+        ],
+        "offenderCount": 0,
+        "offenders": [],
+        "documentOverflowX": 0,
+        "bodyOverflowX": 0,
+        "footerVisible": true,
+        "selectedTabs": 1,
+        "bindingConflicts": "0",
+        "activeTab": "controls",
+        "legacySettingsTabAttr": null
+      },
+      "failed": [],
+      "logs": [],
+      "screenshots": {
+        "game": "R:\\itch_games\\tester\\checks\\2026-07-01-unsoccer-v0.0.010-local-release-gate\\mobile-390x844-game.png",
+        "settings": "R:\\itch_games\\tester\\checks\\2026-07-01-unsoccer-v0.0.010-local-release-gate\\mobile-390x844-settings.png"
+      }
+    }
+  ],
+  "ok": true
+}

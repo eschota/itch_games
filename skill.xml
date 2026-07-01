@@ -18,6 +18,10 @@
     <child path="ui_designer/public_pages/unsoccer-itch-page-copy.md" role="unsoccer-itch-copy" />
     <child path="ui_designer/public_pages/unsoccer-itch-publishing-checklist.md" role="unsoccer-itch-publish-checklist" />
     <child path="ui_designer/public_pages/unsoccer-itch-assets" role="unsoccer-itch-storefront-assets" />
+    <child path="ui_designer/public_pages/unsoccer-ui-settings-redesign-v0.0.008.md" role="unsoccer-ui-settings-brief-implemented-v0.0.009" />
+    <child path="ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.json" role="unsoccer-ui-v0.0.009-runtime-smoke-json" />
+    <child path="ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.png" role="unsoccer-ui-v0.0.009-runtime-smoke-screenshot" />
+    <child path="ui_designer/public_pages/unsoccer-ui-final-local-gate-v0.0.010-rerun.json" role="unsoccer-ui-v0.0.010-final-local-gate-json" />
     <child path="game_designer_skill.md" role="game-designer-root" />
     <child path="game_designer/game_designer.skill.md" role="game-designer-workspace" />
     <child path="game_designer/briefs/unsoccer-v0.0.009-core-loop.md" role="unsoccer-v0.0.009-core-loop-brief" />
@@ -26,12 +30,15 @@
     <child path="programmer/checks/2026-07-01-unsoccer-v0.0.003-acceptance.md" role="unsoccer-v0.0.003-acceptance-evidence" />
     <child path="tester_skill.md" role="tester-root" />
     <child path="tester/tester.skill.md" role="tester-workspace" />
+    <child path="tester/checks/2026-07-01-unsoccer-v0.0.010-local-release-gate/browser-retry-v010.json" role="unsoccer-tester-v0.0.010-final-local-gate" />
     <child path="sound_designer_skill.md" role="sound-designer-root" />
     <child path="sound_designer/sound_designer.skill.md" role="sound-designer-workspace" />
     <child path="sound_designer/implementation/audio-pass-v0.0.006.md" role="sound-v0.0.006-evidence" />
     <child path="sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md" role="unsoccer-audio-v0.0.002-evidence" />
     <child path="sound_designer/implementation/unsoccer-audio-pass-v0.0.003.md" role="unsoccer-audio-v0.0.003-evidence" />
     <child path="sound_designer/implementation/unsoccer-audio-pass-v0.0.008.md" role="unsoccer-audio-v0.0.008-evidence" />
+    <child path="sound_designer/checks/2026-07-01-unsoccer-v0.0.010-final-audio-gate.md" role="unsoccer-audio-v0.0.010-final-local-gate" />
+    <child path="art_director/checks/2026-07-01-unsoccer-v0.0.010-final-local-art-gate-retry.md" role="unsoccer-art-v0.0.010-final-local-gate" />
     <child path="ai_chat_skill.md" role="ai-chat-root" />
     <child path="ai_chat/ai_chat.skill.md" role="ai-chat-workspace" />
     <child path="ai_chat/deploy/deploy.skill.md" role="ai-chat-deploy-folder-skill" />
@@ -47,7 +54,13 @@
     <child path="unsoccer/skill.xml" role="unsoccer-folder-map" />
     <child path="unsoccer/index.html" role="unsoccer-public-page" />
     <child path="unsoccer/client" role="unsoccer-client" />
+    <child path="unsoccer/client/index.html" role="unsoccer-client-entry-hud-settings" />
+    <child path="unsoccer/client/src/main.ts" role="unsoccer-three-runtime-hud-settings-input-network" />
+    <child path="unsoccer/client/src/styles.css" role="unsoccer-hud-settings-responsive-css" />
+    <child path="unsoccer/client/src/settings.ts" role="unsoccer-ui-settings-persistence" />
+    <child path="unsoccer/client/src/input-map.ts" role="unsoccer-input-remap-resolution" />
     <child path="unsoccer/client/src/audio.ts" role="unsoccer-procedural-audio-runtime" />
+    <child path="unsoccer/client/src/weather.ts" role="unsoccer-weather-graphics-options" />
     <child path="unsoccer/server" role="unsoccer-authoritative-server" />
     <child path="unsoccer/shared" role="unsoccer-shared-protocol" />
     <child path="unsoccer/assets" role="unsoccer-assets-provenance" />
@@ -114,6 +127,7 @@
         <node path="sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md" role="unsoccer-audio-pass-evidence" />
         <node path="sound_designer/implementation/unsoccer-audio-pass-v0.0.003.md" role="unsoccer-audio-unlock-sync-evidence" />
         <node path="sound_designer/implementation/unsoccer-audio-pass-v0.0.008.md" role="unsoccer-audio-server-events-evidence" />
+        <node path="sound_designer/checks/2026-07-01-unsoccer-v0.0.010-final-audio-gate.md" role="unsoccer-audio-final-local-gate" />
       </node>
     </node>
   </hierarchy>
@@ -212,6 +226,7 @@
       <artifact path="sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md" role="unsoccer-audio-pass-evidence" />
       <artifact path="sound_designer/implementation/unsoccer-audio-pass-v0.0.003.md" role="unsoccer-audio-unlock-sync-evidence" />
       <artifact path="sound_designer/implementation/unsoccer-audio-pass-v0.0.008.md" role="unsoccer-audio-server-events-evidence" />
+      <artifact path="sound_designer/checks/2026-07-01-unsoccer-v0.0.010-final-audio-gate.md" role="unsoccer-audio-final-local-gate" />
     </workspace>
     <workspace name="ai_chat" rootSkill="ai_chat_skill.md" directorySkill="ai_chat/ai_chat.skill.md">
       <rule>Use ai_chat/ for the shared development-agent chat service code, static UI, deployment references, and server-only message storage.</rule>
@@ -225,11 +240,12 @@
     <rule>Generated package output belongs under dist/ and is not committed.</rule>
     <rule>Packaging fails if internal skill, role, agent coordination, deploy, or source-control docs leak into the public zip.</rule>
   </tooling>
-  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.009">
+  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.010">
     <client path="unsoccer/client" package="dist/unsoccer-itch.zip" productionPath="/unsoccer/" productionStatic="unsoccer/client/dist" />
     <server path="unsoccer/server" port="8787" health="/api/health" transport="plain-websocket-json" fallback="http-polling" productionApiPath="/unsoccer/api/" productionSocketPath="/unsoccer/socket/" />
     <shared path="unsoccer/shared" />
     <audio path="unsoccer/client/src/audio.ts" evidence="sound_designer/implementation/unsoccer-audio-pass-v0.0.008.md" mode="procedural-web-audio server-authored-events" />
+    <ui path="unsoccer/client/src/main.ts" settings="unsoccer/client/src/settings.ts" inputMap="unsoccer/client/src/input-map.ts" styles="unsoccer/client/src/styles.css" evidence="ui_designer/public_pages/unsoccer-ui-final-local-gate-v0.0.010-rerun.json" mode="hud-settings-remap-runtime" />
     <assetRules path="unsoccer/assets/licenses/free3d-provenance.json">
       <rule>Free3D downloads require FREE3D_API_TOKEN and exact format/lod/relativePath tuples.</rule>
       <rule>Runtime assets must be local optimized GLB files with provenance before shipping.</rule>
@@ -241,6 +257,10 @@
     <rule>v0.0.008 server audioEvents synchronize roster, kick/body, goal, and countdown cues across WebSocket and HTTP fallback clients by authoritative event id.</rule>
     <rule>v0.0.009 ships the Art Director runtime 3D/animation pass: expanded courtyard models, animated procedural footballer rigs, visible sun/moon/orbit marker, and 120-second lighting datasets.</rule>
     <rule>v0.0.009 fixes team-relative WASD movement, immediate local controlled-player rendering, and removes artificial pitch bounds from player movement.</rule>
+    <rule>v0.0.009 ships the UI Designer runtime pass: redesigned HUD, event/status/network panels, toolbar, settings modal tabs, localStorage settings, remappable input, audio/graphics/network/accessibility controls, and QA-readable UI datasets.</rule>
+    <rule>v0.0.010 is the unified 0010 release build with all current runtime workstreams, a camera-framed sun/moon marker, synchronized version surfaces, and repo-side publication evidence.</rule>
+    <rule>tools/unsoccer_acceptance.mjs derives the expected version from package.json.games.unsoccer.version and checks HTTP fallback join/input/state.</rule>
+    <rule>npm run package:unsoccer rebuilds before writing dist/unsoccer-itch.zip so stale dist output cannot become the release package.</rule>
   </game>
   <publicSurfaces owner="UI Designer">
     <surface path="index.html" url="https://io-games.mecharulez.com/" role="local-public-catalog" />
@@ -259,12 +279,16 @@
     <surface path="ui_designer/public_pages/unsoccer-itch-page-copy.md" role="unsoccer-itch-page-copy" />
     <surface path="ui_designer/public_pages/unsoccer-itch-publishing-checklist.md" role="unsoccer-itch-publish-checklist" />
     <surface path="ui_designer/public_pages/unsoccer-itch-assets" role="unsoccer-itch-storefront-assets" />
+    <surface path="ui_designer/public_pages/unsoccer-ui-settings-redesign-v0.0.008.md" role="unsoccer-ui-settings-design-and-implementation-status" />
+    <surface path="ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.json" role="unsoccer-ui-runtime-smoke-evidence" />
+    <surface path="ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.png" role="unsoccer-ui-runtime-smoke-screenshot" />
+    <surface path="ui_designer/public_pages/unsoccer-ui-final-local-gate-v0.0.010-rerun.json" role="unsoccer-ui-v0.0.010-final-local-gate" />
     <rule>Itch upload packages must exclude internal skill, role, agent coordination, server, and source-control docs.</rule>
     <rule>Public game pages, clients, screenshots, and assets are static bundles served directly by nginx from each game public directory; do not add app-server routes for static games or assets unless the Producer explicitly asks for dynamic behavior.</rule>
     <rule>Orbital Courier itch upload must include vendored Three.js and must not require cdn.jsdelivr.net at runtime.</rule>
     <rule>External itch.io pages remain incomplete until the public URL, uploaded zip, exact live copy, screenshots, publication date, and version match are recorded under ui_designer/public_pages/.</rule>
   </publicSurfaces>
-  <versioning initial="v0.0.001" current="v0.0.009">
+  <versioning initial="v0.0.001" current="v0.0.010">
     <rule>Every created game starts at v0.0.001.</rule>
     <rule>Every shipped bump increments the version.</rule>
     <rule>The current version is visible in the bottom-left corner.</rule>

@@ -15,6 +15,7 @@ integration in this game.
 - [sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md](sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md)
 - [sound_designer/implementation/unsoccer-audio-pass-v0.0.003.md](sound_designer/implementation/unsoccer-audio-pass-v0.0.003.md)
 - [sound_designer/implementation/unsoccer-audio-pass-v0.0.008.md](sound_designer/implementation/unsoccer-audio-pass-v0.0.008.md)
+- [sound_designer/checks/2026-07-01-unsoccer-v0.0.010-final-audio-gate.md](sound_designer/checks/2026-07-01-unsoccer-v0.0.010-final-audio-gate.md)
 
 ## Core Mandate
 

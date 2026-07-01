@@ -36,6 +36,15 @@ Use this file for work inside `/itch_games`.
   `ui_designer/public_pages/unsoccer-itch-publishing-checklist.md`, and
   `ui_designer/public_pages/unsoccer-itch-assets/`: Ragdoll Soccer II external
   itch.io page source and storefront/public-page assets.
+- `ui_designer/public_pages/unsoccer-ui-settings-redesign-v0.0.008.md`:
+  original UI/settings brief, now recording the v0.0.009 runtime implementation
+  status.
+- `ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.json` and
+  `ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.png`: headless
+  Chrome UI runtime evidence for the v0.0.009 HUD/settings pass.
+- `ui_designer/public_pages/unsoccer-ui-final-local-gate-v0.0.010-rerun.json`
+  and matching PNGs: final local UI Designer gate evidence for the v0.0.010
+  release build.
 - `ui_designer/public_pages/public_pages.skill.md`: folder skill for public
   page briefs and itch.io presentation source-of-truth.
 - `orbital-courier/index.html`: current Orbital Courier game entrypoint.
@@ -50,8 +59,14 @@ Use this file for work inside `/itch_games`.
 - `unsoccer/client/`: Vite TypeScript browser client.
 - `unsoccer/client/src/main.ts`: Three.js scene, gameplay HUD, player action
   telegraphs, QA datasets, input, camera, and network state application.
+- `unsoccer/client/src/settings.ts`: UI/settings defaults, validation, local
+  persistence, reset, and binding-conflict helpers.
+- `unsoccer/client/src/input-map.ts`: key/mouse binding resolution, movement
+  orientation/inversion, and `InputState` mapping.
 - `unsoccer/client/src/audio.ts`: procedural Web Audio runtime for UnSoccer
   server-state-driven cues.
+- `unsoccer/client/src/weather.ts`: weather visuals with runtime graphics/UI
+  options for particles and reduced opacity.
 - `unsoccer/server/`: authoritative Node/Rapier/WebSocket server.
 - `unsoccer/shared/`: shared protocol, constants, and gameplay tuning.
 - `unsoccer/assets/`: local runtime assets plus Free3D roster/provenance files.
@@ -86,6 +101,9 @@ Use this file for work inside `/itch_games`.
 - `sound_designer/implementation/unsoccer-audio-pass-v0.0.008.md`: UnSoccer
   server-authored audioEvents ring buffer, client event cursor, and acceptance
   evidence.
+- `sound_designer/checks/2026-07-01-unsoccer-v0.0.010-final-audio-gate.md`:
+  final local v0.0.010 audio gate tied to deterministic acceptance and browser
+  smoke.
 - `ai_chat/`: service code, static UI, deployment references, and server-only
   message storage for the shared development-agent chat.
 - `ai_chat/deploy/deploy.skill.md`: deployment reference rules for nginx,
@@ -158,8 +176,8 @@ Use this file for work inside `/itch_games`.
 
 ## Versioning
 
-- Current release: `v0.0.009`.
-- `unsoccer` release: `v0.0.009`.
+- Current release: `v0.0.010`.
+- `unsoccer` release: `v0.0.010`.
 - Game releases start at `v0.0.001` and every behavior change increments the
   version.
 - The visible bottom-left badge, `package.json.gameVersion`, README, and skill
@@ -185,9 +203,10 @@ Use this file for work inside `/itch_games`.
 8. Confirm the itch package excludes internal `*skill*.md`, `skill.xml`, role,
    and agent coordination files.
 9. For `unsoccer`, run `npm run build:unsoccer`,
-   `npm run test:unsoccer:acceptance`, start
+   `npm run test:unsoccer:acceptance`, `npm run package:unsoccer`, start
    `npm run server:unsoccer`, confirm `/api/health`, and open 4 clients with
-   unique `name` query strings.
+   unique `name` query strings. `package:unsoccer` rebuilds first by contract
+   and must not package stale client/server/shared dist output.
 10. For UnSoccer audio, confirm `npm run test:unsoccer:acceptance` reports
   `websocket no-join has no phantom roster audio`, `websocket join audioEvents`,
   `server audioEvents roster`, and `server audioEvents kicks/body/goal/countdown`.
@@ -196,5 +215,11 @@ Use this file for work inside `/itch_games`.
     `data-audio-played-events` increase; also inspect
     `data-audio-server-event-id` and `data-audio-server-primed`.
     Automation-only clicks may leave Chromium `AudioContext` suspended.
-12. Confirm `/unsoccer/` never exposes a directory listing on local or
+12. For UnSoccer UI/settings, confirm the v0.0.010 client shows
+    `v0.0.010 / 0.61 MB`, opens `#settings-panel`, exposes settings/audio/
+    graphics/remapping controls, and records a nonblank runtime screenshot plus
+    JSON evidence under `ui_designer/public_pages/`; current final local
+    evidence is
+    `ui_designer/public_pages/unsoccer-ui-final-local-gate-v0.0.010-rerun.json`.
+13. Confirm `/unsoccer/` never exposes a directory listing on local or
     production static hosts.

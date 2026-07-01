@@ -17,7 +17,9 @@ Use this brief when designing or reviewing any public page tied to `unsoccer`.
 - Visual signal: green pitch, blue/orange teams, ball, and contact energy.
 - Primary status: playable client requires a separately deployed multiplayer
   server; never hide that constraint on public pages.
-- Version: show `v0.0.002` where it helps QA and public support.
+- Version: local source/build target is `v0.0.010`; external public/itch copy
+  must wait until route, package, API/server health, screenshots, and ledger
+  evidence all match that same version.
 - Tone: prototype-forward, clear, and not apologetic.
 
 ## Itch.io Page Copy Source
@@ -32,7 +34,9 @@ Long description:
 `Ragdoll Soccer II is an HTML5 multiplayer soccer prototype built around
 authoritative physics, four active players, spectator slots, team goals, and a
 static browser client. The itch.io build contains the client; live multiplayer
-requires the deployed game server.`
+requires the deployed game server. The v0.0.010 runtime includes the denser match HUD,
+settings tabs, remappable controls, audio/graphics/network options, and
+QA-readable UI state.`
 
 Suggested tags:
 `soccer`, `football`, `multiplayer`, `physics`, `html5`, `browser`, `prototype`
@@ -41,6 +45,8 @@ Suggested tags:
 
 - Catalog and `/unsoccer/` use the same pitch green, blue team, orange team,
   off-white field lines, and warm orange accent.
+- The in-game UI and public page both expose the same target version and do not
+  contradict the itch publication ledger.
 - The page must not expose repository directories, source files, or skill docs.
 - The prototype status is visible before a player expects a live match.
 - Text remains inside buttons and panels at mobile widths.

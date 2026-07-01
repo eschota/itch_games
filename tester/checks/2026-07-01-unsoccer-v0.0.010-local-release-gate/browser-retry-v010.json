@@ -1,0 +1,378 @@
+{
+  "checkedAt": "2026-07-01T15:08:27.830Z",
+  "targetBase": "http://127.0.0.1:5181/",
+  "server": "http://127.0.0.1:8793",
+  "results": [
+    {
+      "label": "desktop-1440x900",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "mobile": false,
+      "url": "http://127.0.0.1:5181/?server=http%3A%2F%2F127.0.0.1%3A8793&qaTime=30&name=DesktopRetryV010",
+      "httpStatus": 200,
+      "ok": true,
+      "finalDom": {
+        "title": "UnSoccer v0.0.010 | Ragdoll Soccer II",
+        "url": "http://127.0.0.1:5181/?server=http%3A%2F%2F127.0.0.1%3A8793&qaTime=30&name=DesktopRetryV010",
+        "badge": "v0.0.010 / 0.61 MB",
+        "hasSettingsButton": true,
+        "settingsOpen": "false",
+        "canvasCount": 1,
+        "canvasClient": {
+          "width": 1440,
+          "height": 900
+        },
+        "bodyHas010": true,
+        "bodyHas009": false,
+        "documentOverflowX": 0,
+        "bodyOverflowX": 0,
+        "dataset": {
+          "gameVersion": "v0.0.010",
+          "gameWeightLabel": "0.61 MB",
+          "transport": "websocket",
+          "artPass": "v0.0.010",
+          "environment": "residential-courtyard-v010",
+          "environmentModels": "apartments,cars,trees,benches,playground,kiosk,clotheslines,pavement",
+          "playerRig": "procedural-animated-footballer",
+          "animatedPlayers": "4",
+          "sunVisible": "true",
+          "sunFramed": "true",
+          "moonVisible": "false",
+          "dayCycleSeconds": "30.00",
+          "dayCycleLengthSeconds": "120",
+          "daylight": "0.994",
+          "settingsStorageKey": "unsoccer.settings.v1",
+          "movementMode": "screen",
+          "graphicsPreset": "balanced",
+          "bindingConflicts": "0",
+          "audioSupported": "true",
+          "audioUnlocked": "true",
+          "audioContext": "running",
+          "audioPlayedEvents": "3",
+          "audioBlockedEvents": "5",
+          "audioServerEventId": "28",
+          "audioServerPrimed": "true"
+        }
+      },
+      "settings": {
+        "tabs": {
+          "controls": {
+            "selected": "true",
+            "hidden": false,
+            "textLength": 343
+          },
+          "audio": {
+            "selected": "true",
+            "hidden": false,
+            "textLength": 113
+          },
+          "graphics": {
+            "selected": "true",
+            "hidden": false,
+            "textLength": 223
+          },
+          "network": {
+            "selected": "true",
+            "hidden": false,
+            "textLength": 63
+          },
+          "accessibility": {
+            "selected": "true",
+            "hidden": false,
+            "textLength": 60
+          }
+        },
+        "tabsOk": true,
+        "layout": {
+          "hidden": false,
+          "panel": {
+            "left": 0,
+            "top": 0,
+            "right": 1440,
+            "bottom": 900,
+            "width": 1440,
+            "height": 900
+          },
+          "shell": {
+            "left": 230,
+            "top": 282.625,
+            "right": 1210,
+            "bottom": 617.375,
+            "width": 980,
+            "height": 334.75
+          },
+          "footer": {
+            "left": 231,
+            "top": 550.375,
+            "right": 1209,
+            "bottom": 616.375,
+            "width": 978,
+            "height": 66
+          },
+          "offenderCount": 0,
+          "offenders": [],
+          "documentOverflowX": 0,
+          "bodyOverflowX": 0,
+          "bindingConflicts": "0"
+        },
+        "screenshot": "R:\\itch_games\\tester\\checks\\2026-07-01-unsoccer-v0.0.010-local-release-gate\\retry-desktop-1440x900-settings.png"
+      },
+      "snapshots": {
+        "game": {
+          "connected": true,
+          "localJoin": {
+            "id": "ws-1782918495061-129r628morb8",
+            "role": "player",
+            "team": 0,
+            "index": 2,
+            "characterId": "6298507",
+            "version": "v0.0.010",
+            "maxActivePlayers": 4,
+            "maxRoomClients": 32
+          },
+          "art": {
+            "pass": "v0.0.010",
+            "environment": "residential-courtyard-v010",
+            "sunVisible": true,
+            "moonVisible": false,
+            "rig": "procedural-animated-footballer"
+          },
+          "ui": {
+            "settingsOpen": false,
+            "activeTab": "controls",
+            "movementMode": "screen",
+            "graphicsPreset": "balanced",
+            "transport": "websocket",
+            "bindingConflicts": 0
+          },
+          "serverAudio": {
+            "lastEventId": 28,
+            "primed": true
+          },
+          "audio": {
+            "supported": true,
+            "unlocked": false,
+            "contextState": "missing",
+            "ambienceReady": false,
+            "rollGain": 0,
+            "crowdGain": 0,
+            "weatherGain": 0,
+            "playedEvents": 0,
+            "blockedEvents": 5,
+            "lastEvent": null,
+            "lastBlockedEvent": "roster"
+          },
+          "interpolation": {
+            "bufferedStates": 12,
+            "delayMs": 100,
+            "alpha": 0.666,
+            "renderAgeMs": 100,
+            "localPredictionMs": 0
+          }
+        },
+        "movement": {
+          "dx": 0,
+          "dz": 3.2966690063476562,
+          "distance": 3.2966690063476562,
+          "role": "player"
+        }
+      },
+      "logs": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "badResponses": [],
+      "screenshots": {
+        "game": "R:\\itch_games\\tester\\checks\\2026-07-01-unsoccer-v0.0.010-local-release-gate\\retry-desktop-1440x900-game.png",
+        "settings": "R:\\itch_games\\tester\\checks\\2026-07-01-unsoccer-v0.0.010-local-release-gate\\retry-desktop-1440x900-settings.png"
+      }
+    },
+    {
+      "label": "mobile-390x844",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "mobile": true,
+      "url": "http://127.0.0.1:5181/?server=http%3A%2F%2F127.0.0.1%3A8793&qaTime=30&name=MobileRetryV010",
+      "httpStatus": 200,
+      "ok": true,
+      "finalDom": {
+        "title": "UnSoccer v0.0.010 | Ragdoll Soccer II",
+        "url": "http://127.0.0.1:5181/?server=http%3A%2F%2F127.0.0.1%3A8793&qaTime=30&name=MobileRetryV010",
+        "badge": "v0.0.010 / 0.61 MB",
+        "hasSettingsButton": true,
+        "settingsOpen": "false",
+        "canvasCount": 1,
+        "canvasClient": {
+          "width": 390,
+          "height": 844
+        },
+        "bodyHas010": true,
+        "bodyHas009": false,
+        "documentOverflowX": 0,
+        "bodyOverflowX": 0,
+        "dataset": {
+          "gameVersion": "v0.0.010",
+          "gameWeightLabel": "0.61 MB",
+          "transport": "websocket",
+          "artPass": "v0.0.010",
+          "environment": "residential-courtyard-v010",
+          "environmentModels": "apartments,cars,trees,benches,playground,kiosk,clotheslines,pavement",
+          "playerRig": "procedural-animated-footballer",
+          "animatedPlayers": "4",
+          "sunVisible": "true",
+          "sunFramed": "true",
+          "moonVisible": "false",
+          "dayCycleSeconds": "30.00",
+          "dayCycleLengthSeconds": "120",
+          "daylight": "0.994",
+          "settingsStorageKey": "unsoccer.settings.v1",
+          "movementMode": "screen",
+          "graphicsPreset": "balanced",
+          "bindingConflicts": "0",
+          "audioSupported": "true",
+          "audioUnlocked": "true",
+          "audioContext": "running",
+          "audioPlayedEvents": "3",
+          "audioBlockedEvents": "3",
+          "audioServerEventId": "31",
+          "audioServerPrimed": "true"
+        }
+      },
+      "settings": {
+        "tabs": {
+          "controls": {
+            "selected": "true",
+            "hidden": false,
+            "textLength": 343
+          },
+          "audio": {
+            "selected": "true",
+            "hidden": false,
+            "textLength": 113
+          },
+          "graphics": {
+            "selected": "true",
+            "hidden": false,
+            "textLength": 223
+          },
+          "network": {
+            "selected": "true",
+            "hidden": false,
+            "textLength": 64
+          },
+          "accessibility": {
+            "selected": "true",
+            "hidden": false,
+            "textLength": 60
+          }
+        },
+        "tabsOk": true,
+        "layout": {
+          "hidden": false,
+          "panel": {
+            "left": 0,
+            "top": 0,
+            "right": 390,
+            "bottom": 844,
+            "width": 390,
+            "height": 844
+          },
+          "shell": {
+            "left": 18,
+            "top": 170.625,
+            "right": 372,
+            "bottom": 673.375,
+            "width": 354,
+            "height": 502.75
+          },
+          "footer": {
+            "left": 19,
+            "top": 606.375,
+            "right": 371,
+            "bottom": 672.375,
+            "width": 352,
+            "height": 66
+          },
+          "offenderCount": 0,
+          "offenders": [],
+          "documentOverflowX": 0,
+          "bodyOverflowX": 0,
+          "bindingConflicts": "0"
+        },
+        "screenshot": "R:\\itch_games\\tester\\checks\\2026-07-01-unsoccer-v0.0.010-local-release-gate\\retry-mobile-390x844-settings.png"
+      },
+      "snapshots": {
+        "game": {
+          "connected": true,
+          "localJoin": {
+            "id": "ws-1782918501852-nb29peovuch",
+            "role": "player",
+            "team": 1,
+            "index": 3,
+            "characterId": "6300462",
+            "version": "v0.0.010",
+            "maxActivePlayers": 4,
+            "maxRoomClients": 32
+          },
+          "art": {
+            "pass": "v0.0.010",
+            "environment": "residential-courtyard-v010",
+            "sunVisible": true,
+            "moonVisible": false,
+            "rig": "procedural-animated-footballer"
+          },
+          "ui": {
+            "settingsOpen": false,
+            "activeTab": "controls",
+            "movementMode": "screen",
+            "graphicsPreset": "balanced",
+            "transport": "websocket",
+            "bindingConflicts": 0
+          },
+          "serverAudio": {
+            "lastEventId": 31,
+            "primed": true
+          },
+          "audio": {
+            "supported": true,
+            "unlocked": false,
+            "contextState": "missing",
+            "ambienceReady": false,
+            "rollGain": 0,
+            "crowdGain": 0,
+            "weatherGain": 0,
+            "playedEvents": 0,
+            "blockedEvents": 3,
+            "lastEvent": null,
+            "lastBlockedEvent": "roster"
+          },
+          "interpolation": {
+            "bufferedStates": 12,
+            "delayMs": 100,
+            "alpha": 0.152,
+            "renderAgeMs": 100,
+            "localPredictionMs": 0
+          }
+        },
+        "movement": {
+          "dx": 0,
+          "dz": -3.5833358764648438,
+          "distance": 3.5833358764648438,
+          "role": "player"
+        }
+      },
+      "logs": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "badResponses": [],
+      "screenshots": {
+        "game": "R:\\itch_games\\tester\\checks\\2026-07-01-unsoccer-v0.0.010-local-release-gate\\retry-mobile-390x844-game.png",
+        "settings": "R:\\itch_games\\tester\\checks\\2026-07-01-unsoccer-v0.0.010-local-release-gate\\retry-mobile-390x844-settings.png"
+      }
+    }
+  ],
+  "ok": true
+}

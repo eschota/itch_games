@@ -29,6 +29,17 @@ Use this file for UI Designer work inside
   background, screenshots, and asset manifest for Orbital Courier.
 - `unsoccer-public-pages.md`: Ragdoll Soccer II local route, catalog card,
   multiplayer status, and itch.io page brief.
+- `unsoccer-ui-settings-redesign-v0.0.008.md`: original UnSoccer UI/settings
+  redesign brief; current status records the runtime implementation in
+  `v0.0.009`.
+- `unsoccer-ui-runtime-smoke-v0.0.009.json` and
+  `unsoccer-ui-runtime-smoke-v0.0.009.png`: headless Chrome evidence for the
+  v0.0.009 in-game HUD/settings UI.
+- `unsoccer-ui-final-local-gate-v0.0.010-rerun.json` and matching viewport
+  PNGs: final local UI Designer v0.0.010 gate evidence for desktop, mobile, and
+  minimum widths.
+- `unsoccer-ui-release-gate-v0.0.010.md`: v0.0.010 UI release-gate report and
+  publication follow-up notes.
 
 ## Rules
 

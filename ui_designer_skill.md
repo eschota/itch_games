@@ -16,6 +16,13 @@ this browser game.
 - [index.html](index.html)
 - [orbital-courier/index.html](orbital-courier/index.html)
 - [ui_designer/public_pages/orbital-courier-public-pages.md](ui_designer/public_pages/orbital-courier-public-pages.md)
+- [unsoccer/index.html](unsoccer/index.html)
+- [unsoccer/client/index.html](unsoccer/client/index.html)
+- [unsoccer/client/src/styles.css](unsoccer/client/src/styles.css)
+- [ui_designer/public_pages/unsoccer-public-pages.md](ui_designer/public_pages/unsoccer-public-pages.md)
+- [ui_designer/public_pages/unsoccer-ui-settings-redesign-v0.0.008.md](ui_designer/public_pages/unsoccer-ui-settings-redesign-v0.0.008.md)
+- [ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.json](ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.json)
+- [ui_designer/public_pages/unsoccer-ui-final-local-gate-v0.0.010-rerun.json](ui_designer/public_pages/unsoccer-ui-final-local-gate-v0.0.010-rerun.json)
 
 ## Core Mandate
 

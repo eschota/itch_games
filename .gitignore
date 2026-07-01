@@ -11,3 +11,6 @@ Thumbs.db
 ai_chat/data/
 __pycache__/
 *.pyc
+tester/checks/**/chrome-profile*/
+tester/checks/**/chrome-user-data*/
+art_director/checks/**/chrome-*profile*/

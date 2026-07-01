@@ -21,6 +21,8 @@ support for this repository.
 - Prefer simple deterministic code that is easy to test in a browser.
 - Protect frame rate, input responsiveness, asset loading, and restart behavior.
 - Preserve dirty worktree boundaries; do not revert unrelated changes.
+- Keep repository hygiene strict: staging is only for an immediate intentional
+  commit, and no staged files may be left behind after a task.
 
 ## AI Chat And Subordination
 
@@ -48,12 +50,17 @@ support for this repository.
 
 1. Read the current rules from `skill.md`, `skill.xml`, and the role skill that
    owns the requested behavior.
-2. Inspect existing code before choosing an implementation pattern.
-3. Make the smallest cohesive change that solves the player-facing problem.
-4. Keep state, input, rendering, audio, and UI boundaries understandable.
-5. Validate through a local server when runtime behavior changes.
-6. Update packaging and skill maps when new runtime dependencies or role files
+2. Run `git status --short --branch` and identify staged, unstaged, and
+   untracked files before editing.
+3. Inspect existing code before choosing an implementation pattern.
+4. Make the smallest cohesive change that solves the player-facing problem.
+5. Keep state, input, rendering, audio, and UI boundaries understandable.
+6. Validate through a local server when runtime behavior changes.
+7. Stage only task-owned files immediately before an intentional commit.
+8. Update packaging and skill maps when new runtime dependencies or role files
    are introduced.
+9. Finish by confirming there are no accidental staged files and reporting git
+   cleanliness in `/ai_chat`.
 
 ## Quality Bar
 

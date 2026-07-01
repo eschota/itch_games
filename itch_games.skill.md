@@ -66,6 +66,19 @@ Use this file for work inside `/itch_games`.
   Designer are second-level creative leads; all other roles have voice and
   warning rights.
 
+## Repository Hygiene
+
+- Start and finish with `git status --short --branch`.
+- Leave no staged files after a task unless the next immediate action is the
+  intended commit.
+- Stage only task-owned source/rule files. Never stage generated packages,
+  caches, logs, temp files, local data, secrets, service env files, `dist/`,
+  `ai_chat/data/`, `__pycache__/`, or `*.pyc`.
+- If staging contains accidental files, unstage them without reverting file
+  content.
+- Preserve unrelated user or agent changes; report them instead of cleaning
+  them by force.
+
 ## Versioning
 
 - Current release: `v0.0.005`.

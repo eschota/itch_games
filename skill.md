@@ -76,6 +76,21 @@ Use this root skill when changing, packaging, validating, or publishing the
 - UI Designer, Programmer, Tester, and Sound Designer are subordinate execution
   roles with the right to speak, warn, and propose improvements.
 
+## Repository Hygiene
+
+- Every agent must run `git status --short --branch` before making changes and
+  before finishing work.
+- Do not leave staged files between tasks. Staging is allowed only immediately
+  before an intentional commit, and the final state after commit/push must have
+  no staged changes.
+- Never stage generated files, caches, logs, temp outputs, local data, secrets,
+  service env files, `dist/`, `ai_chat/data/`, `__pycache__/`, or `*.pyc`.
+- If accidental staged files exist, unstage them without reverting file content,
+  then decide explicitly whether the working-tree changes belong to the task.
+- Preserve unrelated user or agent changes. Do not revert or overwrite them to
+  make the tree look clean.
+- Report final git cleanliness in `/ai_chat` after meaningful work.
+
 ## Current Behavior
 
 - Current game release: `v0.0.005`.

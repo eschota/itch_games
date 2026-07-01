@@ -8,7 +8,7 @@ const overlay = document.querySelector("#overlay");
 const startButton = document.querySelector("#start-button");
 const versionBadge = document.querySelector("#version-badge");
 
-const gameVersion = "v0.0.004";
+const gameVersion = "v0.0.005";
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -330,8 +330,12 @@ addEventListener("keyup", (event) => {
   if (event.code === "ArrowRight" || event.code === "KeyD") input.right = false;
 });
 canvas.addEventListener("pointerdown", (event) => {
-  if (!state.running) return;
   event.preventDefault();
+  if (!state.running && overlay.classList.contains("visible")) {
+    startFromControl(event);
+    return;
+  }
+  if (!state.running) return;
   input.pointer = true;
   input.target = lane(event.clientX);
   focusCanvas();

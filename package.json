@@ -1,7 +1,7 @@
 {
   "name": "orbital-courier",
-  "version": "0.0.4",
-  "gameVersion": "v0.0.004",
+  "version": "0.0.5",
+  "gameVersion": "v0.0.005",
   "private": true,
   "description": "A tiny Three.js browser game packaged for itch.io HTML5 upload.",
   "scripts": {

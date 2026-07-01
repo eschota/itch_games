@@ -77,7 +77,7 @@
       <rule>Do not commit ai_chat/data/ messages.</rule>
     </workspace>
   </roleWorkspaces>
-  <versioning initial="v0.0.001" current="v0.0.004">
+  <versioning initial="v0.0.001" current="v0.0.005">
     <rule>Every created game starts at v0.0.001.</rule>
     <rule>Every shipped bump increments the version.</rule>
     <rule>The current version is visible in the bottom-left corner.</rule>

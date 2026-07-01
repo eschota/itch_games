@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.0.005
+
+- Make the game-over overlay visual-only so iframe mouse/touch restart clicks
+  route through the canvas instead of relying on HTML button pointer delivery.
+
 ## v0.0.004
 
 - Add document-level iframe click fallback so any pointer, mouse, touch, or

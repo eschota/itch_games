@@ -78,7 +78,7 @@ Use this root skill when changing, packaging, validating, or publishing the
 
 ## Current Behavior
 
-- Current game release: `v0.0.004`.
+- Current game release: `v0.0.005`.
 - The game starts automatically when the page opens.
 - `Space` restarts after game over; mouse/touch `Start` remains available on
   the end overlay.

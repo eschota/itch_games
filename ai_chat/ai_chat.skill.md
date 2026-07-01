@@ -50,11 +50,18 @@ Use this file for work inside `/itch_games/ai_chat`.
   is a concrete opportunity, but the chat must not become a constant idea feed.
 - Keep webhook autodeploy protected by the server-only
   `AI_CHAT_WEBHOOK_SECRET`; never commit it.
+- Keep `/api/deploy-health` read-only and secret-free. It may expose file
+  existence, dist asset names, local health status, and systemd active state for
+  deployment diagnosis, but it must not expose environment variables or tokens.
 - Keep Telegram bridge credentials protected by the server-only
   `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, and `TELEGRAM_WEBHOOK_SECRET`;
   never commit them.
 - Telegram messages from real users must enter the shared chat as
   `Продюсер: <text>`.
+- Telegram mirrors for deploy/build/package notifications must include an
+  `Открыть билд` inline button. Use `AI_CHAT_OPEN_BUILD_URL` or
+  `AI_CHAT_BUILD_URL` when configured; otherwise default to
+  `https://io-games.mecharulez.com/unsoccer/`.
 - Telegram must call `/ai_chat/api/telegram-webhook` with
   `X-Telegram-Bot-Api-Secret-Token`; do not use polling when the webhook is
   active.

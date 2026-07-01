@@ -63,16 +63,23 @@ communication.
 - Data storage lives in `ai_chat/data/messages.jsonl`,
   `ai_chat/data/tasks.json`, and `ai_chat/data/tasks.jsonl` on the server and
   is ignored by git.
-- Service code uses Python standard library only to avoid server dependency
-  drift.
+- Service code uses Node.js standard library only on the qwertystock target to
+  avoid runtime dependency drift.
 - Autodeploy uses a GitHub push webhook at
   `/ai_chat/api/deploy-webhook`, protected by `X-Hub-Signature-256` HMAC.
+- Deployment diagnosis uses `/ai_chat/api/deploy-health`, a read-only,
+  secret-free endpoint that reports UnSoccer dist files, hashed assets, local
+  server health, and systemd active state when SSH is unavailable.
 - The old timer-based autodeploy must stay disabled once webhook deployment is
   installed.
 - Telegram bridge uses a Telegram webhook at `/ai_chat/api/telegram-webhook`,
   accepts messages only from the configured group, stores real-user messages as
   `Продюсер`, and mirrors agent chat messages back to Telegram under their role
   names.
+- Telegram mirrors for deploy/build/package notifications include an
+  `Открыть билд` inline button. The URL comes from `AI_CHAT_OPEN_BUILD_URL` or
+  `AI_CHAT_BUILD_URL`, falling back to
+  `https://io-games.mecharulez.com/unsoccer/`.
 - Telegram bot token and target chat id are stored only on the server in
   `/etc/itch-games-ai-chat.env`; never commit them.
 
@@ -112,4 +119,5 @@ communication.
 - Telegram bridge config and secret token are stored only on the server in
   `/etc/itch-games-ai-chat.env`, then registered with Telegram `setWebhook`.
 - Validate with `/ai_chat/api/health`, `/ai_chat/api/messages`, and a browser
-  smoke of the chat UI.
+  smoke of the chat UI. Use `/ai_chat/api/deploy-health` when validating
+  UnSoccer production route, build, and server readiness.

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Orbital Courier AI Chat</title>
-    <link rel="stylesheet" href="static/styles.css">
+    <link rel="stylesheet" href="styles.css">
   </head>
   <body>
     <main class="shell">
@@ -39,7 +39,11 @@
           </datalist>
           <label class="message-field">
             <span>Message</span>
-            <textarea id="messageInput" name="message" maxlength="4000" required></textarea>
+            <textarea id="messageInput" name="message" maxlength="4000"></textarea>
+          </label>
+          <label class="media-field">
+            <span>Media</span>
+            <input id="mediaInput" name="files" type="file" multiple>
           </label>
           <button type="submit">Send</button>
         </form>
@@ -125,6 +129,6 @@
         </section>
       </aside>
     </main>
-    <script src="static/app.js"></script>
+    <script src="app.js"></script>
   </body>
 </html>

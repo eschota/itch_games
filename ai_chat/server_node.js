@@ -15,10 +15,14 @@ const DATA_DIR = process.env.AI_CHAT_DATA_DIR || path.join(__dirname, "data");
 const MESSAGES_FILE = path.join(DATA_DIR, "messages.jsonl");
 const TASKS_FILE = path.join(DATA_DIR, "tasks.json");
 const TASK_EVENTS_FILE = path.join(DATA_DIR, "tasks.jsonl");
+const MEDIA_DIR = path.join(DATA_DIR, "media");
 const TELEGRAM_SEEN_FILE = path.join(DATA_DIR, "telegram_seen_updates.txt");
 const MAX_MESSAGE_CHARS = 4000;
 const MAX_ROLE_CHARS = 80;
 const MAX_TASK_TEXT_CHARS = 2000;
+const MAX_MEDIA_FILE_BYTES = 25 * 1024 * 1024;
+const MAX_MEDIA_UPLOAD_BYTES = 80 * 1024 * 1024;
+const MAX_MEDIA_ATTACHMENTS = 8;
 let deployRunning = false;
 let unsoccerChild = null;
 let shuttingDown = false;
@@ -33,7 +37,7 @@ const TASK_ROLES = [
   "Sound Designer",
 ];
 const ROLE_BADGES = [
-  { label: "Producer", icon: "👑", match: ["producer", "продюсер", "рџс"] },
+  { label: "Producer", icon: "👑", match: ["producer", "продюсер"] },
   { label: "Orchestrator", icon: "🧭", match: ["orchestrator"] },
   { label: "Art", icon: "🎨", match: ["art director"] },
   { label: "Game", icon: "🎲", match: ["game designer"] },
@@ -118,9 +122,21 @@ const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".gif": "image/gif",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".mp3": "audio/mpeg",
+  ".mp4": "video/mp4",
+  ".mov": "video/quicktime",
+  ".ogg": "audio/ogg",
+  ".pdf": "application/pdf",
   ".png": "image/png",
   ".svg": "image/svg+xml; charset=utf-8",
   ".txt": "text/plain; charset=utf-8",
+  ".webm": "video/webm",
+  ".webp": "image/webp",
+  ".wav": "audio/wav",
+  ".zip": "application/zip",
 };
 
 function nowIso() {
@@ -129,6 +145,11 @@ function nowIso() {
 
 function ensureDataDir() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+function ensureMediaDir() {
+  ensureDataDir();
+  fs.mkdirSync(MEDIA_DIR, { recursive: true });
 }
 
 function jsonResponse(res, status, payload) {
@@ -157,6 +178,173 @@ function roleBadge(role) {
   if (badge) return { icon: badge.icon, label: badge.label, text: `${badge.icon} ${badge.label}` };
   const fallback = clean.split(/[/:|-]/)[0].trim().split(/\s+/).slice(0, 2).join(" ") || "Agent";
   return { icon: "🤖", label: fallback.slice(0, 18), text: `🤖 ${fallback.slice(0, 18)}` };
+}
+
+function sanitizeFileName(value, fallback) {
+  const name = String(value || fallback || "file")
+    .normalize("NFKD")
+    .replace(/[^\w.\-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "")
+    .slice(0, 90);
+  return name || fallback || "file";
+}
+
+function extensionFromMime(mimeType) {
+  const mime = String(mimeType || "").toLowerCase().split(";")[0].trim();
+  const map = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+    "video/mp4": ".mp4",
+    "video/quicktime": ".mov",
+    "video/webm": ".webm",
+    "audio/mpeg": ".mp3",
+    "audio/ogg": ".ogg",
+    "audio/wav": ".wav",
+    "application/pdf": ".pdf",
+    "application/zip": ".zip",
+    "text/plain": ".txt",
+  };
+  return map[mime] || "";
+}
+
+function safeMediaType(fileName, mimeType) {
+  const mime = String(mimeType || "").toLowerCase().split(";")[0].trim();
+  const ext = path.extname(String(fileName || "")).toLowerCase();
+  const allowedByExt = {
+    ".gif": "image/gif",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".mp3": "audio/mpeg",
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".ogg": "audio/ogg",
+    ".pdf": "application/pdf",
+    ".png": "image/png",
+    ".txt": "text/plain",
+    ".wav": "audio/wav",
+    ".webm": "video/webm",
+    ".webp": "image/webp",
+    ".zip": "application/zip",
+  };
+  const allowedMimes = new Set(Object.values(allowedByExt));
+  const safeMime = allowedMimes.has(mime) ? mime : (allowedByExt[ext] || "application/octet-stream");
+  const safeExt = allowedByExt[ext] === safeMime ? ext : (extensionFromMime(safeMime) || ".bin");
+  return { mimeType: safeMime, extension: safeExt };
+}
+
+function mediaKind(mimeType, fileName) {
+  const mime = String(mimeType || "").toLowerCase();
+  const ext = path.extname(String(fileName || "")).toLowerCase();
+  if (mime.startsWith("image/") || [".png", ".jpg", ".jpeg", ".gif", ".webp"].includes(ext)) return "image";
+  if (mime.startsWith("video/") || [".mp4", ".webm", ".mov"].includes(ext)) return "video";
+  if (mime.startsWith("audio/") || [".mp3", ".wav", ".ogg"].includes(ext)) return "audio";
+  return "file";
+}
+
+function publicBaseUrl(req) {
+  const configured = String(process.env.AI_CHAT_PUBLIC_URL || "").replace(/\/+$/, "").replace(/\/ai_chat$/i, "");
+  if (configured) return configured;
+  const host = req.headers["x-forwarded-host"] || req.headers.host || "127.0.0.1";
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  let proto = forwardedProto || (req.socket.encrypted ? "https" : "http");
+  if (!forwardedProto && !/^(localhost|127(?:\.\d{1,3}){3}|\[?::1\]?)(:\d+)?$/i.test(String(host))) proto = "https";
+  return `${proto}://${host}`;
+}
+
+function mediaUrl(req, relativePath) {
+  return `${publicBaseUrl(req)}/ai_chat/media/${relativePath.split(path.sep).join("/")}`;
+}
+
+function datedMediaDir() {
+  const now = new Date();
+  const parts = [
+    String(now.getUTCFullYear()),
+    String(now.getUTCMonth() + 1).padStart(2, "0"),
+    String(now.getUTCDate()).padStart(2, "0"),
+  ];
+  return path.join(...parts);
+}
+
+function attachmentFromStoredFile(req, options) {
+  const relativePath = options.relativePath.split(path.sep).join("/");
+  const mimeType = String(options.mimeType || MIME_TYPES[path.extname(options.fileName).toLowerCase()] || "application/octet-stream");
+  return {
+    id: randomId(),
+    collection_id: options.collectionId || "",
+    created_at: nowIso(),
+    source: options.source || "web",
+    kind: mediaKind(mimeType, options.fileName),
+    file_name: options.fileName,
+    original_name: options.originalName || options.fileName,
+    mime_type: mimeType,
+    size: Number(options.size || 0),
+    path: relativePath,
+    url: mediaUrl(req, relativePath),
+  };
+}
+
+function storeMediaBuffer(req, file, source, collectionId) {
+  const body = Buffer.isBuffer(file.body) ? file.body : Buffer.alloc(0);
+  if (!body.length) throw new Error("empty media file");
+  if (body.length > MAX_MEDIA_FILE_BYTES) throw new Error(`media file exceeds ${MAX_MEDIA_FILE_BYTES} bytes`);
+  ensureMediaDir();
+  const originalName = sanitizeFileName(file.filename || "upload", "upload");
+  const mediaType = safeMediaType(originalName, file.contentType);
+  const ext = mediaType.extension;
+  const baseName = sanitizeFileName(path.basename(originalName, path.extname(originalName)), "media");
+  const storedName = `${Date.now().toString(36)}-${randomId().slice(0, 8)}-${baseName}${ext}`.toLowerCase();
+  const relativeDir = datedMediaDir();
+  const absoluteDir = path.join(MEDIA_DIR, relativeDir);
+  fs.mkdirSync(absoluteDir, { recursive: true });
+  const absolutePath = path.join(absoluteDir, storedName);
+  fs.writeFileSync(absolutePath, body);
+  return attachmentFromStoredFile(req, {
+    relativePath: path.join(relativeDir, storedName),
+    fileName: storedName,
+    originalName,
+    mimeType: mediaType.mimeType,
+    size: body.length,
+    source,
+    collectionId,
+  });
+}
+
+function storeMediaStream(req, readable, options) {
+  ensureMediaDir();
+  const originalName = sanitizeFileName(options.originalName || "telegram-file", "telegram-file");
+  const mediaType = safeMediaType(originalName, options.mimeType);
+  const ext = mediaType.extension;
+  const baseName = sanitizeFileName(path.basename(originalName, path.extname(originalName)), "media");
+  const storedName = `${Date.now().toString(36)}-${randomId().slice(0, 8)}-${baseName}${ext}`.toLowerCase();
+  const relativeDir = datedMediaDir();
+  const absoluteDir = path.join(MEDIA_DIR, relativeDir);
+  fs.mkdirSync(absoluteDir, { recursive: true });
+  const absolutePath = path.join(absoluteDir, storedName);
+  let size = 0;
+  return new Promise((resolve, reject) => {
+    const output = fs.createWriteStream(absolutePath, { flags: "wx" });
+    readable.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > MAX_MEDIA_FILE_BYTES) {
+        readable.destroy(new Error(`media file exceeds ${MAX_MEDIA_FILE_BYTES} bytes`));
+      }
+    });
+    readable.on("error", reject);
+    output.on("error", reject);
+    output.on("finish", () => resolve(attachmentFromStoredFile(req, {
+      relativePath: path.join(relativeDir, storedName),
+      fileName: storedName,
+      originalName,
+      mimeType: mediaType.mimeType,
+      size,
+      source: options.source || "telegram",
+      collectionId: options.collectionId || "",
+    })));
+    readable.pipe(output);
+  });
 }
 
 function readPackage() {
@@ -208,10 +396,32 @@ function readMessages(limit) {
   return rows.slice(-limit);
 }
 
-function appendMessage(role, text, source, mirrorTelegram) {
+function sanitizeAttachments(attachments) {
+  if (!Array.isArray(attachments)) return [];
+  return attachments
+    .filter((item) => item && item.url && item.file_name)
+    .slice(0, MAX_MEDIA_ATTACHMENTS)
+    .map((item) => ({
+      id: cleanText(item.id || randomId(), 80),
+      collection_id: cleanText(item.collection_id || "", 120),
+      created_at: cleanText(item.created_at || nowIso(), 40),
+      source: cleanText(item.source || "web", 40),
+      kind: ["image", "video", "audio", "file"].includes(item.kind) ? item.kind : "file",
+      file_name: cleanText(item.file_name, 180),
+      original_name: cleanText(item.original_name || item.file_name, 180),
+      mime_type: cleanText(item.mime_type || "application/octet-stream", 120),
+      size: Number(item.size || 0),
+      path: cleanText(item.path || "", 300),
+      url: cleanText(item.url, 1000),
+    }));
+}
+
+function appendMessage(role, text, source, mirrorTelegram, attachments) {
   const cleanRole = String(role || "Agent").trim().split(/\s+/).join(" ").slice(0, MAX_ROLE_CHARS) || "Agent";
-  const cleanText = String(text || "").trim().slice(0, MAX_MESSAGE_CHARS);
-  if (!cleanText) throw new Error("message is required");
+  const cleanAttachments = sanitizeAttachments(attachments);
+  let cleanText = String(text || "").trim().slice(0, MAX_MESSAGE_CHARS);
+  if (!cleanText && cleanAttachments.length) cleanText = "Media attachments";
+  if (!cleanText) throw new Error("message or media attachment is required");
   const context = gitContext();
   const badge = roleBadge(cleanRole);
   const record = {
@@ -227,6 +437,7 @@ function appendMessage(role, text, source, mirrorTelegram) {
     commit: context.commit,
     dirty: context.dirty,
     source: source || "web",
+    attachments: cleanAttachments,
   };
   ensureDataDir();
   fs.appendFileSync(MESSAGES_FILE, JSON.stringify(record) + os.EOL, "utf8");
@@ -487,20 +698,124 @@ function telegramText(record) {
   return text;
 }
 
-function sendTelegramMessage(text) {
-  if (!telegramConfig().enabled) return;
-  telegramApi("sendMessage", {
+function telegramCaption(record) {
+  const caption = telegramText(record);
+  return caption.length > 1024 ? `${caption.slice(0, 1014).trimEnd()}\n...[cut]` : caption;
+}
+
+function publicSiteBaseUrl() {
+  const configured = String(process.env.AI_CHAT_PUBLIC_URL || "").replace(/\/+$/, "").replace(/\/ai_chat$/i, "");
+  return configured || "https://io-games.mecharulez.com";
+}
+
+function openBuildUrl() {
+  const configured = String(process.env.AI_CHAT_OPEN_BUILD_URL || process.env.AI_CHAT_BUILD_URL || "").trim();
+  return configured || `${publicSiteBaseUrl()}/unsoccer/`;
+}
+
+function isBuildNotification(record) {
+  const role = String(record.role || "").toLowerCase();
+  const message = String(record.message || "").toLowerCase();
+  return role.includes("deploy")
+    || message.includes("autodeploy")
+    || message.includes("build:unsoccer")
+    || message.includes("package:unsoccer")
+    || message.includes("package_itch.py unsoccer")
+    || message.includes("unsoccer-itch.zip")
+    || message.includes("health 8788")
+    || message.includes("health 8787");
+}
+
+function telegramOpenBuildMarkup(record) {
+  if (!isBuildNotification(record)) return null;
+  const url = openBuildUrl();
+  const button = process.env.AI_CHAT_TELEGRAM_BUILD_WEB_APP === "1"
+    ? { text: "Открыть билд", web_app: { url } }
+    : { text: "Открыть билд", url };
+  return { inline_keyboard: [[button]] };
+}
+
+function sendTelegramMessage(text, replyMarkup) {
+  if (!telegramConfig().enabled) return Promise.resolve();
+  const payload = {
     chat_id: telegramConfig().chat_id,
     text: text.slice(0, 4096),
     disable_web_page_preview: true,
-  }).catch((error) => {
-    console.error(`telegram send failed: ${error.message}`);
-  });
+  };
+  if (replyMarkup) payload.reply_markup = replyMarkup;
+  return telegramApi("sendMessage", payload);
+}
+
+function telegramAttachmentUrl(attachment) {
+  const configured = String(process.env.AI_CHAT_PUBLIC_URL || "").replace(/\/+$/, "").replace(/\/ai_chat$/i, "");
+  if (!configured) return attachment.url;
+  try {
+    const url = new URL(String(attachment.url || ""));
+    return `${configured}${url.pathname}${url.search}`;
+  } catch (_) {
+    return attachment.url;
+  }
+}
+
+function telegramMediaType(attachment) {
+  if (attachment.kind === "image") return "photo";
+  if (attachment.kind === "video") return "video";
+  if (attachment.kind === "audio") return "audio";
+  return "document";
+}
+
+function sendTelegramAttachment(attachment, caption) {
+  const type = telegramMediaType(attachment);
+  const payload = {
+    chat_id: telegramConfig().chat_id,
+    caption: caption || undefined,
+  };
+  if (type === "photo") payload.photo = telegramAttachmentUrl(attachment);
+  else if (type === "video") payload.video = telegramAttachmentUrl(attachment);
+  else if (type === "audio") payload.audio = telegramAttachmentUrl(attachment);
+  else payload.document = telegramAttachmentUrl(attachment);
+  const method = type === "photo" ? "sendPhoto"
+    : type === "video" ? "sendVideo"
+    : type === "audio" ? "sendAudio"
+    : "sendDocument";
+  return telegramApi(method, payload, 60000);
+}
+
+async function sendTelegramRecord(record) {
+  const attachments = sanitizeAttachments(record.attachments);
+  const text = telegramText(record);
+  const openBuildMarkup = telegramOpenBuildMarkup(record);
+  if (!attachments.length) {
+    await sendTelegramMessage(text, openBuildMarkup);
+    return;
+  }
+  await sendTelegramMessage(text, openBuildMarkup);
+  const groupable = attachments.length > 1
+    && attachments.length <= 10
+    && attachments.every((attachment) => ["image", "video"].includes(attachment.kind));
+  if (groupable) {
+    await telegramApi("sendMediaGroup", {
+      chat_id: telegramConfig().chat_id,
+      media: attachments.map((attachment, index) => ({
+        type: attachment.kind === "video" ? "video" : "photo",
+        media: telegramAttachmentUrl(attachment),
+        caption: index === 0 ? `Media attachments (${attachments.length})` : undefined,
+      })),
+    }, 60000);
+    return;
+  }
+  for (let index = 0; index < attachments.length; index += 1) {
+    await sendTelegramAttachment(attachments[index], `Media ${index + 1}/${attachments.length}`);
+  }
 }
 
 function mirrorRecordToTelegram(record) {
   if (!telegramConfig().enabled) return;
-  setImmediate(() => sendTelegramMessage(telegramText(record)));
+  setImmediate(() => {
+    sendTelegramRecord(record).catch((error) => {
+      console.error(`telegram send failed: ${error.message}`);
+    });
+  });
 }
 
 function telegramUpdateSeen(updateId) {
@@ -533,7 +848,97 @@ function telegramMessageText(message) {
   return "";
 }
 
-function processTelegramUpdate(update) {
+function telegramAttachmentCandidates(message) {
+  const items = [];
+  if (Array.isArray(message.photo) && message.photo.length) {
+    const photo = message.photo[message.photo.length - 1];
+    items.push({
+      file_id: photo.file_id,
+      file_size: photo.file_size || 0,
+      original_name: `telegram-photo-${message.message_id || Date.now()}.jpg`,
+      mime_type: "image/jpeg",
+    });
+  }
+  if (message.document?.file_id) {
+    items.push({
+      file_id: message.document.file_id,
+      file_size: message.document.file_size || 0,
+      original_name: message.document.file_name || `telegram-document-${message.message_id || Date.now()}`,
+      mime_type: message.document.mime_type || "application/octet-stream",
+    });
+  }
+  if (message.video?.file_id) {
+    items.push({
+      file_id: message.video.file_id,
+      file_size: message.video.file_size || 0,
+      original_name: message.video.file_name || `telegram-video-${message.message_id || Date.now()}.mp4`,
+      mime_type: message.video.mime_type || "video/mp4",
+    });
+  }
+  if (message.audio?.file_id) {
+    items.push({
+      file_id: message.audio.file_id,
+      file_size: message.audio.file_size || 0,
+      original_name: message.audio.file_name || `telegram-audio-${message.message_id || Date.now()}.mp3`,
+      mime_type: message.audio.mime_type || "audio/mpeg",
+    });
+  }
+  if (message.voice?.file_id) {
+    items.push({
+      file_id: message.voice.file_id,
+      file_size: message.voice.file_size || 0,
+      original_name: `telegram-voice-${message.message_id || Date.now()}.ogg`,
+      mime_type: message.voice.mime_type || "audio/ogg",
+    });
+  }
+  if (message.animation?.file_id) {
+    items.push({
+      file_id: message.animation.file_id,
+      file_size: message.animation.file_size || 0,
+      original_name: message.animation.file_name || `telegram-animation-${message.message_id || Date.now()}.mp4`,
+      mime_type: message.animation.mime_type || "video/mp4",
+    });
+  }
+  return items.filter((item) => item.file_id).slice(0, MAX_MEDIA_ATTACHMENTS);
+}
+
+function telegramFileDownloadStream(token, filePath) {
+  const encodedPath = String(filePath || "").split("/").map(encodeURIComponent).join("/");
+  return new Promise((resolve, reject) => {
+    const req = https.get({
+      hostname: "api.telegram.org",
+      path: `/file/bot${token}/${encodedPath}`,
+    }, (response) => {
+      if (response.statusCode !== 200) {
+        response.resume();
+        reject(new Error(`Telegram file HTTP ${response.statusCode}`));
+        return;
+      }
+      resolve(response);
+    });
+    req.on("error", reject);
+    req.setTimeout(60000, () => req.destroy(new Error("Telegram file download timed out")));
+  });
+}
+
+async function downloadTelegramAttachment(req, candidate, collectionId) {
+  if (candidate.file_size && candidate.file_size > MAX_MEDIA_FILE_BYTES) {
+    throw new Error(`${candidate.original_name} exceeds media size limit`);
+  }
+  const config = telegramConfig();
+  const info = await telegramApi("getFile", { file_id: candidate.file_id }, 30000);
+  const filePath = info?.result?.file_path;
+  if (!filePath) throw new Error("Telegram getFile did not return file_path");
+  const stream = await telegramFileDownloadStream(config.token, filePath);
+  return storeMediaStream(req, stream, {
+    originalName: candidate.original_name,
+    mimeType: candidate.mime_type,
+    source: "telegram",
+    collectionId,
+  });
+}
+
+async function processTelegramUpdate(req, update) {
   const updateId = Number(update.update_id || 0);
   if (telegramUpdateSeen(updateId)) return false;
   const message = update.message || update.edited_message || {};
@@ -543,12 +948,25 @@ function processTelegramUpdate(update) {
   const sender = message.from || {};
   if (sender.is_bot) return false;
   const text = telegramMessageText(message);
-  if (!text) return false;
+  const candidates = telegramAttachmentCandidates(message);
+  if (!text && !candidates.length) return false;
+  const collectionId = message.media_group_id ? `telegram_${message.media_group_id}` : "";
+  const attachments = [];
+  const mediaErrors = [];
+  for (const candidate of candidates) {
+    try {
+      attachments.push(await downloadTelegramAttachment(req, candidate, collectionId));
+    } catch (error) {
+      mediaErrors.push(`${candidate.original_name}: ${error.message}`);
+    }
+  }
   const telegramProducerName = telegramSenderName(message);
+  const mediaNote = attachments.length ? `\n\nMedia: ${attachments.map((item) => item.url).join("\n")}` : "";
+  const errorNote = mediaErrors.length ? `\n\nMedia download errors:\n${mediaErrors.join("\n")}` : "";
   const telegramProducerText = telegramProducerName
-    ? `Продюсер: ${text}\n\nTelegram user: ${telegramProducerName}`
-    : `Продюсер: ${text}`;
-  appendMessage("Продюсер", telegramProducerText, "telegram", false);
+    ? `Продюсер: ${text || "Media message"}${mediaNote}${errorNote}\n\nTelegram user: ${telegramProducerName}`
+    : `Продюсер: ${text || "Media message"}${mediaNote}${errorNote}`;
+  appendMessage("Продюсер", telegramProducerText, "telegram", false, attachments);
   return true;
 }
 
@@ -676,6 +1094,137 @@ function runDeployFromWebhook(payload) {
   });
 }
 
+function fileReport(...parts) {
+  const target = path.join(ROOT, ...parts);
+  const relativePath = path.relative(ROOT, target).split(path.sep).join("/");
+  try {
+    const stat = fs.statSync(target);
+    return {
+      path: relativePath,
+      exists: true,
+      file: stat.isFile(),
+      directory: stat.isDirectory(),
+      size: stat.size,
+      mtime: stat.mtime.toISOString(),
+    };
+  } catch (error) {
+    return {
+      path: relativePath,
+      exists: false,
+      error: error.code || error.message,
+    };
+  }
+}
+
+function readTextFileSlice(parts, maxBytes) {
+  const target = path.join(ROOT, ...parts);
+  try {
+    return fs.readFileSync(target, "utf8").slice(0, maxBytes || 12000);
+  } catch (_) {
+    return "";
+  }
+}
+
+function unsoccerDistAssetReports(distHtml) {
+  const matches = Array.from(distHtml.matchAll(/(?:src|href)="\.\/assets\/([^"]+)"/g))
+    .map((match) => match[1])
+    .filter(Boolean);
+  return Array.from(new Set(matches)).map((assetName) => fileReport("unsoccer", "client", "dist", "assets", assetName));
+}
+
+function localHttpJson(port, requestPath, timeoutMs) {
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    const request = http.get({
+      hostname: "127.0.0.1",
+      port,
+      path: requestPath,
+      timeout: timeoutMs || 1500,
+    }, (response) => {
+      const chunks = [];
+      response.on("data", (chunk) => chunks.push(chunk));
+      response.on("end", () => {
+        const body = Buffer.concat(chunks).toString("utf8");
+        let json = null;
+        try {
+          json = JSON.parse(body);
+        } catch (_) {
+          json = null;
+        }
+        resolve({
+          ok: response.statusCode >= 200 && response.statusCode < 300,
+          status: response.statusCode,
+          elapsed_ms: Date.now() - startedAt,
+          json,
+          body_sample: json ? undefined : body.slice(0, 400),
+        });
+      });
+    });
+    request.on("error", (error) => resolve({
+      ok: false,
+      elapsed_ms: Date.now() - startedAt,
+      error: error.message,
+    }));
+    request.on("timeout", () => {
+      request.destroy(new Error("timeout"));
+    });
+  });
+}
+
+function execFileReport(command, args, timeoutMs) {
+  return new Promise((resolve) => {
+    childProcess.execFile(command, args, {
+      timeout: timeoutMs || 1500,
+      encoding: "utf8",
+      maxBuffer: 64 * 1024,
+    }, (error, stdout, stderr) => {
+      resolve({
+        ok: !error,
+        code: error && error.code !== undefined ? error.code : 0,
+        signal: error && error.signal ? error.signal : "",
+        stdout: String(stdout || "").trim().slice(-1000),
+        stderr: String(stderr || "").trim().slice(-1000),
+        error: error ? error.message : "",
+      });
+    });
+  });
+}
+
+async function deployHealthSnapshot() {
+  const distHtml = readTextFileSlice(["unsoccer", "client", "dist", "index.html"], 16000);
+  const distAssets = unsoccerDistAssetReports(distHtml);
+  const serverHealth = await localHttpJson(Number(process.env.UNSOCCER_PORT || 8787), "/api/health", 1800);
+  const systemd = await execFileReport("systemctl", ["is-active", "itch-games-unsoccer-server.service"], 1800);
+  const hasBuiltHtml = /(?:src|href)="\.\/assets\/index-[^"]+\.(?:js|css)"/.test(distHtml);
+  const hasJsAsset = distAssets.some((asset) => asset.exists && /\.js$/i.test(asset.path));
+  return {
+    ok: true,
+    ready: Boolean(hasBuiltHtml && hasJsAsset && serverHealth.ok),
+    time: nowIso(),
+    project_version: projectVersion(),
+    git: gitContext(),
+    deploy_running: deployRunning,
+    urls: {
+      public_game: `${publicSiteBaseUrl()}/unsoccer/`,
+      public_api_health: `${publicSiteBaseUrl()}/unsoccer/api/health`,
+      local_api_health: "http://127.0.0.1:8787/api/health",
+    },
+    unsoccer: {
+      built_html_detected: hasBuiltHtml,
+      files: {
+        public_page: fileReport("unsoccer", "index.html"),
+        client_dev_html: fileReport("unsoccer", "client", "index.html"),
+        client_dist_html: fileReport("unsoccer", "client", "dist", "index.html"),
+        server_entry: fileReport("unsoccer", "server", "dist", "index.js"),
+      },
+      dist_assets: distAssets,
+      local_api_health: serverHealth,
+      systemd_service: systemd,
+      autostart_child_pid: unsoccerChild && unsoccerChild.pid ? unsoccerChild.pid : null,
+    },
+  };
+}
+
 function readBody(req, maxBytes) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -692,6 +1241,120 @@ function readBody(req, maxBytes) {
     req.on("end", () => resolve(Buffer.concat(chunks)));
     req.on("error", reject);
   });
+}
+
+function headerParameter(value, name) {
+  const pattern = new RegExp(`${name}="([^"]*)"|${name}=([^;\\s]+)`, "i");
+  const match = String(value || "").match(pattern);
+  return match ? (match[1] || match[2] || "") : "";
+}
+
+function multipartBoundary(contentType) {
+  const boundary = headerParameter(contentType, "boundary");
+  return boundary ? Buffer.from(`--${boundary}`) : null;
+}
+
+function trimPartBody(body) {
+  if (body.length >= 2 && body[body.length - 2] === 13 && body[body.length - 1] === 10) {
+    return body.subarray(0, body.length - 2);
+  }
+  return body;
+}
+
+function parseMultipartBody(buffer, contentType) {
+  const boundary = multipartBoundary(contentType);
+  if (!boundary) throw new Error("multipart boundary is required");
+  const fields = {};
+  const files = [];
+  let cursor = buffer.indexOf(boundary);
+  while (cursor >= 0) {
+    let partStart = cursor + boundary.length;
+    if (buffer[partStart] === 45 && buffer[partStart + 1] === 45) break;
+    if (buffer[partStart] === 13 && buffer[partStart + 1] === 10) partStart += 2;
+    const next = buffer.indexOf(boundary, partStart);
+    if (next < 0) break;
+    const rawPart = buffer.subarray(partStart, next);
+    const headerEnd = rawPart.indexOf(Buffer.from("\r\n\r\n"));
+    if (headerEnd >= 0) {
+      const headerText = rawPart.subarray(0, headerEnd).toString("utf8");
+      const body = trimPartBody(rawPart.subarray(headerEnd + 4));
+      const headers = {};
+      for (const line of headerText.split(/\r?\n/)) {
+        const split = line.indexOf(":");
+        if (split > 0) headers[line.slice(0, split).trim().toLowerCase()] = line.slice(split + 1).trim();
+      }
+      const disposition = headers["content-disposition"] || "";
+      const name = headerParameter(disposition, "name");
+      const filename = headerParameter(disposition, "filename");
+      if (name) {
+        if (filename) {
+          files.push({
+            fieldName: name,
+            filename,
+            contentType: headers["content-type"] || "application/octet-stream",
+            body,
+          });
+        } else {
+          fields[name] = body.toString("utf8");
+        }
+      }
+    }
+    cursor = next;
+  }
+  return { fields, files };
+}
+
+function attachmentsFromUploadedFiles(req, files, source) {
+  const selected = files.filter((file) => file.fieldName === "files" || file.fieldName === "file" || file.fieldName === "attachments").slice(0, MAX_MEDIA_ATTACHMENTS);
+  const collectionId = selected.length > 1 ? `media_${Date.now().toString(36)}_${randomId().slice(0, 6)}` : "";
+  return selected.map((file) => storeMediaBuffer(req, file, source || "web", collectionId));
+}
+
+async function parseMessageRequest(req) {
+  const contentType = String(req.headers["content-type"] || "");
+  if (contentType.toLowerCase().startsWith("multipart/form-data")) {
+    const body = await readBody(req, MAX_MEDIA_UPLOAD_BYTES);
+    const parsed = parseMultipartBody(body, contentType);
+    return {
+      payload: parsed.fields,
+      attachments: attachmentsFromUploadedFiles(req, parsed.files, "web"),
+    };
+  }
+  const body = await readBody(req, 32768);
+  if (!body.length) throw new Error("invalid request size");
+  const payload = JSON.parse(body.toString("utf8"));
+  return { payload, attachments: sanitizeAttachments(payload.attachments) };
+}
+
+function sendMediaFile(req, res, requestPath) {
+  const requested = decodeURIComponent(requestPath.replace(/^\/media\/+/, ""));
+  const safePath = path.normalize(requested);
+  if (!requested || safePath.startsWith("..") || path.isAbsolute(safePath)) {
+    res.writeHead(403);
+    res.end("Forbidden");
+    return;
+  }
+  const target = path.join(MEDIA_DIR, safePath);
+  const relative = path.relative(MEDIA_DIR, target);
+  if (relative.startsWith("..") || path.isAbsolute(relative) || !fs.existsSync(target) || !fs.statSync(target).isFile()) {
+    res.writeHead(404);
+    res.end("Not found");
+    return;
+  }
+  const stat = fs.statSync(target);
+  const contentType = MIME_TYPES[path.extname(target).toLowerCase()] || "application/octet-stream";
+  const kind = mediaKind(contentType, target);
+  const headers = {
+    "Content-Type": contentType,
+    "Cache-Control": "public, max-age=86400",
+    "Content-Length": String(stat.size),
+    "X-Content-Type-Options": "nosniff",
+  };
+  if (kind === "file") {
+    headers["Content-Disposition"] = `attachment; filename="${path.basename(target).replace(/["\\]/g, "-")}"`;
+  }
+  res.writeHead(200, headers);
+  fs.createReadStream(target).pipe(res);
 }
 
 function sendStatic(res, requestPath) {
@@ -728,6 +1391,71 @@ function normalizePath(pathname) {
   return pathname;
 }
 
+function spawnUnsoccerServer(port) {
+  const entry = path.join(ROOT, "unsoccer", "server", "dist", "index.js");
+  if (!fs.existsSync(entry)) {
+    console.warn(`unsoccer autostart skipped: missing ${entry}`);
+    return;
+  }
+  unsoccerChild = childProcess.spawn(process.execPath, [entry], {
+    cwd: ROOT,
+    env: {
+      ...process.env,
+      NODE_ENV: process.env.NODE_ENV || "production",
+      UNSOCCER_PORT: String(port)
+    },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  unsoccerChild.stdout.on("data", (chunk) => process.stdout.write(`[unsoccer] ${chunk}`));
+  unsoccerChild.stderr.on("data", (chunk) => process.stderr.write(`[unsoccer] ${chunk}`));
+  unsoccerChild.on("exit", (code, signal) => {
+    console.error(`unsoccer server exited code=${code} signal=${signal || ""}`);
+    unsoccerChild = null;
+    if (!shuttingDown) {
+      const timer = setTimeout(startUnsoccerServer, 3000);
+      timer.unref();
+    }
+  });
+}
+
+function startUnsoccerServer() {
+  if (process.env.UNSOCCER_AUTOSTART === "0") return;
+  if (unsoccerChild && unsoccerChild.exitCode === null && !unsoccerChild.killed) return;
+  const port = Number(process.env.UNSOCCER_PORT || 8787);
+  let settled = false;
+  const spawnIfNeeded = () => {
+    if (settled) return;
+    settled = true;
+    spawnUnsoccerServer(port);
+  };
+  const request = http.get({ hostname: "127.0.0.1", port, path: "/api/health", timeout: 1000 }, (response) => {
+    response.resume();
+    if (response.statusCode === 200) {
+      settled = true;
+      console.log(`unsoccer server already listening on 127.0.0.1:${port}`);
+      return;
+    }
+    spawnIfNeeded();
+  });
+  request.on("error", spawnIfNeeded);
+  request.on("timeout", () => {
+    request.destroy();
+    spawnIfNeeded();
+  });
+}
+
+function installShutdownHandlers() {
+  for (const signal of ["SIGINT", "SIGTERM"]) {
+    process.once(signal, () => {
+      shuttingDown = true;
+      if (unsoccerChild && unsoccerChild.exitCode === null && !unsoccerChild.killed) {
+        unsoccerChild.kill(signal);
+      }
+      process.exit(0);
+    });
+  }
+}
+
 async function handleGet(req, res, parsed) {
   const pathname = normalizePath(parsed.pathname);
   if (pathname === "/api/health" || pathname === "/health") {
@@ -743,6 +1471,10 @@ async function handleGet(req, res, parsed) {
   if (pathname === "/api/messages") {
     const limit = Math.min(Math.max(Number(parsed.query.limit || 200) || 200, 1), 500);
     jsonResponse(res, 200, { ok: true, messages: readMessages(limit) });
+    return;
+  }
+  if (pathname === "/api/deploy-health") {
+    jsonResponse(res, 200, await deployHealthSnapshot());
     return;
   }
   if (pathname === "/api/tasks") {
@@ -778,6 +1510,10 @@ async function handleGet(req, res, parsed) {
       task_count: readTasks().length,
       telegram: { enabled: telegramConfig().enabled },
     });
+    return;
+  }
+  if (pathname.startsWith("/media/")) {
+    sendMediaFile(req, res, pathname);
     return;
   }
   sendStatic(res, pathname);
@@ -833,9 +1569,23 @@ async function handlePost(req, res, parsed) {
       return;
     }
     try {
-      jsonResponse(res, 200, { ok: true, accepted: processTelegramUpdate(payload) });
+      jsonResponse(res, 200, { ok: true, accepted: await processTelegramUpdate(req, payload) });
     } catch (error) {
       errorJson(res, 500, `telegram update failed: ${error.message}`);
+    }
+    return;
+  }
+
+  if (pathname === "/api/media") {
+    try {
+      const contentType = String(req.headers["content-type"] || "");
+      if (!contentType.toLowerCase().startsWith("multipart/form-data")) throw new Error("multipart/form-data is required");
+      const body = await readBody(req, MAX_MEDIA_UPLOAD_BYTES);
+      const parsed = parseMultipartBody(body, contentType);
+      const attachments = attachmentsFromUploadedFiles(req, parsed.files, "web");
+      jsonResponse(res, 201, { ok: true, attachments });
+    } catch (error) {
+      errorJson(res, 400, error.message);
     }
     return;
   }
@@ -927,14 +1677,10 @@ async function handlePost(req, res, parsed) {
     errorJson(res, 404, "not found");
     return;
   }
-  const body = await readBody(req, 16384);
-  if (!body.length) {
-    errorJson(res, 400, "invalid request size");
-    return;
-  }
   try {
-    const payload = JSON.parse(body.toString("utf8"));
-    const record = appendMessage(payload.role || "Agent", payload.message || "");
+    const parsed = await parseMessageRequest(req);
+    const payload = parsed.payload || {};
+    const record = appendMessage(payload.role || "Agent", payload.message || "", "web", true, parsed.attachments);
     jsonResponse(res, 201, { ok: true, message: record });
   } catch (error) {
     errorJson(res, 400, error.message);
@@ -966,71 +1712,6 @@ function argValue(name, fallback) {
   const index = process.argv.indexOf(name);
   if (index >= 0 && process.argv[index + 1]) return process.argv[index + 1];
   return fallback;
-}
-
-function spawnUnsoccerServer(port) {
-  const entry = path.join(ROOT, "unsoccer", "server", "dist", "index.js");
-  if (!fs.existsSync(entry)) {
-    console.warn(`unsoccer autostart skipped: missing ${entry}`);
-    return;
-  }
-  unsoccerChild = childProcess.spawn(process.execPath, [entry], {
-    cwd: ROOT,
-    env: {
-      ...process.env,
-      NODE_ENV: process.env.NODE_ENV || "production",
-      UNSOCCER_PORT: String(port)
-    },
-    stdio: ["ignore", "pipe", "pipe"]
-  });
-  unsoccerChild.stdout.on("data", (chunk) => process.stdout.write(`[unsoccer] ${chunk}`));
-  unsoccerChild.stderr.on("data", (chunk) => process.stderr.write(`[unsoccer] ${chunk}`));
-  unsoccerChild.on("exit", (code, signal) => {
-    console.error(`unsoccer server exited code=${code} signal=${signal || ""}`);
-    unsoccerChild = null;
-    if (!shuttingDown) {
-      const timer = setTimeout(startUnsoccerServer, 3000);
-      timer.unref();
-    }
-  });
-}
-
-function startUnsoccerServer() {
-  if (process.env.UNSOCCER_AUTOSTART === "0") return;
-  if (unsoccerChild && unsoccerChild.exitCode === null && !unsoccerChild.killed) return;
-  const port = Number(process.env.UNSOCCER_PORT || 8787);
-  let settled = false;
-  const spawnIfNeeded = () => {
-    if (settled) return;
-    settled = true;
-    spawnUnsoccerServer(port);
-  };
-  const request = http.get({ hostname: "127.0.0.1", port, path: "/api/health", timeout: 1000 }, (response) => {
-    response.resume();
-    if (response.statusCode === 200) {
-      settled = true;
-      console.log(`unsoccer server already listening on 127.0.0.1:${port}`);
-      return;
-    }
-    spawnIfNeeded();
-  });
-  request.on("error", spawnIfNeeded);
-  request.on("timeout", () => {
-    request.destroy();
-    spawnIfNeeded();
-  });
-}
-
-function installShutdownHandlers() {
-  for (const signal of ["SIGINT", "SIGTERM"]) {
-    process.once(signal, () => {
-      shuttingDown = true;
-      if (unsoccerChild && unsoccerChild.exitCode === null && !unsoccerChild.killed) {
-        unsoccerChild.kill(signal);
-      }
-      process.exit(0);
-    });
-  }
 }
 
 function main() {

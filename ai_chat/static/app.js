@@ -2,6 +2,7 @@ const messagesEl = document.querySelector("#messages");
 const formEl = document.querySelector("#messageForm");
 const roleInput = document.querySelector("#roleInput");
 const messageInput = document.querySelector("#messageInput");
+const mediaInput = document.querySelector("#mediaInput");
 const versionEl = document.querySelector("#version");
 const gitEl = document.querySelector("#git");
 const telegramEl = document.querySelector("#telegram");
@@ -24,7 +25,7 @@ const seedTasksButton = document.querySelector("#seedTasksButton");
 const api = (path) => `api/${path}`;
 let taskOptionsReady = false;
 const ROLE_BADGES = [
-  { label: "Producer", icon: "👑", match: ["producer", "продюсер", "рџс"] },
+  { label: "Producer", icon: "👑", match: ["producer", "продюсер"] },
   { label: "Orchestrator", icon: "🧭", match: ["orchestrator"] },
   { label: "Art", icon: "🎨", match: ["art director"] },
   { label: "Game", icon: "🎲", match: ["game designer"] },
@@ -82,6 +83,70 @@ function renderRoleBadge(role, item = {}) {
   `;
 }
 
+function safeMediaUrl(value) {
+  try {
+    const url = new URL(String(value || ""), window.location.href);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return "#";
+    return url.href;
+  } catch (_) {
+    return "#";
+  }
+}
+
+function attachmentLabel(attachment) {
+  const name = attachment.original_name || attachment.file_name || "media";
+  const size = Number(attachment.size || 0);
+  if (!size) return name;
+  if (size > 1024 * 1024) return `${name} (${(size / 1024 / 1024).toFixed(1)} MB)`;
+  if (size > 1024) return `${name} (${Math.ceil(size / 1024)} KB)`;
+  return `${name} (${size} B)`;
+}
+
+function renderAttachment(attachment) {
+  const url = safeMediaUrl(attachment.url);
+  const label = escapeText(attachmentLabel(attachment));
+  const kind = attachment.kind || "file";
+  if (kind === "image") {
+    return `
+      <a class="attachment attachment-image" href="${escapeText(url)}" target="_blank" rel="noopener">
+        <img src="${escapeText(url)}" alt="${label}" loading="lazy">
+        <span>${label}</span>
+      </a>
+    `;
+  }
+  if (kind === "video") {
+    return `
+      <div class="attachment attachment-player">
+        <video src="${escapeText(url)}" controls preload="metadata"></video>
+        <a href="${escapeText(url)}" target="_blank" rel="noopener">${label}</a>
+      </div>
+    `;
+  }
+  if (kind === "audio") {
+    return `
+      <div class="attachment attachment-player">
+        <audio src="${escapeText(url)}" controls preload="metadata"></audio>
+        <a href="${escapeText(url)}" target="_blank" rel="noopener">${label}</a>
+      </div>
+    `;
+  }
+  return `
+    <a class="attachment attachment-file" href="${escapeText(url)}" target="_blank" rel="noopener">
+      <span>${label}</span>
+    </a>
+  `;
+}
+
+function renderAttachments(item) {
+  const attachments = Array.isArray(item.attachments) ? item.attachments : [];
+  if (!attachments.length) return "";
+  return `
+    <div class="attachments">
+      ${attachments.map(renderAttachment).join("")}
+    </div>
+  `;
+}
+
 async function getJson(path) {
   const response = await fetch(api(path), { cache: "no-store" });
   if (!response.ok) throw new Error(`${path}: ${response.status}`);
@@ -120,6 +185,7 @@ async function loadMessages() {
         <span>${escapeText(formatDate(item.created_at))}</span>
       </header>
       <p>${escapeText(item.message || "")}</p>
+      ${renderAttachments(item)}
       <footer>
         <span>${escapeText(item.project_version || "version unknown")}</span>
         <span>${escapeText(item.branch || "branch unknown")} @ ${escapeText(item.commit || "commit unknown")}</span>
@@ -235,18 +301,32 @@ formEl.addEventListener("submit", async (event) => {
   event.preventDefault();
   const role = roleInput.value.trim();
   const message = messageInput.value.trim();
-  if (!role || !message) return;
-  const response = await fetch(api("messages"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ role, message }),
-  });
+  const files = Array.from(mediaInput.files || []);
+  if (!role || (!message && !files.length)) return;
+  let response;
+  if (files.length) {
+    const formData = new FormData();
+    formData.append("role", role);
+    formData.append("message", message);
+    files.forEach((file) => formData.append("files", file, file.name));
+    response = await fetch(api("messages"), {
+      method: "POST",
+      body: formData,
+    });
+  } else {
+    response = await fetch(api("messages"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role, message }),
+    });
+  }
   if (!response.ok) {
     const text = await response.text();
     alert(`Message failed: ${text}`);
     return;
   }
   messageInput.value = "";
+  mediaInput.value = "";
   await refreshAll();
 });
 

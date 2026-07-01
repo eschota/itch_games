@@ -23,8 +23,18 @@ Use this root skill when changing, packaging, validating, or publishing the
   - Public pages: `ui_designer/public_pages/public_pages.skill.md`
   - Orbital Courier public brief:
     `ui_designer/public_pages/orbital-courier-public-pages.md`
+  - Orbital Courier itch copy/checklist/assets:
+    `ui_designer/public_pages/orbital-courier-itch-page-copy.md`,
+    `ui_designer/public_pages/orbital-courier-itch-publishing-checklist.md`,
+    `ui_designer/public_pages/orbital-courier-itch-assets/`
+  - Cross-game itch publication ledger:
+    `ui_designer/public_pages/itch-publication-ledger.md`
   - UnSoccer public brief:
     `ui_designer/public_pages/unsoccer-public-pages.md`
+  - UnSoccer itch copy/checklist/assets:
+    `ui_designer/public_pages/unsoccer-itch-page-copy.md`,
+    `ui_designer/public_pages/unsoccer-itch-publishing-checklist.md`,
+    `ui_designer/public_pages/unsoccer-itch-assets/`
 - Art Director: `art_director_skill.md`,
   `art_director/art_director.skill.md`
   - UnSoccer HDR/day-cycle/camera target:
@@ -34,6 +44,8 @@ Use this root skill when changing, packaging, validating, or publishing the
 - Game Designer: `game_designer_skill.md`,
   `game_designer/game_designer.skill.md`
 - Programmer: `programmer_skill.md`, `programmer/programmer.skill.md`
+  - UnSoccer v0.0.003 acceptance evidence:
+    `programmer/checks/2026-07-01-unsoccer-v0.0.003-acceptance.md`
 - Tester: `tester_skill.md`, `tester/tester.skill.md`
 - Sound Designer: `sound_designer_skill.md`,
   `sound_designer/sound_designer.skill.md`
@@ -41,10 +53,15 @@ Use this root skill when changing, packaging, validating, or publishing the
     `sound_designer/implementation/audio-pass-v0.0.006.md`
   - UnSoccer audio v0.0.002 evidence:
     `sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md`
+  - UnSoccer audio v0.0.003 evidence:
+    `sound_designer/implementation/unsoccer-audio-pass-v0.0.003.md`
 - AI chat service: `ai_chat_skill.md`, `ai_chat/ai_chat.skill.md`
   - Deploy references: `ai_chat/deploy/deploy.skill.md`
+    - UnSoccer production service:
+      `ai_chat/deploy/itch-games-unsoccer-server-qwertystock.service`
 - Tools: `tools/tools.skill.md`
   - Itch package helper: `tools/package_itch.py`
+  - UnSoccer acceptance gate: `tools/unsoccer_acceptance.mjs`
 
 ## Rules
 
@@ -60,6 +77,11 @@ Use this root skill when changing, packaging, validating, or publishing the
   `v0.0.001` and tracks its own displayed version.
 - Do not commit generated files under `dist/`.
 - Test through a local static server before upload.
+- Public game pages, game clients, and game assets must be a static-file bundle
+  in each game public directory. Nginx should serve those files directly from
+  the filesystem; do not add app-server routes for static games, static assets,
+  screenshots, or downloadable client files unless the Producer explicitly asks
+  for dynamic behavior.
 - Treat GitHub `eschota/itch_games` as the public source repository.
 - Version bumps must be committed, pushed to GitHub, and autodeployed.
 - Use `art_director_skill.md` for art direction, visual quality, 3D, animation,
@@ -96,9 +118,18 @@ Use this root skill when changing, packaging, validating, or publishing the
 - Public pages must expose the game title, actual play fantasy, primary play
   action, current version when relevant, and a visual preview that matches the
   game.
+- Each game should keep a public static directory with relative links for its
+  page, client bundle, screenshots, downloadable files, and assets, so nginx can
+  serve `/game-name/` directly without app-server static routes.
 - If a public page is external and cannot be changed from this repository, keep
   the source-of-truth brief under `ui_designer/public_pages/` and mirror the
   relevant hierarchy in `skill.md` and `skill.xml`.
+- External itch.io pages are incomplete until their URL, uploaded zip, exact
+  live copy, screenshots, publication date, and version match are recorded in
+  `ui_designer/public_pages/`.
+- Track cross-game external publication status in
+  `ui_designer/public_pages/itch-publication-ledger.md`; per-game checklists
+  remain the operational steps for each page.
 - The itch.io upload package is player-facing; keep internal skill, role, agent
   coordination, server, and source-control docs out of the zip unless the
   Producer explicitly asks to publish them.
@@ -155,14 +186,26 @@ Use this root skill when changing, packaging, validating, or publishing the
 ## Current Behavior
 
 - Current game release: `v0.0.006`.
-- `unsoccer` current prototype release: `v0.0.002`.
+- `unsoccer` current prototype release: `v0.0.003`.
 - `unsoccer` uses a headless authoritative Node server with Rapier3D physics
   and geckos.io transport; the itch package is static client-only and needs the
   live game server for multiplayer.
+- Production `https://io-games.mecharulez.com/unsoccer/` serves
+  `unsoccer/client/dist`; `/unsoccer/api/` and `/unsoccer/socket/` are nginx
+  proxies to the authoritative server on `127.0.0.1:8787`.
 - The game starts automatically when the page opens.
 - `unsoccer` v0.0.002 has a client-only procedural Web Audio layer driven by
   authoritative server snapshots for kicks, body contacts, goals, countdown,
   roster changes, and ball rolling.
+- `unsoccer` v0.0.003 adds server-authoritative snow weather, puddles, slush,
+  snowbanks, weather visuals/audio, and an isolated deterministic acceptance
+  gate for spectator assignment, contacts, and goal reset.
+- `unsoccer` client contact telegraphs distinguish left-foot, right-foot, head,
+  and body contacts with different flash colors/shapes and QA-readable
+  `data-last-action-*` fields.
+- `unsoccer` v0.0.003 audio must expose debug counters for played and blocked
+  Web Audio events and hydrate connection/local role cues after the first
+  successful trusted browser unlock.
 - `v0.0.006` adds procedural Web Audio feedback and exposes
   `window.orbitalCourierAudio` plus `orbital-courier:audio-event` so future
   network code can replicate semantic sound events instead of audio files.

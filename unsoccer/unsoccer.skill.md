@@ -39,9 +39,15 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 - `v0.0.002` audio pass keeps sound client-only and driven by authoritative
   `ServerState` diffs: kicks/body contacts, score, countdown, roster changes,
   and ball speed.
+- `v0.0.003` audio pass adds Web Audio played/blocked debug counters and
+  hydrates connection/local role cues after the first successful trusted browser
+  unlock, while keeping gameplay cues driven by server snapshots.
 - `v0.0.003` weather pass keeps snow/puddle/slush/snowbank physics
   server-authoritative and requires client visuals for any hazard that changes
   movement or ball collision.
+- Server-confirmed left-foot, right-foot, head, and body contacts must stay
+  visually distinguishable in the client and expose QA-readable
+  `data-last-action-*` fields on `document.documentElement`.
 - `v0.0.003` server acceptance uses `UNSOCCER_TEST_MODE=1` only on an isolated
   local port. Never expose `/api/test/*` on a production multiplayer server.
 - Run `npm run test:unsoccer:acceptance` before claiming spectator assignment,

@@ -22,10 +22,12 @@
     <rule>Client bundles must not import server-only code.</rule>
     <rule>v0.0.002 keeps Russian player-facing text, HDR-style environment lighting, a visible sun, a 120-second realtime day cycle, an inertial perspective follow camera, and distinct server-authoritative body/left-foot/right-foot contacts.</rule>
     <rule>v0.0.003 keeps weather and hazards server-authoritative; any puddle, slush, or snowbank that changes movement or ball physics must also be visible in the client.</rule>
+    <rule>Server-confirmed left-foot, right-foot, head, and body contacts must stay visually distinguishable and expose data-last-action-kind, data-last-action-player, and data-last-action-at for QA.</rule>
     <rule>Server owns physics, score, teams, and room assignment.</rule>
     <rule>UNSOCCER_TEST_MODE enables /api/test/* only for isolated local acceptance and must not be exposed in production.</rule>
     <rule>npm run test:unsoccer:acceptance is the deterministic gate for spectator roles, kicks, body contact, and goal reset.</rule>
     <rule>Client audio is procedural Web Audio driven by authoritative ServerState diffs, not local input prediction.</rule>
+    <rule>Audio QA must inspect data-audio-played-events, data-audio-blocked-events, data-audio-context, and data-audio-unlocked after a real trusted browser gesture.</rule>
     <rule>First 4 clients are players; clients 5-32 are spectators/testers.</rule>
     <rule>Itch package contains static built client only.</rule>
     <rule>Free3D runtime assets require local GLB files and provenance.</rule>

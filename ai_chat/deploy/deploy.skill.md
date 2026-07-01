@@ -35,7 +35,24 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
   catalog root, not a single game route.
 - Keep webhook and Telegram secrets only in server environment files.
 - Deployment changes must be reported to `/ai_chat` with validation status.
+- Use `/ai_chat/api/deploy-health` for read-only production diagnosis when SSH
+  is unavailable. It must remain secret-free and report the UnSoccer dist HTML,
+  hashed assets, server entry, local `127.0.0.1:8787/api/health`, and systemd
+  active state.
 - The production UnSoccer route serves `unsoccer/client/dist` at `/unsoccer/`,
   proxies `/unsoccer/api/` to `127.0.0.1:8787/api/`, and strips
   `/unsoccer/socket/` before forwarding geckos.io `/.wrtc/v2` requests to
   `127.0.0.1:8787`.
+- The qwertystock autodeploy must install
+  `itch-games-ai-chat-qwertystock.service` as the active
+  `itch-games-ai-chat.service` before restart, so Node `server_node.js` owns
+  Task Queue, Telegram, deploy webhook, and `/api/media`.
+- The qwertystock autodeploy must verify `unsoccer/client/dist/index.html`
+  and at least one built JS asset before nginx reload.
+- The webhook child process must not synchronously restart
+  `itch-games-ai-chat.service` before it exits. Schedule a delayed chat restart
+  after local health checks so the parent process can append deploy
+  completion/failure to `/ai_chat`.
+- Keep `/ai_chat/` nginx `client_max_body_size` aligned with the Node media
+  upload limit so Producer gameplay videos are not rejected before reaching the
+  service.

@@ -15,6 +15,7 @@ import {
   type TeamId,
   type InputState,
   type JoinAccepted,
+  type KickKind,
   type PlayerSnapshot,
   type ServerState,
   type WeatherSnapshot
@@ -167,6 +168,43 @@ const ballAuraMaterial = new THREE.MeshBasicMaterial({
 });
 const ballAura = new THREE.Mesh(new THREE.SphereGeometry(BALL_RADIUS * 1.52, 32, 18), ballAuraMaterial);
 scene.add(ballAura);
+
+const ACTION_TELEGRAPH: Record<KickKind, {
+  color: number;
+  opacity: number;
+  scale: [number, number, number];
+  ballPulse: number;
+  cameraImpulse: number;
+}> = {
+  left: {
+    color: 0x58a8ff,
+    opacity: 0.66,
+    scale: [1.15, 0.8, 2.35],
+    ballPulse: 0.78,
+    cameraImpulse: 0.56
+  },
+  right: {
+    color: 0xff9d42,
+    opacity: 0.66,
+    scale: [1.15, 0.8, 2.35],
+    ballPulse: 0.78,
+    cameraImpulse: 0.56
+  },
+  head: {
+    color: 0xf7fbff,
+    opacity: 0.74,
+    scale: [1.55, 1.55, 1.55],
+    ballPulse: 0.84,
+    cameraImpulse: 0.64
+  },
+  body: {
+    color: 0xfff16a,
+    opacity: 0.82,
+    scale: [2.35, 1.35, 1.55],
+    ballPulse: 1,
+    cameraImpulse: 1
+  }
+};
 
 const players = new Map<string, PlayerVisual>();
 let latestState: ServerState | null = null;
@@ -390,6 +428,7 @@ class PlayerVisual {
   private readonly label: THREE.Sprite;
   private readonly ring: THREE.Mesh;
   private readonly contactFlash: THREE.Mesh;
+  private readonly contactFlashMaterial: THREE.MeshBasicMaterial;
 
   constructor(private readonly snapshot: PlayerSnapshot) {
     const color = teamColor(snapshot.team);
@@ -423,17 +462,15 @@ class PlayerVisual {
     this.ring.position.y = 0.04;
     this.root.add(this.ring);
 
-    this.contactFlash = new THREE.Mesh(
-      new THREE.SphereGeometry(0.18, 14, 8),
-      new THREE.MeshBasicMaterial({
-        color: 0xfff2a6,
-        transparent: true,
-        opacity: 0,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        toneMapped: false
-      })
-    );
+    this.contactFlashMaterial = new THREE.MeshBasicMaterial({
+      color: 0xfff2a6,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      toneMapped: false
+    });
+    this.contactFlash = new THREE.Mesh(new THREE.SphereGeometry(0.18, 14, 8), this.contactFlashMaterial);
     this.root.add(this.contactFlash);
 
     this.label = makeLabel(snapshot.name);
@@ -459,8 +496,20 @@ class PlayerVisual {
     this.body.rotation.set(0, 0, 0);
     this.body.position.z = 0;
     this.contactFlash.visible = actionPulse > 0;
-    (this.contactFlash.material as THREE.MeshBasicMaterial).opacity = actionPulse * 0.58;
-    this.contactFlash.scale.setScalar(0.7 + (1 - actionPulse) * 1.9);
+    const telegraph = snapshot.lastAction ? ACTION_TELEGRAPH[snapshot.lastAction] : null;
+    if (telegraph) {
+      const bloom = 0.7 + (1 - actionPulse) * 1.85;
+      this.contactFlashMaterial.color.setHex(telegraph.color);
+      this.contactFlashMaterial.opacity = actionPulse * telegraph.opacity;
+      this.contactFlash.scale.set(
+        telegraph.scale[0] * bloom,
+        telegraph.scale[1] * bloom,
+        telegraph.scale[2] * bloom
+      );
+    } else {
+      this.contactFlashMaterial.opacity = 0;
+      this.contactFlash.scale.setScalar(1);
+    }
 
     if (snapshot.lastAction === "left") {
       this.leftLeg.rotation.x = -1.05 * kickArc;
@@ -719,8 +768,12 @@ function applyState(state: ServerState, time: number) {
     seen.add(player.id);
     if (player.lastActionAt > lastSeenActionAt) {
       lastSeenActionAt = player.lastActionAt;
-      ballPulse = player.lastAction === "body" ? 1 : 0.76;
-      if (player.id === localJoin?.id) cameraImpulse = Math.max(cameraImpulse, player.lastAction === "body" ? 1 : 0.58);
+      const telegraph = player.lastAction ? ACTION_TELEGRAPH[player.lastAction] : null;
+      ballPulse = telegraph?.ballPulse ?? 0.76;
+      document.documentElement.dataset.lastActionKind = player.lastAction || "none";
+      document.documentElement.dataset.lastActionPlayer = player.id;
+      document.documentElement.dataset.lastActionAt = String(player.lastActionAt);
+      if (player.id === localJoin?.id) cameraImpulse = Math.max(cameraImpulse, telegraph?.cameraImpulse ?? 0.58);
     }
     let visual = players.get(player.id);
     if (!visual) {

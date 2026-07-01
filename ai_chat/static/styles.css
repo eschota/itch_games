@@ -125,6 +125,63 @@ h3 {
   white-space: pre-wrap;
 }
 
+.attachments {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 260px));
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.attachment {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #11161a;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.attachment-image {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+}
+
+.attachment-image img {
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  background: #090c0e;
+  border-radius: 6px;
+}
+
+.attachment span,
+.attachment a {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.attachment-player {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+}
+
+.attachment-player video,
+.attachment-player audio {
+  width: 100%;
+  max-height: 220px;
+}
+
+.attachment-file {
+  display: block;
+  padding: 10px;
+}
+
 .message strong {
   color: var(--good);
 }
@@ -154,7 +211,7 @@ h3 {
 
 .composer {
   display: grid;
-  grid-template-columns: 190px minmax(0, 1fr) 110px;
+  grid-template-columns: 190px minmax(0, 1fr) 190px 110px;
   gap: 12px;
   align-items: end;
   padding: 16px 20px;
@@ -183,6 +240,11 @@ textarea {
 textarea {
   min-height: 64px;
   resize: vertical;
+}
+
+input[type="file"] {
+  min-height: 42px;
+  padding: 8px;
 }
 
 button {

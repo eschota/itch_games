@@ -19,10 +19,23 @@ Use this file for work inside `/itch_games`.
 - `index.html`: shared IO Games catalog for the public domain root.
 - `tools/tools.skill.md`: tooling folder rules.
 - `tools/package_itch.py`: creates the player-facing upload zip in `dist/`.
+- `tools/unsoccer_acceptance.mjs`: isolated deterministic acceptance gate for
+  UnSoccer authoritative server mechanics.
 - `ui_designer/public_pages/orbital-courier-public-pages.md`: public-page
   design brief for local catalog, game entry, and itch.io presentation.
+- `ui_designer/public_pages/orbital-courier-itch-page-copy.md`,
+  `ui_designer/public_pages/orbital-courier-itch-publishing-checklist.md`, and
+  `ui_designer/public_pages/orbital-courier-itch-assets/`: Orbital Courier
+  external itch.io page source and storefront assets.
+- `ui_designer/public_pages/itch-publication-ledger.md`: cross-game external
+  itch.io publication ledger for URLs, packages, screenshots, live copy, and
+  version-match proof.
 - `ui_designer/public_pages/unsoccer-public-pages.md`: public-page design brief
   for Ragdoll Soccer II local route and itch.io presentation.
+- `ui_designer/public_pages/unsoccer-itch-page-copy.md`,
+  `ui_designer/public_pages/unsoccer-itch-publishing-checklist.md`, and
+  `ui_designer/public_pages/unsoccer-itch-assets/`: Ragdoll Soccer II external
+  itch.io page source and storefront/public-page assets.
 - `ui_designer/public_pages/public_pages.skill.md`: folder skill for public
   page briefs and itch.io presentation source-of-truth.
 - `orbital-courier/index.html`: current Orbital Courier game entrypoint.
@@ -35,6 +48,8 @@ Use this file for work inside `/itch_games`.
 - `unsoccer/index.html`: public prototype page served at `/unsoccer/`.
 - `unsoccer/unsoccer.skill.md`: game-folder rules for the new prototype.
 - `unsoccer/client/`: Vite TypeScript browser client.
+- `unsoccer/client/src/main.ts`: Three.js scene, gameplay HUD, player action
+  telegraphs, QA datasets, input, camera, and network state application.
 - `unsoccer/client/src/audio.ts`: procedural Web Audio runtime for UnSoccer
   server-state-driven cues.
 - `unsoccer/server/`: authoritative Node/Rapier/geckos server.
@@ -53,6 +68,8 @@ Use this file for work inside `/itch_games`.
   tuning, level notes, playtests, and briefs.
 - `programmer/`: non-runtime Programmer workspace for investigations,
   profiling, compatibility notes, plans, and validation checks.
+- `programmer/checks/2026-07-01-unsoccer-v0.0.003-acceptance.md`: UnSoccer
+  deterministic server acceptance evidence.
 - `tester/`: non-runtime Tester workspace for plans, bug notes, evidence,
   playtests, regression checks, and creative QA ideas.
 - `sound_designer/`: non-runtime Sound Designer workspace for source research,
@@ -61,6 +78,8 @@ Use this file for work inside `/itch_games`.
   procedural provenance, implementation contract, and QA evidence for v0.0.006.
 - `sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md`: UnSoccer
   audio map, procedural provenance, implementation points, and QA evidence.
+- `sound_designer/implementation/unsoccer-audio-pass-v0.0.003.md`: UnSoccer
+  network audio sync, unlock diagnostics, and browser smoke evidence.
 - `ai_chat/`: service code, static UI, deployment references, and server-only
   message storage for the shared development-agent chat.
 - `ai_chat/deploy/deploy.skill.md`: deployment reference rules for nginx,
@@ -134,7 +153,7 @@ Use this file for work inside `/itch_games`.
 ## Versioning
 
 - Current release: `v0.0.006`.
-- `unsoccer` release: `v0.0.002`.
+- `unsoccer` release: `v0.0.003`.
 - Game releases start at `v0.0.001` and every behavior change increments the
   version.
 - The visible bottom-left badge, `package.json.gameVersion`, README, and skill
@@ -159,8 +178,13 @@ Use this file for work inside `/itch_games`.
    and `vendor/three.module.js`.
 8. Confirm the itch package excludes internal `*skill*.md`, `skill.xml`, role,
    and agent coordination files.
-9. For `unsoccer`, run `npm run build:unsoccer`, start
+9. For `unsoccer`, run `npm run build:unsoccer`,
+   `npm run test:unsoccer:acceptance`, start
    `npm run server:unsoccer`, confirm `/api/health`, and open 4 clients with
    unique `name` query strings.
-10. Confirm `/unsoccer/` never exposes a directory listing on local or
+10. For UnSoccer audio, confirm a real trusted click/touch/key makes
+    `data-audio-context="running"`, `data-audio-unlocked="true"`, and
+    `data-audio-played-events` increase; automation-only clicks may leave
+    Chromium `AudioContext` suspended.
+11. Confirm `/unsoccer/` never exposes a directory listing on local or
     production static hosts.

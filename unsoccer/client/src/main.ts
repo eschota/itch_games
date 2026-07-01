@@ -117,6 +117,12 @@ declare global {
         daylight: string;
         camera: { x: number; y: number; z: number };
         audio: AudioRuntimeSnapshot;
+        interpolation: {
+          bufferedStates: number;
+          delayMs: number;
+          alpha: number;
+          renderAgeMs: number;
+        };
         weather: {
           hazards: number;
           localHazardId: string | null;
@@ -291,6 +297,7 @@ const ACTION_TELEGRAPH: Record<KickKind, {
 
 const players = new Map<string, PlayerVisual>();
 let latestState: ServerState | null = null;
+let renderedState: ServerState | null = null;
 let localJoin: JoinAccepted | null = null;
 let connected = false;
 let inputSequence = 0;
@@ -304,6 +311,8 @@ let lastSeenActionAt = 0;
 let ballPulse = 0;
 let cameraImpulse = 0;
 let lastFrameSeconds = 0;
+let interpolationAlpha = 1;
+let interpolationRenderAgeMs = 0;
 let qaDayCycleSeconds: number | null = readQaDayCycleSeconds();
 const audio = new UnSoccerAudio();
 let audioObservedPlayers = new Map<string, { role: PlayerSnapshot["role"]; lastActionAt: number }>();
@@ -317,6 +326,11 @@ const hazardAudioEvents: Record<HazardType, number> = {
   slush: 0,
   snowbank: 0
 };
+const STATE_INTERPOLATION_DELAY_SECONDS = 0.1;
+const STATE_HISTORY_LIMIT = 12;
+const PLAYER_SNAP_DISTANCE = 7.5;
+const BALL_SNAP_DISTANCE = FIELD_LENGTH * 0.45;
+const stateHistory: Array<{ state: ServerState; receivedAt: number }> = [];
 
 function readQaDayCycleSeconds(): number | null {
   const value = Number(new URLSearchParams(location.search).get("qaTime"));
@@ -345,6 +359,12 @@ window.unsoccerDebug = {
       z: Number(camera.position.z.toFixed(2))
     },
     audio: audio.snapshot(),
+    interpolation: {
+      bufferedStates: stateHistory.length,
+      delayMs: Math.round(STATE_INTERPOLATION_DELAY_SECONDS * 1000),
+      alpha: Number(interpolationAlpha.toFixed(3)),
+      renderAgeMs: Math.round(interpolationRenderAgeMs)
+    },
     weather: {
       hazards: latestState?.weather?.hazards.length ?? 0,
       localHazardId: audioObservedLocalHazardId,
@@ -891,6 +911,7 @@ function connect() {
 }
 
 function connectWebSocket(name: string) {
+  resetStateInterpolation();
   transportMode = "websocket";
   const wsChannel = new WebSocketNetworkChannel(webSocketUrl());
   channel = wsChannel;
@@ -930,6 +951,7 @@ function connectWebSocket(name: string) {
     audioObservedPlayers.clear();
     audioObservedScore = null;
     audioCountdownSecond = null;
+    resetStateInterpolation();
     statusEl.textContent = "\u041e\u0442\u043a\u043b\u044e\u0447\u0435\u043d\u043e. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0438\u0433\u0440\u043e\u0432\u043e\u0439 \u0441\u0435\u0440\u0432\u0435\u0440.";
   });
   wsChannel.on("joined", (data) => {
@@ -939,13 +961,13 @@ function connectWebSocket(name: string) {
     statusEl.textContent = "\u0421\u0435\u0440\u0432\u0435\u0440 \u0437\u0430\u043f\u043e\u043b\u043d\u0435\u043d.";
   });
   wsChannel.on("state", (data) => {
-    latestState = data as ServerState;
-    observeAudioState(latestState);
+    receiveState(data as ServerState);
   });
 }
 
 async function connectHttp(name: string, reason: string) {
   if (transportMode === "http" && httpClientId) return;
+  resetStateInterpolation();
   channel = null;
   transportMode = "http";
   httpPollGeneration += 1;
@@ -957,8 +979,7 @@ async function connectHttp(name: string, reason: string) {
     connected = true;
     audio.playConnection(true);
     acceptJoin(payload.joined);
-    latestState = payload.state;
-    observeAudioState(latestState);
+    receiveState(payload.state);
     document.documentElement.dataset.transport = `http:${reason}`;
     void pollHttpState(generation);
   } catch (error) {
@@ -976,8 +997,7 @@ async function pollHttpState(generation: number) {
         `state?clientId=${encodeURIComponent(httpClientId)}`
       );
       acceptJoin(payload.joined);
-      latestState = payload.state;
-      observeAudioState(latestState);
+      receiveState(payload.state);
       await wait(55);
     } catch (error) {
       connected = false;
@@ -1024,6 +1044,13 @@ function primeAudioObservation(state: ServerState) {
   audioObservedBallHazardId = hazardAt(state.ball.position, state.weather)?.id ?? null;
 }
 
+function resetStateInterpolation(): void {
+  stateHistory.length = 0;
+  renderedState = null;
+  interpolationAlpha = 1;
+  interpolationRenderAgeMs = 0;
+}
+
 function sendInput(force = false) {
   if (!connected) return;
   const now = performance.now();
@@ -1038,6 +1065,98 @@ function sendInput(force = false) {
   }
   if (!channel) return;
   channel.emit("input", { input, sequence: inputSequence });
+}
+
+function receiveState(state: ServerState) {
+  latestState = state;
+  stateHistory.push({ state, receivedAt: performance.now() * 0.001 });
+  while (stateHistory.length > STATE_HISTORY_LIMIT) stateHistory.shift();
+  observeAudioState(state);
+}
+
+function selectRenderState(nowSeconds: number): ServerState | null {
+  if (!latestState) return null;
+  if (stateHistory.length < 2) {
+    interpolationAlpha = 1;
+    interpolationRenderAgeMs = 0;
+    return latestState;
+  }
+
+  const targetTime = nowSeconds - STATE_INTERPOLATION_DELAY_SECONDS;
+  let from = stateHistory[0];
+  let to = stateHistory[stateHistory.length - 1];
+
+  if (targetTime <= from.receivedAt) {
+    interpolationAlpha = 0;
+    interpolationRenderAgeMs = (nowSeconds - from.receivedAt) * 1000;
+    return from.state;
+  }
+
+  if (targetTime >= to.receivedAt) {
+    interpolationAlpha = 1;
+    interpolationRenderAgeMs = (nowSeconds - to.receivedAt) * 1000;
+    return to.state;
+  }
+
+  for (let index = 0; index < stateHistory.length - 1; index += 1) {
+    const candidateFrom = stateHistory[index];
+    const candidateTo = stateHistory[index + 1];
+    if (candidateFrom.receivedAt <= targetTime && targetTime <= candidateTo.receivedAt) {
+      from = candidateFrom;
+      to = candidateTo;
+      break;
+    }
+  }
+
+  const span = Math.max(0.001, to.receivedAt - from.receivedAt);
+  const alpha = THREE.MathUtils.clamp((targetTime - from.receivedAt) / span, 0, 1);
+  interpolationAlpha = alpha;
+  interpolationRenderAgeMs = (nowSeconds - targetTime) * 1000;
+  return interpolateState(from.state, to.state, alpha);
+}
+
+function interpolateState(from: ServerState, to: ServerState, alpha: number): ServerState {
+  const previousPlayers = new Map(from.players.map((player) => [player.id, player]));
+  return {
+    ...to,
+    ball: interpolateBall(from.ball, to.ball, alpha),
+    players: to.players.map((player) => interpolatePlayer(previousPlayers.get(player.id), player, alpha))
+  };
+}
+
+function interpolateBall(from: ServerState["ball"], to: ServerState["ball"], alpha: number): ServerState["ball"] {
+  if (vecDistance(from.position, to.position) > BALL_SNAP_DISTANCE) return to;
+  return {
+    position: lerpVec3(from.position, to.position, alpha),
+    velocity: lerpVec3(from.velocity, to.velocity, alpha)
+  };
+}
+
+function interpolatePlayer(from: PlayerSnapshot | undefined, to: PlayerSnapshot, alpha: number): PlayerSnapshot {
+  if (!from || from.role !== to.role || vecDistance(from.position, to.position) > PLAYER_SNAP_DISTANCE) return to;
+  return {
+    ...to,
+    position: lerpVec3(from.position, to.position, alpha),
+    velocity: lerpVec3(from.velocity, to.velocity, alpha),
+    yaw: lerpAngle(from.yaw, to.yaw, alpha)
+  };
+}
+
+function lerpVec3(from: { x: number; y: number; z: number }, to: { x: number; y: number; z: number }, alpha: number) {
+  return {
+    x: THREE.MathUtils.lerp(from.x, to.x, alpha),
+    y: THREE.MathUtils.lerp(from.y, to.y, alpha),
+    z: THREE.MathUtils.lerp(from.z, to.z, alpha)
+  };
+}
+
+function vecDistance(from: { x: number; y: number; z: number }, to: { x: number; y: number; z: number }) {
+  return Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z);
+}
+
+function lerpAngle(from: number, to: number, alpha: number) {
+  const delta = Math.atan2(Math.sin(to - from), Math.cos(to - from));
+  return from + delta * alpha;
 }
 
 function updateHud(state: ServerState) {
@@ -1283,7 +1402,7 @@ function updateLighting(elapsedSeconds: number) {
   sunMesh.position.copy(sun.position).multiplyScalar(1.7);
   sunColor.copy(dayColor).lerp(sunsetColor, sunset).lerp(nightColor, 1 - daylight);
   skyColor.copy(nightColor).lerp(dayColor, daylight).lerp(sunsetColor, sunset * 0.36);
-  const snowIntensity = latestState?.weather?.intensity ?? 0;
+  const snowIntensity = (renderedState ?? latestState)?.weather?.intensity ?? 0;
   fogColor.copy(fogNightColor).lerp(fogDayColor, daylight).lerp(sunsetColor, sunset * 0.22).lerp(snowFogColor, snowIntensity * 0.14);
   sun.color.copy(sunColor);
   sun.intensity = 0.32 + daylight * 2.6 + sunset * 0.75;
@@ -1318,10 +1437,11 @@ function updateCamera(delta: number) {
   cameraVelocity.set(0, 0, 0);
   let yaw = 0;
   let team: TeamId | null = localJoin?.team ?? null;
+  const cameraState = renderedState ?? latestState;
 
-  if (latestState) {
-    cameraBall.set(latestState.ball.position.x, latestState.ball.position.y, latestState.ball.position.z);
-    const player = latestState.players.find((item) => item.id === localJoin?.id && item.role === "player");
+  if (cameraState) {
+    cameraBall.set(cameraState.ball.position.x, cameraState.ball.position.y, cameraState.ball.position.z);
+    const player = cameraState.players.find((item) => item.id === localJoin?.id && item.role === "player");
     if (player) {
       cameraFocus.set(player.position.x, 0.6, player.position.z);
       cameraVelocity.set(player.velocity.x, 0, player.velocity.z);
@@ -1416,7 +1536,12 @@ function frame(time: number) {
   const delta = lastFrameSeconds > 0 ? Math.min(0.05, seconds - lastFrameSeconds) : 1 / 60;
   lastFrameSeconds = seconds;
   sendInput();
-  if (latestState) applyState(latestState, seconds);
+  renderedState = selectRenderState(seconds);
+  document.documentElement.dataset.interpolationBuffer = String(stateHistory.length);
+  document.documentElement.dataset.interpolationDelayMs = String(Math.round(STATE_INTERPOLATION_DELAY_SECONDS * 1000));
+  document.documentElement.dataset.interpolationAlpha = interpolationAlpha.toFixed(3);
+  document.documentElement.dataset.interpolationRenderAgeMs = String(Math.round(interpolationRenderAgeMs));
+  if (renderedState) applyState(renderedState, seconds);
   updateLighting(seconds);
   updateCamera(delta);
   renderer.render(scene, camera);

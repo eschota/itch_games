@@ -13,6 +13,7 @@ const ROOT = path.resolve(__dirname, "..");
 const STATIC_DIR = path.join(__dirname, "static");
 const DATA_DIR = process.env.AI_CHAT_DATA_DIR || path.join(__dirname, "data");
 const MESSAGES_FILE = path.join(DATA_DIR, "messages.jsonl");
+const MESSAGE_ARCHIVES_DIR = path.join(DATA_DIR, "message_archives");
 const TASKS_FILE = path.join(DATA_DIR, "tasks.json");
 const TASK_EVENTS_FILE = path.join(DATA_DIR, "tasks.jsonl");
 const TODOS_FILE = path.join(DATA_DIR, "todos.json");
@@ -391,6 +392,10 @@ function gitContext() {
 }
 
 function readMessages(limit) {
+  return readAllMessages().slice(-limit);
+}
+
+function readAllMessages() {
   if (!fs.existsSync(MESSAGES_FILE)) return [];
   const rows = [];
   for (const line of fs.readFileSync(MESSAGES_FILE, "utf8").split(/\r?\n/)) {
@@ -399,7 +404,70 @@ function readMessages(limit) {
       rows.push(JSON.parse(line));
     } catch (_) {}
   }
-  return rows.slice(-limit);
+  return rows;
+}
+
+function writeMessages(records) {
+  ensureDataDir();
+  const payload = records.map((record) => JSON.stringify(record)).join(os.EOL) + (records.length ? os.EOL : "");
+  const tempFile = `${MESSAGES_FILE}.tmp`;
+  fs.writeFileSync(tempFile, payload, "utf8");
+  fs.renameSync(tempFile, MESSAGES_FILE);
+}
+
+function messageArchiveCount() {
+  if (!fs.existsSync(MESSAGE_ARCHIVES_DIR)) return 0;
+  return fs.readdirSync(MESSAGE_ARCHIVES_DIR).filter((name) => name.endsWith(".jsonl")).length;
+}
+
+function isAdminRole(role) {
+  const key = roleKey(role);
+  return key.includes("admin") || key.includes("storekeeper") || key.includes("administrator");
+}
+
+function archiveMessages(payload) {
+  const actorRole = cleanRole(payload.actor_role || payload.role || payload.created_by_role);
+  if (!isProducerOrOrchestrator(actorRole) && !isAdminRole(actorRole)) {
+    throw new Error("only Producer, Orchestrator, or Admin can archive chat");
+  }
+  if (String(payload.confirm || "").trim() !== "archive-chat") {
+    throw new Error("confirm must be archive-chat");
+  }
+
+  const keep = Math.min(Math.max(Number(payload.keep || 160) || 160, 50), 500);
+  const reason = cleanText(payload.reason || "Admin chat history archive", 500);
+  const messages = readAllMessages();
+  if (messages.length <= keep) {
+    return { archived: 0, kept: messages.length, archive_file: "", keep, reason };
+  }
+
+  const archive = messages.slice(0, messages.length - keep);
+  const kept = messages.slice(-keep);
+  fs.mkdirSync(MESSAGE_ARCHIVES_DIR, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const safeVersion = sanitizeFileName(projectVersion(), "version");
+  const archiveFile = path.join(MESSAGE_ARCHIVES_DIR, `${stamp}-${safeVersion}-${archive.length}-messages.jsonl`);
+  fs.writeFileSync(archiveFile, archive.map((record) => JSON.stringify(record)).join(os.EOL) + os.EOL, "utf8");
+
+  const context = gitContext();
+  const badge = roleBadge("Admin Storekeeper");
+  kept.push({
+    id: randomId(),
+    created_at: nowIso(),
+    role: "Admin Storekeeper",
+    role_icon: badge.icon,
+    role_label: badge.label,
+    role_badge: badge.text,
+    message: `Archived ${archive.length} older chat message(s) to ${path.relative(DATA_DIR, archiveFile).replace(/\\/g, "/")}. Reason: ${reason}`,
+    project_version: projectVersion(),
+    branch: context.branch,
+    commit: context.commit,
+    dirty: context.dirty,
+    source: "system",
+    attachments: [],
+  });
+  writeMessages(kept);
+  return { archived: archive.length, kept: kept.length, archive_file: path.basename(archiveFile), keep, reason };
 }
 
 function sanitizeAttachments(attachments) {
@@ -1731,7 +1799,8 @@ async function handleGet(req, res, parsed) {
       ok: true,
       project_version: projectVersion(),
       git: gitContext(),
-      message_count: readMessages(100000).length,
+      message_count: readAllMessages().length,
+      message_archive_count: messageArchiveCount(),
       task_count: readTasks().length,
       todo_count: readTodos().length,
       todo_gate: todoGate(),
@@ -1811,6 +1880,17 @@ async function handlePost(req, res, parsed) {
       const parsed = parseMultipartBody(body, contentType);
       const attachments = attachmentsFromUploadedFiles(req, parsed.files, "web");
       jsonResponse(res, 201, { ok: true, attachments });
+    } catch (error) {
+      errorJson(res, 400, error.message);
+    }
+    return;
+  }
+
+  if (pathname === "/api/admin/archive-messages") {
+    try {
+      const payload = await readJsonPayload(req, 8192);
+      const result = archiveMessages(payload);
+      jsonResponse(res, 200, { ok: true, archive: result, message_count: readAllMessages().length, message_archive_count: messageArchiveCount() });
     } catch (error) {
       errorJson(res, 400, error.message);
     }

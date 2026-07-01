@@ -35,6 +35,11 @@ Use this file for work inside `/itch_games/ai_chat`.
 - Do not commit `ai_chat/data/`.
 - Keep API responses JSON and browser-safe.
 - Keep commit history visible in the service menu, separate from chat messages.
+- Archive old chat history through `/api/admin/archive-messages` before major
+  version transitions when chat grows too large. The endpoint must preserve a
+  JSONL archive under server-only `ai_chat/data/message_archives/`, keep a
+  recent live tail, and leave a system summary message instead of deleting
+  history without an archive.
 - Keep Task Queue as the source of truth for role work. The Orchestrator or
   Producer creates tasks; execution roles do not do non-read-only project work
   without an assigned or claimed task for their role.

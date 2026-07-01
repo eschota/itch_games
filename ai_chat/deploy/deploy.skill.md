@@ -59,12 +59,13 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
   `@dimforge/rapier3d-compat` and `@itch-games/unsoccer-shared`; it must not
   require `ws`, geckos.io, or `node-datachannel` for the WebSocket transport.
 - The qwertystock autodeploy must run `npm ci` with dev dependencies even when
-  the service environment is production, delete `unsoccer/client/dist` before
-  rebuilding, then verify `unsoccer/client/dist/index.html`, the visible
-  `v0.0.008` marker, the `0.56 MB` weight label, at least one built JS asset,
-  the `residential-courtyard` client marker inside built assets, and that the
-  server bundle does not import geckos.io, `ws`, or `node-datachannel` before
-  nginx reload.
+  the service environment is production, delete generated UnSoccer dist folders
+  before rebuilding, then verify `unsoccer/client/dist/index.html` against
+  `package.json.games.unsoccer.version`, the `0.56 MB` weight label, every
+  referenced asset path, at least one built JS asset, the
+  `residential-courtyard` client marker inside built assets, and that the server
+  bundle does not import geckos.io, `ws`, or `node-datachannel` before nginx
+  reload.
 - After nginx reload, the qwertystock autodeploy must smoke the public
   `/unsoccer/` route for the same version and weight markers plus
   `/unsoccer/api/health` for the matching server version. `/api/deploy-health`

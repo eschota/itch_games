@@ -1409,6 +1409,68 @@ function localHttpJson(port, requestPath, timeoutMs) {
   });
 }
 
+function remoteHttpText(targetUrl, timeoutMs, maxBytes) {
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(targetUrl);
+    } catch (error) {
+      resolve({ ok: false, elapsed_ms: 0, error: error.message });
+      return;
+    }
+    const transport = parsedUrl.protocol === "http:" ? http : https;
+    const limit = maxBytes || 16000;
+    const request = transport.get(parsedUrl, {
+      timeout: timeoutMs || 2000,
+      headers: { "User-Agent": "itch-games-deploy-health" },
+    }, (response) => {
+      const chunks = [];
+      let total = 0;
+      response.on("data", (chunk) => {
+        if (total < limit) chunks.push(chunk.subarray(0, limit - total));
+        total += chunk.length;
+      });
+      response.on("end", () => {
+        const body = Buffer.concat(chunks).toString("utf8");
+        resolve({
+          ok: response.statusCode >= 200 && response.statusCode < 300,
+          status: response.statusCode,
+          elapsed_ms: Date.now() - startedAt,
+          truncated: total > limit,
+          body,
+        });
+      });
+    });
+    request.on("error", (error) => resolve({
+      ok: false,
+      elapsed_ms: Date.now() - startedAt,
+      error: error.message,
+    }));
+    request.on("timeout", () => {
+      request.destroy(new Error("timeout"));
+    });
+  });
+}
+
+async function remoteHttpJson(targetUrl, timeoutMs) {
+  const report = await remoteHttpText(targetUrl, timeoutMs || 2000, 4000);
+  let json = null;
+  try {
+    json = report.body ? JSON.parse(report.body) : null;
+  } catch (_) {
+    json = null;
+  }
+  return {
+    ok: report.ok && Boolean(json),
+    status: report.status,
+    elapsed_ms: report.elapsed_ms,
+    json,
+    body_sample: json ? undefined : String(report.body || "").slice(0, 400),
+    error: report.error,
+  };
+}
+
 function execFileReport(command, args, timeoutMs) {
   return new Promise((resolve) => {
     childProcess.execFile(command, args, {
@@ -1448,9 +1510,12 @@ function trackUnsoccerOutput(streamName, chunk) {
 }
 
 async function deployHealthSnapshot() {
+  const publicBaseUrl = publicSiteBaseUrl();
   const distHtml = readTextFileSlice(["unsoccer", "client", "dist", "index.html"], 16000);
   const distAssets = unsoccerDistAssetReports(distHtml);
   const serverHealth = await localHttpJson(Number(process.env.UNSOCCER_PORT || 8787), "/api/health", 1800);
+  const publicGameHtml = await remoteHttpText(`${publicBaseUrl}/unsoccer/`, 2500, 16000);
+  const publicApiHealth = await remoteHttpJson(`${publicBaseUrl}/unsoccer/api/health`, 2500);
   const systemd = await execFileReport("systemctl", ["is-active", "itch-games-unsoccer-server.service"], 1800);
   const processList = await execFileReport("pgrep", ["-af", "unsoccer/server/dist/index.js"], 1800);
   const dependencyCheck = await execFileReport(process.execPath, [
@@ -1464,23 +1529,40 @@ async function deployHealthSnapshot() {
   const distHtmlVersionMatches = Boolean(expectedVersion && distHtml.includes(expectedVersion));
   const localApiVersion = String(serverHealth.json?.version || "");
   const localApiVersionMatches = Boolean(localApiVersion && localApiVersion === expectedVersion);
+  const publicHtmlVersionMatches = Boolean(publicGameHtml.ok && expectedVersion && publicGameHtml.body.includes(expectedVersion));
+  const publicHtmlWeightMatches = Boolean(publicGameHtml.ok && publicGameHtml.body.includes("0.56 MB"));
+  const publicApiVersion = String(publicApiHealth.json?.version || "");
+  const publicApiVersionMatches = Boolean(publicApiVersion && publicApiVersion === expectedVersion);
   const requiresSystemd = process.platform === "linux";
   return {
     ok: true,
-    ready: Boolean(hasBuiltHtml && hasJsAsset && serverHealth.ok && distHtmlVersionMatches && localApiVersionMatches),
+    ready: Boolean(hasBuiltHtml && hasJsAsset && serverHealth.ok && distHtmlVersionMatches
+      && localApiVersionMatches && publicHtmlVersionMatches && publicHtmlWeightMatches
+      && publicApiVersionMatches),
     time: nowIso(),
     project_version: expectedVersion,
     git: gitContext(),
     deploy_running: deployRunning,
     urls: {
-      public_game: `${publicSiteBaseUrl()}/unsoccer/`,
-      public_api_health: `${publicSiteBaseUrl()}/unsoccer/api/health`,
+      public_game: `${publicBaseUrl}/unsoccer/`,
+      public_api_health: `${publicBaseUrl}/unsoccer/api/health`,
       local_api_health: "http://127.0.0.1:8787/api/health",
     },
     unsoccer: {
       built_html_detected: hasBuiltHtml,
       dist_html_version_matches: distHtmlVersionMatches,
       local_api_version_matches: localApiVersionMatches,
+      public_html_version_matches: publicHtmlVersionMatches,
+      public_html_weight_matches: publicHtmlWeightMatches,
+      public_api_version_matches: publicApiVersionMatches,
+      public_game_html: {
+        ok: publicGameHtml.ok,
+        status: publicGameHtml.status,
+        elapsed_ms: publicGameHtml.elapsed_ms,
+        truncated: publicGameHtml.truncated,
+        body_sample: String(publicGameHtml.body || "").slice(0, 400),
+        error: publicGameHtml.error,
+      },
       files: {
         public_page: fileReport("unsoccer", "index.html"),
         client_dev_html: fileReport("unsoccer", "client", "index.html"),
@@ -1489,6 +1571,7 @@ async function deployHealthSnapshot() {
       },
       dist_assets: distAssets,
       local_api_health: serverHealth,
+      public_api_health: publicApiHealth,
       requires_systemd: requiresSystemd,
       systemd_service: systemd,
       process_list: processList,

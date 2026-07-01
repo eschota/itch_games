@@ -10,9 +10,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@geckos.io/client": "^3.0.2",
     "@itch-games/unsoccer-shared": "0.0.3",
-    "@mavonengine/core": "0.0.20",
     "three": "^0.184.0"
   },
   "devDependencies": {

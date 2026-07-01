@@ -41,8 +41,9 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
   active state.
 - The production UnSoccer route serves `unsoccer/client/dist` at `/unsoccer/`,
   proxies `/unsoccer/api/` to `127.0.0.1:8787/api/`, and strips
-  `/unsoccer/socket/` before forwarding geckos.io `/.wrtc/v2` requests to
-  `127.0.0.1:8787`.
+  `/unsoccer/socket/` before forwarding WebSocket requests to
+  `127.0.0.1:8787`. The socket location must pass `Upgrade` and `Connection`
+  headers and long read/send timeouts.
 - The qwertystock autodeploy must install
   `itch-games-ai-chat-qwertystock.service` as the active
   `itch-games-ai-chat.service` before restart, so Node `server_node.js` owns

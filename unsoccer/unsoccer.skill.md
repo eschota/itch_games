@@ -15,7 +15,7 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 - `client/`: Vite TypeScript browser client for rendering, input, HUD,
   procedural Web Audio, and asset loading.
 - `server/`: Node authoritative game server using the MavonEngine stack shape:
-  headless simulation, Rapier3D physics, and geckos.io WebRTC transport.
+  headless simulation, Rapier3D physics, and WebSocket transport.
 - `shared/`: protocol constants, message types, and gameplay tuning shared by
   client and server.
 - `assets/`: final local runtime assets and license/provenance manifests.
@@ -53,7 +53,10 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 - Run `npm run test:unsoccer:acceptance` before claiming spectator assignment,
   kick/body contacts, or goal/reset behavior is ready.
 - Keep the itch.io package static. The zip contains the built client only; live
-  multiplayer requires a separately deployed HTTPS/geckos server.
+  multiplayer requires a separately deployed HTTPS/WebSocket server.
+- Production uses `/unsoccer/socket/` as the WebSocket proxy path. Do not
+  reintroduce geckos.io as a required production dependency on the Qwertystock
+  host; its native `node-datachannel` addon is not compatible with that target.
 - Treat `index.html` as a UI Designer-owned public surface for catalog
   continuity, prototype status, itch.io page direction, and safe local-server
   presentation. It must never expose a directory listing.

@@ -1,7 +1,7 @@
 import http from "node:http";
 import express, { type Request, type Response } from "express";
 import RAPIER from "@dimforge/rapier3d-compat";
-import geckos, { iceServers, type Data, type ServerChannel } from "@geckos.io/server";
+import { WebSocket, WebSocketServer, type RawData } from "ws";
 import {
   BALL_RADIUS,
   BODY_BUMP_COOLDOWN_MS,
@@ -25,7 +25,6 @@ import {
   PLAYER_HEIGHT,
   PLAYER_RADIUS,
   PLAYER_SPEED,
-  ROOM_ID,
   SERVER_TICK_RATE,
   SNAPSHOT_RATE,
   type BallSnapshot,
@@ -47,6 +46,72 @@ import {
   sanitizePlayerName
 } from "@itch-games/unsoccer-shared";
 
+type TransportEventHandler = (data: unknown) => void;
+
+interface TransportChannel {
+  id: string;
+  emit(eventName: string, data: unknown): void;
+  on(eventName: string, handler: TransportEventHandler): void;
+  onDisconnect(handler: () => void): void;
+  close(): void;
+}
+
+interface WireMessage {
+  event?: unknown;
+  data?: unknown;
+}
+
+function rawDataToString(data: RawData): string {
+  if (typeof data === "string") return data;
+  if (Buffer.isBuffer(data)) return data.toString("utf8");
+  if (data instanceof ArrayBuffer) return Buffer.from(data).toString("utf8");
+  return Buffer.concat(data).toString("utf8");
+}
+
+class WebSocketChannel implements TransportChannel {
+  readonly id = `ws-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  private readonly handlers = new Map<string, TransportEventHandler[]>();
+
+  constructor(private readonly socket: WebSocket) {
+    socket.on("message", (raw) => this.handleMessage(rawDataToString(raw)));
+    socket.on("error", () => {
+      // Close performs player cleanup; this listener prevents an unhandled error crash.
+    });
+  }
+
+  emit(eventName: string, data: unknown): void {
+    if (this.socket.readyState !== WebSocket.OPEN) return;
+    this.socket.send(JSON.stringify({ event: eventName, data }));
+  }
+
+  on(eventName: string, handler: TransportEventHandler): void {
+    const handlers = this.handlers.get(eventName) || [];
+    handlers.push(handler);
+    this.handlers.set(eventName, handlers);
+  }
+
+  onDisconnect(handler: () => void): void {
+    this.socket.once("close", handler);
+  }
+
+  close(): void {
+    this.socket.close();
+  }
+
+  private handleMessage(raw: string): void {
+    let message: WireMessage;
+    try {
+      message = JSON.parse(raw) as WireMessage;
+    } catch (_) {
+      return;
+    }
+    if (typeof message.event !== "string") return;
+    for (const handler of this.handlers.get(message.event) || []) {
+      handler(message.data);
+    }
+  }
+}
+
 interface PlayerRuntime {
   id: string;
   name: string;
@@ -55,7 +120,8 @@ interface PlayerRuntime {
   index: number;
   joinOrder: number;
   characterId: string;
-  channel: ServerChannel | null;
+  channel: TransportChannel | null;
+  transport: "websocket" | "http" | "test";
   input: InputState;
   inputSequence: number;
   body: RAPIER.RigidBody | null;
@@ -69,10 +135,10 @@ interface PlayerRuntime {
   lastActionAt: number;
   yaw: number;
   velocity: Vec3;
+  lastSeenAt: number;
 }
 
 const PORT = Number(process.env.UNSOCCER_PORT || 8787);
-const LOCAL_ICE = process.env.UNSOCCER_LOCAL_ICE === "1";
 const TEST_MODE = process.env.UNSOCCER_TEST_MODE === "1";
 const TEST_TOKEN = process.env.UNSOCCER_TEST_TOKEN || "";
 const WEATHER_HAZARDS: HazardSnapshot[] = [
@@ -155,10 +221,7 @@ function cloneInput(input: InputState): InputState {
 class UnsoccerServer {
   private readonly app = express();
   private readonly httpServer = http.createServer(this.app);
-  private readonly io = geckos({
-    cors: { origin: "*" },
-    iceServers: LOCAL_ICE ? [] : iceServers
-  });
+  private readonly wss = new WebSocketServer({ server: this.httpServer });
 
   private world!: RAPIER.World;
   private ballBody!: RAPIER.RigidBody;
@@ -174,8 +237,7 @@ class UnsoccerServer {
     await RAPIER.init();
     this.createPhysicsWorld();
     this.configureHttp();
-    this.io.addServer(this.httpServer);
-    this.io.onConnection((channel) => this.onConnection(channel));
+    this.configureWebSocket();
     this.httpServer.listen(PORT, () => {
       console.log(`unsoccer ${GAME_VERSION} listening on http://127.0.0.1:${PORT}`);
     });
@@ -183,10 +245,66 @@ class UnsoccerServer {
     setInterval(() => this.tick(), 1000 / SERVER_TICK_RATE);
   }
 
+  private configureWebSocket(): void {
+    this.wss.on("connection", (socket) => this.onConnection(new WebSocketChannel(socket)));
+  }
+
   private configureHttp(): void {
     this.app.use(express.json({ limit: "32kb" }));
     this.app.get("/api/health", (_request, response) => {
       response.json(this.serverInfo());
+    });
+    this.app.post("/api/join", (request, response) => {
+      if (this.players.size >= MAX_ROOM_CLIENTS) {
+        response.status(409).json({ ok: false, error: "server-full", maxRoomClients: MAX_ROOM_CLIENTS });
+        return;
+      }
+      const body = this.requestBody(request);
+      const runtime = this.createRuntime({
+        id: `http-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name: sanitizePlayerName(body.name),
+        channel: null,
+        transport: "http"
+      });
+      this.players.set(runtime.id, runtime);
+      this.rebalanceRoles();
+      this.message = `${runtime.name} \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0438\u043b\u0441\u044f ${runtime.role === "player" ? "\u043a \u043f\u043e\u043b\u044e" : "\u043a\u0430\u043a \u043d\u0430\u0431\u043b\u044e\u0434\u0430\u0442\u0435\u043b\u044c"}`;
+      response.json({ ok: true, joined: this.joinPayload(runtime), state: this.snapshot() });
+    });
+    this.app.post("/api/input", (request, response) => {
+      const body = this.requestBody(request);
+      const player = this.players.get(String(body.clientId || ""));
+      if (!player || player.transport !== "http") {
+        response.status(404).json({ ok: false, error: "client not found" });
+        return;
+      }
+      const message = body as Partial<ClientInputMessage> & { clientId?: string };
+      if (typeof message.sequence === "number" && message.sequence >= player.inputSequence) {
+        player.input = cloneInput(message.input || DEFAULT_INPUT);
+        player.inputSequence = message.sequence;
+        player.lastSeenAt = Date.now();
+      }
+      response.json({ ok: true });
+    });
+    this.app.get("/api/state", (request, response) => {
+      const player = this.players.get(String(request.query.clientId || ""));
+      if (!player || player.transport !== "http") {
+        response.status(404).json({ ok: false, error: "client not found" });
+        return;
+      }
+      player.lastSeenAt = Date.now();
+      response.json({ ok: true, joined: this.joinPayload(player), state: this.snapshot() });
+    });
+    this.app.post("/api/leave", (request, response) => {
+      const body = this.requestBody(request);
+      const player = this.players.get(String(body.clientId || ""));
+      if (player && player.transport === "http") {
+        this.destroyBody(player);
+        this.players.delete(player.id);
+        this.rebalanceRoles();
+        this.message = `${player.name} \u0432\u044b\u0448\u0435\u043b`;
+      }
+      response.json({ ok: true });
     });
     if (TEST_MODE) this.configureTestHttp();
   }
@@ -306,36 +424,51 @@ class UnsoccerServer {
     this.players.clear();
     this.joinCounter = 0;
     for (let index = 0; index < count; index += 1) {
-      const id = `test-player-${index + 1}`;
-      const runtime: PlayerRuntime = {
-        id,
+      const runtime = this.createRuntime({
+        id: `test-player-${index + 1}`,
         name: `\u0422\u0435\u0441\u0442 ${index + 1}`,
-        role: "spectator",
-        team: null,
-        index,
-        joinOrder: this.joinCounter++,
-        characterId: CHARACTER_ROSTER[index % CHARACTER_ROSTER.length],
         channel: null,
-        input: { ...DEFAULT_INPUT },
-        inputSequence: 0,
-        body: null,
-        lastKickAt: 0,
-        lastHeadAt: 0,
-        lastKickLeft: 0,
-        lastKickRight: 0,
-        lastHead: 0,
-        lastBodyAt: 0,
-        lastAction: null,
-        lastActionAt: 0,
-        yaw: 0,
-        velocity: zeroVec()
-      };
-      this.players.set(id, runtime);
+        transport: "test"
+      });
+      this.players.set(runtime.id, runtime);
     }
     this.rebalanceRoles();
     this.message = count > 0
       ? "\u0422\u0435\u0441\u0442\u043e\u0432\u044b\u0435 \u0438\u0433\u0440\u043e\u043a\u0438 \u0433\u043e\u0442\u043e\u0432\u044b"
       : "\u0416\u0434\u0451\u043c \u0438\u0433\u0440\u043e\u043a\u043e\u0432";
+  }
+
+  private createRuntime(options: {
+    id: string;
+    name: string;
+    channel: TransportChannel | null;
+    transport: PlayerRuntime["transport"];
+  }): PlayerRuntime {
+    return {
+      id: options.id,
+      name: options.name,
+      role: "spectator",
+      team: null,
+      index: this.players.size,
+      joinOrder: this.joinCounter++,
+      characterId: CHARACTER_ROSTER[0],
+      channel: options.channel,
+      transport: options.transport,
+      input: { ...DEFAULT_INPUT },
+      inputSequence: 0,
+      body: null,
+      lastKickAt: 0,
+      lastHeadAt: 0,
+      lastKickLeft: 0,
+      lastKickRight: 0,
+      lastHead: 0,
+      lastBodyAt: 0,
+      lastAction: null,
+      lastActionAt: 0,
+      yaw: 0,
+      velocity: zeroVec(),
+      lastSeenAt: Date.now()
+    };
   }
 
   private resetMatch(now: number): void {
@@ -404,55 +537,38 @@ class UnsoccerServer {
     );
   }
 
-  private onConnection(channel: ServerChannel): void {
+  private onConnection(channel: TransportChannel): void {
     if (this.players.size >= MAX_ROOM_CLIENTS) {
-      channel.emit("server-full", { maxRoomClients: MAX_ROOM_CLIENTS }, { reliable: true });
+      channel.emit("server-full", { maxRoomClients: MAX_ROOM_CLIENTS });
       channel.close();
       return;
     }
 
-    const id = channel.id || `client-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    channel.join(ROOM_ID);
-    const runtime: PlayerRuntime = {
+    const id = channel.id;
+    const runtime = this.createRuntime({
       id,
       name: `\u0413\u043e\u0441\u0442\u044c ${this.players.size + 1}`,
-      role: "spectator",
-      team: null,
-      index: this.players.size,
-      joinOrder: this.joinCounter++,
-      characterId: CHARACTER_ROSTER[0],
       channel,
-      input: { ...DEFAULT_INPUT },
-      inputSequence: 0,
-      body: null,
-      lastKickAt: 0,
-      lastHeadAt: 0,
-      lastKickLeft: 0,
-      lastKickRight: 0,
-      lastHead: 0,
-      lastBodyAt: 0,
-      lastAction: null,
-      lastActionAt: 0,
-      yaw: 0,
-      velocity: zeroVec()
-    };
+      transport: "websocket"
+    });
 
     this.players.set(id, runtime);
     this.rebalanceRoles();
 
-    channel.on("join", (data: Data) => {
+    channel.on("join", (data: unknown) => {
       const request = data as JoinRequest;
       runtime.name = sanitizePlayerName(request?.name);
       this.sendJoin(runtime);
       this.message = `${runtime.name} \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0438\u043b\u0441\u044f ${runtime.role === "player" ? "\u043a \u043f\u043e\u043b\u044e" : "\u043a\u0430\u043a \u043d\u0430\u0431\u043b\u044e\u0434\u0430\u0442\u0435\u043b\u044c"}`;
     });
 
-    channel.on("input", (data: Data) => {
+    channel.on("input", (data: unknown) => {
       const message = data as ClientInputMessage;
       if (!message || typeof message.sequence !== "number") return;
       if (message.sequence < runtime.inputSequence) return;
       runtime.input = cloneInput(message.input || DEFAULT_INPUT);
       runtime.inputSequence = message.sequence;
+      runtime.lastSeenAt = Date.now();
     });
 
     channel.onDisconnect(() => {
@@ -501,7 +617,11 @@ class UnsoccerServer {
   private sendJoin(player: PlayerRuntime): void {
     const channel = player.channel;
     if (!channel) return;
-    const payload: JoinAccepted = {
+    channel.emit("joined", this.joinPayload(player));
+  }
+
+  private joinPayload(player: PlayerRuntime): JoinAccepted {
+    return {
       id: player.id,
       role: player.role,
       team: player.team,
@@ -511,7 +631,6 @@ class UnsoccerServer {
       maxActivePlayers: MAX_ACTIVE_PLAYERS,
       maxRoomClients: MAX_ROOM_CLIENTS
     };
-    channel.emit("joined", payload, { reliable: true });
   }
 
   private spawnForIndex(index: number): Vec3 {
@@ -527,6 +646,7 @@ class UnsoccerServer {
   private tick(now = Date.now(), emitSnapshot = true): void {
     const dt = 1 / SERVER_TICK_RATE;
     this.tickCount += 1;
+    this.cleanupStaleHttpPlayers(now);
 
     for (const player of this.players.values()) {
       this.updatePlayer(player, dt, now);
@@ -539,7 +659,28 @@ class UnsoccerServer {
 
     if (emitSnapshot && now - this.lastSnapshotAt >= 1000 / SNAPSHOT_RATE) {
       this.lastSnapshotAt = now;
-      this.io.room(ROOM_ID).emit("state", this.snapshot(now));
+      this.broadcast("state", this.snapshot(now));
+    }
+  }
+
+  private broadcast(eventName: string, data: unknown): void {
+    for (const player of this.players.values()) {
+      if (player.transport === "websocket") player.channel?.emit(eventName, data);
+    }
+  }
+
+  private cleanupStaleHttpPlayers(now: number): void {
+    let changed = false;
+    for (const player of this.players.values()) {
+      if (player.transport !== "http") continue;
+      if (now - player.lastSeenAt < 30000) continue;
+      this.destroyBody(player);
+      this.players.delete(player.id);
+      changed = true;
+    }
+    if (changed) {
+      this.rebalanceRoles();
+      this.message = "\u0418\u0433\u0440\u043e\u043a \u0432\u044b\u0448\u0435\u043b";
     }
   }
 
@@ -844,7 +985,11 @@ class UnsoccerServer {
       activePlayers,
       connectedClients: this.players.size,
       maxActivePlayers: MAX_ACTIVE_PLAYERS,
-      maxRoomClients: MAX_ROOM_CLIENTS
+      maxRoomClients: MAX_ROOM_CLIENTS,
+      transports: {
+        websocket: Boolean(this.wss),
+        http: true
+      }
     };
   }
 }

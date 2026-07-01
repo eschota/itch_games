@@ -52,7 +52,7 @@ Use this file for work inside `/itch_games`.
   telegraphs, QA datasets, input, camera, and network state application.
 - `unsoccer/client/src/audio.ts`: procedural Web Audio runtime for UnSoccer
   server-state-driven cues.
-- `unsoccer/server/`: authoritative Node/Rapier/geckos server.
+- `unsoccer/server/`: authoritative Node/Rapier/WebSocket server.
 - `unsoccer/shared/`: shared protocol, constants, and gameplay tuning.
 - `unsoccer/assets/`: local runtime assets plus Free3D roster/provenance files.
 - `art_director/`: non-runtime Art Director workspace for audits, checks,

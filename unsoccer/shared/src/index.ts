@@ -125,6 +125,10 @@ export interface ServerInfo {
   connectedClients: number;
   maxActivePlayers: number;
   maxRoomClients: number;
+  transports?: {
+    websocket: boolean;
+    http: boolean;
+  };
 }
 
 export const DEFAULT_INPUT: InputState = {

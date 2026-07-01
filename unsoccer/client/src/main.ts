@@ -1,4 +1,3 @@
-import geckos from "@geckos.io/client";
 import * as THREE from "three";
 import {
   BALL_RADIUS,
@@ -23,6 +22,86 @@ import {
 import { UnSoccerAudio, type AudioRuntimeSnapshot } from "./audio";
 import { WeatherVisualLayer } from "./weather";
 import "./styles.css";
+
+interface NetworkChannel {
+  emit(eventName: string, data: unknown, options?: unknown): void;
+  on(eventName: string, handler: (data: unknown) => void): void;
+  onConnect(handler: (error?: Error) => void): void;
+  onDisconnect(handler: () => void): void;
+  close(): void;
+}
+
+interface WireMessage {
+  event?: unknown;
+  data?: unknown;
+}
+
+class WebSocketNetworkChannel implements NetworkChannel {
+  private readonly socket: WebSocket;
+  private readonly handlers = new Map<string, Array<(data: unknown) => void>>();
+  private connectHandler: ((error?: Error) => void) | null = null;
+  private disconnectHandler: (() => void) | null = null;
+  private settled = false;
+
+  constructor(url: string) {
+    this.socket = new WebSocket(url);
+    this.socket.addEventListener("open", () => {
+      this.settled = true;
+      this.connectHandler?.();
+    });
+    this.socket.addEventListener("error", () => {
+      if (this.settled) return;
+      this.settled = true;
+      this.connectHandler?.(new Error("websocket connection failed"));
+    });
+    this.socket.addEventListener("close", () => {
+      if (!this.settled) {
+        this.settled = true;
+        this.connectHandler?.(new Error("websocket connection closed"));
+      }
+      this.disconnectHandler?.();
+    });
+    this.socket.addEventListener("message", (event) => this.handleMessage(event.data));
+  }
+
+  emit(eventName: string, data: unknown): void {
+    if (this.socket.readyState !== WebSocket.OPEN) return;
+    this.socket.send(JSON.stringify({ event: eventName, data }));
+  }
+
+  on(eventName: string, handler: (data: unknown) => void): void {
+    const handlers = this.handlers.get(eventName) || [];
+    handlers.push(handler);
+    this.handlers.set(eventName, handlers);
+  }
+
+  onConnect(handler: (error?: Error) => void): void {
+    this.connectHandler = handler;
+    if (this.socket.readyState === WebSocket.OPEN) handler();
+  }
+
+  onDisconnect(handler: () => void): void {
+    this.disconnectHandler = handler;
+  }
+
+  close(): void {
+    this.socket.close();
+  }
+
+  private handleMessage(raw: unknown): void {
+    if (typeof raw !== "string") return;
+    let message: WireMessage;
+    try {
+      message = JSON.parse(raw) as WireMessage;
+    } catch (_) {
+      return;
+    }
+    if (typeof message.event !== "string") return;
+    for (const handler of this.handlers.get(message.event) || []) {
+      handler(message.data);
+    }
+  }
+}
 
 declare global {
   interface Window {
@@ -212,7 +291,10 @@ let localJoin: JoinAccepted | null = null;
 let connected = false;
 let inputSequence = 0;
 let input: InputState = { ...DEFAULT_INPUT };
-let channel: ReturnType<typeof geckos> | null = null;
+let channel: NetworkChannel | null = null;
+let transportMode: "none" | "websocket" | "http" = "none";
+let httpClientId: string | null = null;
+let httpPollGeneration = 0;
 let lastSentAt = 0;
 let lastSeenActionAt = 0;
 let ballPulse = 0;
@@ -569,39 +651,114 @@ function makeLabel(name: string) {
   return sprite;
 }
 
-function networkOptions() {
+function webSocketUrl() {
   const params = new URLSearchParams(location.search);
   const explicit = params.get("server");
   if (explicit) {
     const target = new URL(explicit);
-    const hasPath = target.pathname !== "/";
-    return {
-      url: hasPath ? explicit : `${target.protocol}//${target.hostname}`,
-      port: hasPath || !target.port ? null : Number(target.port)
-    };
+    if (target.protocol === "ws:" || target.protocol === "wss:") return target.toString();
+    target.protocol = target.protocol === "https:" ? "wss:" : "ws:";
+    if (target.pathname === "/") target.pathname = "/ws";
+    return target.toString();
   }
   if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {
-    return { url: "http://127.0.0.1", port: 8787 };
+    return "ws://127.0.0.1:8787/ws";
   }
-  return { url: `${location.origin}/unsoccer/socket`, port: null };
+  const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${location.host}/unsoccer/socket/ws`;
+}
+
+function serverApiBase() {
+  const explicit = new URLSearchParams(location.search).get("server");
+  if (explicit) {
+    const target = new URL(explicit);
+    target.protocol = target.protocol === "wss:" ? "https:" : target.protocol === "ws:" ? "http:" : target.protocol;
+    let pathname = target.pathname.replace(/\/+$/, "");
+    if (!pathname) pathname = "/api";
+    else if (pathname.endsWith("/socket/ws")) pathname = `${pathname.slice(0, -"/socket/ws".length)}/api`;
+    else if (pathname.endsWith("/socket")) pathname = `${pathname.slice(0, -"/socket".length)}/api`;
+    else if (pathname.endsWith("/ws")) pathname = "/api";
+    else if (!pathname.endsWith("/api")) pathname = `${pathname}/api`;
+    return `${target.origin}${pathname}`;
+  }
+  if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {
+    return "http://127.0.0.1:8787/api";
+  }
+  return `${location.origin}/unsoccer/api`;
+}
+
+function prefersHttpTransport() {
+  const transport = new URLSearchParams(location.search).get("transport");
+  if (transport === "http") return true;
+  return false;
+}
+
+async function postJson<T>(path: string, payload: unknown): Promise<T> {
+  const response = await fetch(`${serverApiBase()}/${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) throw new Error(`${path}: ${response.status}`);
+  return await response.json() as T;
+}
+
+async function getJson<T>(path: string): Promise<T> {
+  const response = await fetch(`${serverApiBase()}/${path}`, { cache: "no-store" });
+  if (!response.ok) throw new Error(`${path}: ${response.status}`);
+  return await response.json() as T;
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function acceptJoin(join: JoinAccepted) {
+  const previous = localJoin;
+  localJoin = join;
+  if (!previous || previous.role !== join.role || previous.team !== join.team || previous.index !== join.index) {
+    audio.playJoin(localJoin.role);
+  }
+  statusEl.textContent = localJoin.role === "player"
+    ? `\u0412\u044b \u0432 \u043a\u043e\u043c\u0430\u043d\u0434\u0435 ${teamNameLabel(localJoin.team)} #${localJoin.index + 1}.`
+    : "\u0420\u0435\u0436\u0438\u043c \u0437\u0440\u0438\u0442\u0435\u043b\u044f/\u0442\u0435\u0441\u0442\u0435\u0440\u0430.";
 }
 
 function connect() {
   const name = new URLSearchParams(location.search).get("name") || `\u0418\u0433\u0440\u043e\u043a ${Math.floor(Math.random() * 90 + 10)}`;
-  channel = geckos(networkOptions() as Parameters<typeof geckos>[0]);
+  if (prefersHttpTransport()) {
+    void connectHttp(name, "preferred");
+    return;
+  }
+  connectWebSocket(name);
+}
+
+function connectWebSocket(name: string) {
+  transportMode = "websocket";
+  channel = new WebSocketNetworkChannel(webSocketUrl());
+  const fallbackTimer = window.setTimeout(() => {
+    if (!connected) void connectHttp(name, "websocket-timeout");
+  }, 1800);
   channel.onConnect((error) => {
+    if (transportMode !== "websocket") return;
     if (error) {
-      statusEl.textContent = "\u041e\u0448\u0438\u0431\u043a\u0430 \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u044f. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0438\u0433\u0440\u043e\u0432\u043e\u0439 \u0441\u0435\u0440\u0432\u0435\u0440.";
+      window.clearTimeout(fallbackTimer);
+      void connectHttp(name, error.message);
       console.warn("unsoccer connection failed", error.message);
       return;
     }
+    window.clearTimeout(fallbackTimer);
     connected = true;
+    document.documentElement.dataset.transport = "websocket";
     audio.playConnection(true);
     statusEl.textContent = "\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u043e. WASD - \u0434\u0432\u0438\u0436\u0435\u043d\u0438\u0435, \u041b\u041a\u041c/\u041f\u041a\u041c - \u0443\u0434\u0430\u0440 \u043d\u043e\u0433\u043e\u0439, \u043a\u043e\u043b\u0435\u0441\u043e - \u0443\u0434\u0430\u0440 \u0433\u043e\u043b\u043e\u0432\u043e\u0439.";
-    channel?.emit("join", { name }, { reliable: true });
+    channel?.emit("join", { name });
   });
   channel.onDisconnect(() => {
+    if (transportMode !== "websocket") return;
     connected = false;
+    transportMode = "none";
+    document.documentElement.dataset.transport = "none";
     audio.playConnection(false);
     audioObservedPlayers.clear();
     audioObservedScore = null;
@@ -609,11 +766,7 @@ function connect() {
     statusEl.textContent = "\u041e\u0442\u043a\u043b\u044e\u0447\u0435\u043d\u043e. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0438\u0433\u0440\u043e\u0432\u043e\u0439 \u0441\u0435\u0440\u0432\u0435\u0440.";
   });
   channel.on("joined", (data) => {
-    localJoin = data as JoinAccepted;
-    audio.playJoin(localJoin.role);
-    statusEl.textContent = localJoin.role === "player"
-      ? `\u0412\u044b \u0432 \u043a\u043e\u043c\u0430\u043d\u0434\u0435 ${teamNameLabel(localJoin.team)} #${localJoin.index + 1}.`
-      : "\u0420\u0435\u0436\u0438\u043c \u0437\u0440\u0438\u0442\u0435\u043b\u044f/\u0442\u0435\u0441\u0442\u0435\u0440\u0430.";
+    acceptJoin(data as JoinAccepted);
   });
   channel.on("server-full", () => {
     statusEl.textContent = "\u0421\u0435\u0440\u0432\u0435\u0440 \u0437\u0430\u043f\u043e\u043b\u043d\u0435\u043d.";
@@ -622,6 +775,51 @@ function connect() {
     latestState = data as ServerState;
     observeAudioState(latestState);
   });
+}
+
+async function connectHttp(name: string, reason: string) {
+  if (transportMode === "http" && httpClientId) return;
+  channel = null;
+  transportMode = "http";
+  httpPollGeneration += 1;
+  const generation = httpPollGeneration;
+  statusEl.textContent = "\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u0435 HTTP fallback...";
+  try {
+    const payload = await postJson<{ ok: boolean; joined: JoinAccepted; state: ServerState }>("join", { name });
+    httpClientId = payload.joined.id;
+    connected = true;
+    audio.playConnection(true);
+    acceptJoin(payload.joined);
+    latestState = payload.state;
+    observeAudioState(latestState);
+    document.documentElement.dataset.transport = `http:${reason}`;
+    void pollHttpState(generation);
+  } catch (error) {
+    connected = false;
+    transportMode = "none";
+    statusEl.textContent = "\u041e\u0448\u0438\u0431\u043a\u0430 \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u044f. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0438\u0433\u0440\u043e\u0432\u043e\u0439 \u0441\u0435\u0440\u0432\u0435\u0440.";
+    console.warn("unsoccer http fallback failed", error);
+  }
+}
+
+async function pollHttpState(generation: number) {
+  while (transportMode === "http" && httpClientId && generation === httpPollGeneration) {
+    try {
+      const payload = await getJson<{ ok: boolean; joined: JoinAccepted; state: ServerState }>(
+        `state?clientId=${encodeURIComponent(httpClientId)}`
+      );
+      acceptJoin(payload.joined);
+      latestState = payload.state;
+      observeAudioState(latestState);
+      await wait(55);
+    } catch (error) {
+      connected = false;
+      audio.playConnection(false);
+      statusEl.textContent = "\u041e\u0442\u043a\u043b\u044e\u0447\u0435\u043d\u043e. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0438\u0433\u0440\u043e\u0432\u043e\u0439 \u0441\u0435\u0440\u0432\u0435\u0440.";
+      console.warn("unsoccer http poll failed", error);
+      await wait(1000);
+    }
+  }
 }
 
 function unlockAudio() {
@@ -660,11 +858,18 @@ function primeAudioObservation(state: ServerState) {
 }
 
 function sendInput(force = false) {
-  if (!channel || !connected) return;
+  if (!connected) return;
   const now = performance.now();
   if (!force && now - lastSentAt < 34) return;
   lastSentAt = now;
   inputSequence += 1;
+  if (transportMode === "http" && httpClientId) {
+    void postJson("input", { clientId: httpClientId, input, sequence: inputSequence }).catch((error) => {
+      console.warn("unsoccer http input failed", error);
+    });
+    return;
+  }
+  if (!channel) return;
   channel.emit("input", { input, sequence: inputSequence });
 }
 
@@ -1030,6 +1235,11 @@ canvas.addEventListener("wheel", (event) => {
 }, { passive: false });
 
 addEventListener("resize", resize);
+addEventListener("pagehide", () => {
+  if (transportMode !== "http" || !httpClientId) return;
+  const body = JSON.stringify({ clientId: httpClientId });
+  navigator.sendBeacon(`${serverApiBase()}/leave`, new Blob([body], { type: "application/json" }));
+});
 resize();
 connect();
 

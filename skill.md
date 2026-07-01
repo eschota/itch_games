@@ -102,5 +102,16 @@ Use this root skill when changing, packaging, validating, or publishing the
 
 ## Transport
 
-The production working copy lives on the Moscow server at `/itch_games`.
-Use SSH alias `freestock-moscow` for server transport and validation.
+The previous production working copy lives on the Moscow server at
+`/itch_games`. Use SSH alias `freestock-moscow` for rollback validation.
+
+The current migration target is the main Qwertystock production server
+`generic@145.239.0.57:22744`, isolated from the main site at
+`/home/generic/itch_games`.
+
+On `qwertystock.com`, do not edit or restart the main Qwertystock PM2 apps,
+`/home/generic/QwertyStock`, `/home/generic/QwertyData`, or the
+`server_name qwertystock.com` nginx block for this project. Orbital Courier
+must use its own `server_name orbital-courier.mecharulez.com`, its own
+`itch-games-ai-chat.service`, and `ai_chat/server_node.js` because the target
+server's system Python is 3.5.

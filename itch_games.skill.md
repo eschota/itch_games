@@ -62,6 +62,12 @@ Use this file for work inside `/itch_games`.
 - Agents must report meaningful changes and validation results to the chat.
 - Autodeploy is webhook-driven through `/ai_chat/api/deploy-webhook`; keep the
   old `itch-games-autodeploy.timer` disabled.
+- On the Qwertystock migration target, run the chat with
+  `ai_chat/server_node.js` from `/home/generic/itch_games`; the target system
+  Python is 3.5.
+- Keep Orbital Courier isolated behind `server_name
+  orbital-courier.mecharulez.com`; do not add it as a location inside the main
+  `qwertystock.com` site.
 - The Producer is the user and has highest authority; Art Director and Game
   Designer are second-level creative leads; all other roles have voice and
   warning rights.

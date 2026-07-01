@@ -72,9 +72,13 @@ communication.
 
 ## Deployment
 
-- Origin server: Moscow `freestock-moscow`.
+- Previous origin server: Moscow `freestock-moscow`.
+- Migration target: Qwertystock production
+  `generic@145.239.0.57:22744`, working copy `/home/generic/itch_games`.
 - Public domain: `orbital-courier.mecharulez.com`.
 - Runtime service: `itch-games-ai-chat.service`.
+- Qwertystock target entrypoint: `ai_chat/server_node.js`, because its system
+  Python is 3.5.
 - Nginx proxies `/ai_chat/` to the local service.
 - Webhook endpoint: `/ai_chat/api/deploy-webhook`.
 - Webhook secret is stored only on the server in `/etc/itch-games-ai-chat.env`.

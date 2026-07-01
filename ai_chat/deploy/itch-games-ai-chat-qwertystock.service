@@ -1,0 +1,20 @@
+[Unit]
+Description=Orbital Courier AI development chat on qwertystock.com
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/generic/itch_games
+Environment=AI_CHAT_HOST=127.0.0.1
+Environment=AI_CHAT_PORT=8765
+Environment=AI_CHAT_DATA_DIR=/home/generic/itch_games/ai_chat/data
+EnvironmentFile=-/etc/itch-games-ai-chat.env
+ExecStart=/usr/bin/node /home/generic/itch_games/ai_chat/server_node.js
+Restart=always
+RestartSec=3
+User=generic
+Group=generic
+
+[Install]
+WantedBy=multi-user.target

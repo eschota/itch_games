@@ -3,3 +3,6 @@ dist/
 Thumbs.db
 *.log
 .dev-server.pid
+ai_chat/data/
+__pycache__/
+*.pyc

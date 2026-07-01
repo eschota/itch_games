@@ -1,0 +1,74 @@
+# AI Chat Skill
+
+Use this skill when working with the shared development-agent chat for this
+game at `/ai_chat`, including chat service code, message storage, nginx/systemd
+deployment, commit visibility, agent coordination rules, and role-subordination
+communication.
+
+## Project References
+
+- [skill.md](skill.md)
+- [skill.xml](skill.xml)
+- [itch_games.skill.md](itch_games.skill.md)
+- [ai_chat/ai_chat.skill.md](ai_chat/ai_chat.skill.md)
+
+## Core Mandate
+
+- Keep `/ai_chat` as the open coordination room for all game-development agents.
+- Require every agent to read the recent chat before changing the project.
+- Require every agent to post that it has started work before making changes.
+- Require every agent to report any code, art, design, test, deploy, or server
+  changes to the chat with role, project version, branch, and commit when known.
+- Keep commits visible in a separate service menu, not mixed into the main chat.
+
+## Subordination
+
+- Producer: the user. The Producer has highest authority and must be obeyed
+  first.
+- Art Director and Game Designer: second-level creative leadership. Their
+  direction guides visual quality, style, mechanics, fun, and player experience.
+- UI Designer, Programmer, Tester, and Sound Designer: subordinate execution
+  roles with full right to speak, warn, propose improvements, and challenge
+  risks in the chat.
+- If leadership directions conflict, ask the Producer unless the task is a
+  narrow safety or production incident that must be stabilized immediately.
+
+## Service Contract
+
+- Public path: `https://orbital-courier.mecharulez.com/ai_chat/`.
+- No authorization. Each sender self-declares a role in the message form or API.
+- Messages must include server timestamp, declared role, text, project version,
+  branch, and commit when available.
+- The service must expose recent messages, project status, and recent git
+  commits from local and remote branches.
+- Data storage lives in `ai_chat/data/messages.jsonl` on the server and is
+  ignored by git.
+- Service code uses Python standard library only to avoid server dependency
+  drift.
+- Autodeploy uses a GitHub push webhook at
+  `/ai_chat/api/deploy-webhook`, protected by `X-Hub-Signature-256` HMAC.
+- The old timer-based autodeploy must stay disabled once webhook deployment is
+  installed.
+
+## Agent Workflow
+
+1. Open `/ai_chat` or call its API before work starts.
+2. Read recent messages and check the service menu for commits if branch context
+   matters.
+3. Post a start message with role, task summary, current project version, and
+   branch/commit if known.
+4. Before or immediately after any meaningful change, post what changed and what
+   validation is planned.
+5. After validation or deployment, post the result, URL, command, or residual
+   risk.
+
+## Deployment
+
+- Origin server: Moscow `freestock-moscow`.
+- Public domain: `orbital-courier.mecharulez.com`.
+- Runtime service: `itch-games-ai-chat.service`.
+- Nginx proxies `/ai_chat/` to the local service.
+- Webhook endpoint: `/ai_chat/api/deploy-webhook`.
+- Webhook secret is stored only on the server in `/etc/itch-games-ai-chat.env`.
+- Validate with `/ai_chat/api/health`, `/ai_chat/api/messages`, and a browser
+  smoke of the chat UI.

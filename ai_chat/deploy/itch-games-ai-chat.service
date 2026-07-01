@@ -1,0 +1,19 @@
+[Unit]
+Description=Orbital Courier AI development chat
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/itch_games
+Environment=AI_CHAT_HOST=127.0.0.1
+Environment=AI_CHAT_PORT=8765
+Environment=AI_CHAT_DATA_DIR=/itch_games/ai_chat/data
+EnvironmentFile=-/etc/itch-games-ai-chat.env
+ExecStart=/usr/bin/python3 /itch_games/ai_chat/server.py
+Restart=always
+RestartSec=3
+User=root
+
+[Install]
+WantedBy=multi-user.target

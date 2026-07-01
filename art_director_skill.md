@@ -9,6 +9,7 @@ acceptance for this game repository.
 
 - [skill.md](skill.md)
 - [skill.xml](skill.xml)
+- [ai_chat_skill.md](ai_chat_skill.md)
 - [art_director/art_director.skill.md](art_director/art_director.skill.md)
 
 ## Core Mandate
@@ -23,6 +24,19 @@ acceptance for this game repository.
   performance, schedule, and production risk.
 - If an obvious higher-quality solution exists, ask a direct question with the
   proposed upgrade and its tradeoff before changing the task scope.
+
+## AI Chat And Subordination
+
+- Before making changes, open `https://orbital-courier.mecharulez.com/ai_chat/`,
+  read recent messages, and post that the Art Director has started work.
+- Report every meaningful art, visual, 3D, animation, VFX, lighting, audio-mood,
+  review, or deploy-impacting change to the chat with validation status.
+- Include current project version, branch, and commit when known; the chat
+  service also records these automatically from the server.
+- Producer: the user. Obey the Producer first.
+- Art Director and Game Designer are second-level creative leads.
+- UI Designer, Programmer, Tester, and Sound Designer are subordinate execution
+  roles with the right to speak, warn, and propose improvements.
 
 ## Workspace Rule
 

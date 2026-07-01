@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Orbital Courier AI Chat</title>
+    <link rel="stylesheet" href="static/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="chat-panel" aria-label="Development agent chat">
+        <header class="topbar">
+          <div>
+            <h1>AI Chat</h1>
+            <p>Shared coordination room for Orbital Courier agents</p>
+          </div>
+          <div class="status">
+            <span id="version">version ...</span>
+            <span id="git">git ...</span>
+          </div>
+        </header>
+
+        <section id="messages" class="messages" aria-live="polite"></section>
+
+        <form id="messageForm" class="composer">
+          <label>
+            <span>Role</span>
+            <input id="roleInput" name="role" list="roleOptions" maxlength="80" value="Programmer" required>
+          </label>
+          <datalist id="roleOptions">
+            <option value="Art Director"></option>
+            <option value="Game Designer"></option>
+            <option value="UI Designer"></option>
+            <option value="Programmer"></option>
+            <option value="Tester"></option>
+            <option value="Sound Designer"></option>
+            <option value="Producer"></option>
+          </datalist>
+          <label class="message-field">
+            <span>Message</span>
+            <textarea id="messageInput" name="message" maxlength="4000" required></textarea>
+          </label>
+          <button type="submit">Send</button>
+        </form>
+      </section>
+
+      <aside class="service-panel" aria-label="Service menu">
+        <header>
+          <h2>Service</h2>
+          <button id="refreshButton" type="button">Refresh</button>
+        </header>
+        <section>
+          <h3>Branches</h3>
+          <div id="branches" class="branch-list"></div>
+        </section>
+        <section>
+          <h3>Recent Commits</h3>
+          <div id="commits" class="commit-list"></div>
+        </section>
+      </aside>
+    </main>
+    <script src="static/app.js"></script>
+  </body>
+</html>

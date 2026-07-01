@@ -4,6 +4,18 @@
     <child path="itch_games.skill.md" role="directory" />
     <child path="art_director_skill.md" role="art-director-root" />
     <child path="art_director/art_director.skill.md" role="art-director-workspace" />
+    <child path="ui_designer_skill.md" role="ui-designer-root" />
+    <child path="ui_designer/ui_designer.skill.md" role="ui-designer-workspace" />
+    <child path="game_designer_skill.md" role="game-designer-root" />
+    <child path="game_designer/game_designer.skill.md" role="game-designer-workspace" />
+    <child path="programmer_skill.md" role="programmer-root" />
+    <child path="programmer/programmer.skill.md" role="programmer-workspace" />
+    <child path="tester_skill.md" role="tester-root" />
+    <child path="tester/tester.skill.md" role="tester-workspace" />
+    <child path="sound_designer_skill.md" role="sound-designer-root" />
+    <child path="sound_designer/sound_designer.skill.md" role="sound-designer-workspace" />
+    <child path="ai_chat_skill.md" role="ai-chat-root" />
+    <child path="ai_chat/ai_chat.skill.md" role="ai-chat-workspace" />
     <child path="skill.xml" role="machine-map" />
     <child path="index.html" role="runtime-entry" />
     <child path="package.json" role="package-metadata" />
@@ -14,11 +26,57 @@
   <transport>
     <server alias="freestock-moscow" path="/itch_games" />
     <github repository="eschota/itch_games" visibility="public" />
+    <domain host="orbital-courier.mecharulez.com" aiChatPath="/ai_chat/" />
   </transport>
+  <coordination>
+    <aiChat url="https://orbital-courier.mecharulez.com/ai_chat/" service="itch-games-ai-chat.service" port="8765" webhookPath="/ai_chat/api/deploy-webhook">
+      <rule>Every development agent reads recent chat messages before making project changes.</rule>
+      <rule>Every development agent posts a start message before making project changes.</rule>
+      <rule>Every development agent reports meaningful changes and validation results to chat.</rule>
+      <rule>Messages include date, self-declared role, current project version, branch, and commit when available.</rule>
+      <rule>Commits from branches are shown in the separate service menu, not mixed into chat messages.</rule>
+      <rule>Autodeploy is triggered by a signed GitHub push webhook, not by a systemd timer.</rule>
+    </aiChat>
+    <subordination>
+      <role name="Producer" authority="1">The user; obey first.</role>
+      <role name="Art Director" authority="2">Creative visual lead.</role>
+      <role name="Game Designer" authority="2">Creative gameplay lead.</role>
+      <role name="UI Designer" authority="3">Execution role with voice and warning rights.</role>
+      <role name="Programmer" authority="3">Execution role with voice and warning rights.</role>
+      <role name="Tester" authority="3">Execution role with voice and warning rights.</role>
+      <role name="Sound Designer" authority="3">Execution role with voice and warning rights.</role>
+    </subordination>
+  </coordination>
   <artDirection workspace="art_director" rootSkill="art_director_skill.md">
     <rule>Use art_director/ for non-runtime art-direction audits, references, tests, drafts, prompts, and QA evidence.</rule>
     <rule>Do not place shipped game code or final game assets in art_director/.</rule>
   </artDirection>
+  <roleWorkspaces>
+    <workspace name="ui_designer" rootSkill="ui_designer_skill.md" directorySkill="ui_designer/ui_designer.skill.md">
+      <rule>Use ui_designer/ for non-runtime UI audits, flows, wireframes, copy, references, and viewport checks.</rule>
+      <rule>Do not place shipped game code or final UI assets in ui_designer/.</rule>
+    </workspace>
+    <workspace name="game_designer" rootSkill="game_designer_skill.md" directorySkill="game_designer/game_designer.skill.md">
+      <rule>Use game_designer/ for non-runtime ideas, systems, tuning, level notes, playtests, and briefs.</rule>
+      <rule>Game Designer must propose creative ideas and feature improvements when they improve the current task.</rule>
+    </workspace>
+    <workspace name="programmer" rootSkill="programmer_skill.md" directorySkill="programmer/programmer.skill.md">
+      <rule>Use programmer/ for non-runtime investigations, profiling, compatibility notes, plans, and validation checks.</rule>
+      <rule>Do not import programmer/ files into the game runtime.</rule>
+    </workspace>
+    <workspace name="tester" rootSkill="tester_skill.md" directorySkill="tester/tester.skill.md">
+      <rule>Use tester/ for non-runtime plans, bug notes, evidence, playtests, regression checks, and creative QA ideas.</rule>
+      <rule>Tester must keep bugs separate from creative feature and polish suggestions.</rule>
+    </workspace>
+    <workspace name="sound_designer" rootSkill="sound_designer_skill.md" directorySkill="sound_designer/sound_designer.skill.md">
+      <rule>Use sound_designer/ for non-runtime source research, license notes, generation prompts, raw sounds, temp edits, mix notes, and audio checks.</rule>
+      <rule>Sound Designer may search free sounds or generate sounds, then implement approved audio into the game with documented provenance.</rule>
+    </workspace>
+    <workspace name="ai_chat" rootSkill="ai_chat_skill.md" directorySkill="ai_chat/ai_chat.skill.md">
+      <rule>Use ai_chat/ for the shared development-agent chat service code, static UI, deployment references, and server-only message storage.</rule>
+      <rule>Do not commit ai_chat/data/ messages.</rule>
+    </workspace>
+  </roleWorkspaces>
   <versioning initial="v0.0.001" current="v0.0.003">
     <rule>Every created game starts at v0.0.001.</rule>
     <rule>Every shipped bump increments the version.</rule>

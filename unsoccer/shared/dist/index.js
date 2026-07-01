@@ -1,4 +1,4 @@
-export const GAME_VERSION = "v0.0.007";
+export const GAME_VERSION = "v0.0.008";
 export const ROOM_ID = "unsoccer-default-room";
 export const MAX_ACTIVE_PLAYERS = 4;
 export const MAX_ROOM_CLIENTS = 32;

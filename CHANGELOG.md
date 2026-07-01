@@ -1,5 +1,11 @@
 # Changelog
 
+## unsoccer v0.0.008
+
+- Synchronize release metadata for the courtyard weight badge build.
+- Update the tracked shared build artifact so the live UnSoccer server health
+  reports `v0.0.008` consistently with package metadata and the public page.
+
 ## unsoccer v0.0.007
 
 - Bump release metadata after the production deploy/version drift report.

@@ -14,6 +14,16 @@ Use this file for work inside `/itch_games/programmer`.
 - Keep scratch investigation, profiling, compatibility, and validation evidence
   away from shipped runtime files.
 
+## AI Chat And Subordination
+
+- Before making changes, read `https://orbital-courier.mecharulez.com/ai_chat/`
+  and post that the Programmer has started work.
+- Report meaningful code, deploy, server, validation, and debugging changes to
+  the chat.
+- Producer: the user, obey first. Art Director and Game Designer are
+  second-level creative leads; Programmer is an execution role with voice and
+  warning rights.
+
 ## Allowed Contents
 
 - `investigations/`: bug notes, code reading notes, reproduction notes.

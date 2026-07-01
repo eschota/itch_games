@@ -16,6 +16,15 @@ Use this file for work inside `/itch_games/art_director`.
   out of the runtime surface.
 - Use this folder as the working archive for visual decisions and QA evidence.
 
+## AI Chat And Subordination
+
+- Before making changes, read `https://orbital-courier.mecharulez.com/ai_chat/`
+  and post that the Art Director has started work.
+- Report meaningful changes and validation results to the chat.
+- Producer: the user, obey first. Art Director and Game Designer are
+  second-level creative leads; other roles are execution roles with voice and
+  warning rights.
+
 ## Allowed Contents
 
 - `audits/`: visual reviews, art debt lists, quality gates.

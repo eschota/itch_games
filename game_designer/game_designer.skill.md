@@ -14,6 +14,15 @@ Use this file for work inside `/itch_games/game_designer`.
 - Keep concepts, tuning evidence, feature proposals, and playtest notes out of
   the runtime surface.
 
+## AI Chat And Subordination
+
+- Before making changes, read `https://orbital-courier.mecharulez.com/ai_chat/`
+  and post that the Game Designer has started work.
+- Report meaningful changes, creative ideas, and validation results to the chat.
+- Producer: the user, obey first. Art Director and Game Designer are
+  second-level creative leads; other roles are execution roles with voice and
+  warning rights.
+
 ## Allowed Contents
 
 - `ideas/`: mechanic pitches, feature banks, surprise/fun hooks.

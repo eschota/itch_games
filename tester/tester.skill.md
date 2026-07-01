@@ -14,6 +14,17 @@ Use this file for work inside `/itch_games/tester`.
 - Keep test plans, evidence, bug notes, playtest observations, and creative QA
   ideas out of the runtime surface.
 
+## AI Chat And Subordination
+
+- Before testing or making changes, read
+  `https://orbital-courier.mecharulez.com/ai_chat/` and post that the Tester
+  has started work.
+- Report bugs, regression results, creative QA ideas, and validation outcomes to
+  the chat.
+- Producer: the user, obey first. Art Director and Game Designer are
+  second-level creative leads; Tester is an execution role with voice and
+  warning rights.
+
 ## Allowed Contents
 
 - `plans/`: test plans, exploratory charters, release checklists.

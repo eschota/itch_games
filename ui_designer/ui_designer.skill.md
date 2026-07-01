@@ -15,6 +15,15 @@ Use this file for work inside `/itch_games/ui_designer`.
 - Keep UI audits, wireframes, screenshots, copy tests, and layout evidence out
   of the runtime surface.
 
+## AI Chat And Subordination
+
+- Before making changes, read `https://orbital-courier.mecharulez.com/ai_chat/`
+  and post that the UI Designer has started work.
+- Report meaningful changes and validation results to the chat.
+- Producer: the user, obey first. Art Director and Game Designer are
+  second-level creative leads; UI Designer is an execution role with voice and
+  warning rights.
+
 ## Allowed Contents
 
 - `audits/`: UI reviews, accessibility notes, hierarchy issues.

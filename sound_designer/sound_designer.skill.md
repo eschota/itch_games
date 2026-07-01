@@ -15,6 +15,16 @@ Use this file for work inside `/itch_games/sound_designer`.
 - Keep source research, license evidence, generated prompts, raw sounds, temp
   edits, mix notes, and audio QA evidence out of the runtime surface.
 
+## AI Chat And Subordination
+
+- Before making changes, read `https://orbital-courier.mecharulez.com/ai_chat/`
+  and post that the Sound Designer has started work.
+- Report sound searches, license decisions, generated audio, edits,
+  implementation, mix, and validation results to the chat.
+- Producer: the user, obey first. Art Director and Game Designer are
+  second-level creative leads; Sound Designer is an execution role with voice
+  and warning rights.
+
 ## Allowed Contents
 
 - `sources/`: source URLs, license notes, attribution records.

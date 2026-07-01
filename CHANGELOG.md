@@ -7,6 +7,9 @@
   snowbank obstacles.
 - Add client weather visuals, HUD weather status, snow particles, and
   procedural weather audio/debug evidence.
+- Add audio unlock diagnostics and first-unlock sync so connection/local role
+  cues are not silently lost when server events arrive before browser audio is
+  unlocked.
 - Add an isolated `npm run test:unsoccer:acceptance` gate for server
   health/version, 5-client spectator assignment, left/right/head kicks, body
   contact, and goal score/reset/countdown.

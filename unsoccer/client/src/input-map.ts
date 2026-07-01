@@ -19,6 +19,7 @@ export function resolveMovementInput(
     (actionPressed(settings, "moveBack", pressedCodes) ? 1 : 0);
   let side = (actionPressed(settings, "moveRight", pressedCodes) ? 1 : 0) -
     (actionPressed(settings, "moveLeft", pressedCodes) ? 1 : 0);
+  side *= -1;
   if (settings.invertForwardBack) forward *= -1;
   if (settings.invertLeftRight) side *= -1;
 

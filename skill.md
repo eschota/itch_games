@@ -57,6 +57,8 @@ Use this root skill when changing, packaging, validating, or publishing the
     `sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md`
   - UnSoccer audio v0.0.003 evidence:
     `sound_designer/implementation/unsoccer-audio-pass-v0.0.003.md`
+  - UnSoccer audio v0.0.008 evidence:
+    `sound_designer/implementation/unsoccer-audio-pass-v0.0.008.md`
 - AI chat service: `ai_chat_skill.md`, `ai_chat/ai_chat.skill.md`
   - Deploy references: `ai_chat/deploy/deploy.skill.md`
     - UnSoccer production service:
@@ -196,8 +198,8 @@ Use this root skill when changing, packaging, validating, or publishing the
 
 ## Current Behavior
 
-- Current game release: `v0.0.008`.
-- `unsoccer` current prototype release: `v0.0.008`.
+- Current game release: `v0.0.009`.
+- `unsoccer` current prototype release: `v0.0.009`.
 - `unsoccer` uses a headless authoritative Node server with Rapier3D physics,
   plain WebSocket transport, and HTTP polling fallback; the itch package is
   static client-only and needs the live game server for multiplayer.
@@ -226,6 +228,12 @@ Use this root skill when changing, packaging, validating, or publishing the
 - `unsoccer` v0.0.008 keeps the release version and client bundle weight
   visible in the HUD and starts the residential courtyard art pass with
   procedural apartment blocks, cars, trees, and benches around the field.
+- `unsoccer` v0.0.008 also adds a server-authored `audioEvents` ring buffer so
+  roster, kick/body, goal, and countdown cues are synchronized across WebSocket
+  and HTTP fallback clients by authoritative event id.
+- `unsoccer` v0.0.009 expands the Art Director runtime pass with a visibly
+  modeled residential courtyard, procedural animated footballer rigs, a visible
+  sun/moon/orbit marker, and QA-readable 120-second day-cycle lighting data.
 - `v0.0.006` adds procedural Web Audio feedback and exposes
   `window.orbitalCourierAudio` plus `orbital-courier:audio-event` so future
   network code can replicate semantic sound events instead of audio files.

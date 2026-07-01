@@ -22,7 +22,7 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 
 ## Rules
 
-- Current release: `v0.0.008`.
+- Current release: `v0.0.009`.
 - Keep client and server separated; browser bundles must not import server-only
   modules.
 - The server is authoritative for room assignment, teams, player physics, ball
@@ -51,13 +51,21 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 - `v0.0.008` adds the always-visible version/weight badge and begins the
   residential courtyard visual pass with procedural apartment blocks, parked
   cars, trees, and benches while preserving weather-hazard readability.
+- `v0.0.008` audio uses a server-authored `audioEvents` ring buffer in
+  `ServerState` so roster, kick/body, goal, and countdown cues are synchronized
+  across WebSocket and HTTP fallback clients by authoritative event id.
+- `v0.0.009` is the runtime Art Director 3D/animation pass: expanded
+  residential courtyard models, procedural animated footballer rigs, visible
+  sun/moon/orbit marker, ambient/bounce lighting, and QA-readable art/day-cycle
+  datasets.
 - Server-confirmed left-foot, right-foot, head, and body contacts must stay
   visually distinguishable in the client and expose QA-readable
   `data-last-action-*` fields on `document.documentElement`.
 - `v0.0.003` server acceptance uses `UNSOCCER_TEST_MODE=1` only on an isolated
   local port. Never expose `/api/test/*` on a production multiplayer server.
 - Run `npm run test:unsoccer:acceptance` before claiming spectator assignment,
-  kick/body contacts, or goal/reset behavior is ready.
+  kick/body contacts, goal/reset behavior, or server-authored audioEvents are
+  ready.
 - Keep the itch.io package static. The zip contains the built client only; live
   multiplayer requires a separately deployed HTTPS/WebSocket server.
 - Production uses `/unsoccer/socket/` as the WebSocket proxy path with the

@@ -83,6 +83,9 @@ Use this file for work inside `/itch_games`.
   audio map, procedural provenance, implementation points, and QA evidence.
 - `sound_designer/implementation/unsoccer-audio-pass-v0.0.003.md`: UnSoccer
   network audio sync, unlock diagnostics, and browser smoke evidence.
+- `sound_designer/implementation/unsoccer-audio-pass-v0.0.008.md`: UnSoccer
+  server-authored audioEvents ring buffer, client event cursor, and acceptance
+  evidence.
 - `ai_chat/`: service code, static UI, deployment references, and server-only
   message storage for the shared development-agent chat.
 - `ai_chat/deploy/deploy.skill.md`: deployment reference rules for nginx,
@@ -155,8 +158,8 @@ Use this file for work inside `/itch_games`.
 
 ## Versioning
 
-- Current release: `v0.0.008`.
-- `unsoccer` release: `v0.0.008`.
+- Current release: `v0.0.009`.
+- `unsoccer` release: `v0.0.009`.
 - Game releases start at `v0.0.001` and every behavior change increments the
   version.
 - The visible bottom-left badge, `package.json.gameVersion`, README, and skill
@@ -185,9 +188,13 @@ Use this file for work inside `/itch_games`.
    `npm run test:unsoccer:acceptance`, start
    `npm run server:unsoccer`, confirm `/api/health`, and open 4 clients with
    unique `name` query strings.
-10. For UnSoccer audio, confirm a real trusted click/touch/key makes
+10. For UnSoccer audio, confirm `npm run test:unsoccer:acceptance` reports
+  `websocket no-join has no phantom roster audio`, `websocket join audioEvents`,
+  `server audioEvents roster`, and `server audioEvents kicks/body/goal/countdown`.
+11. For UnSoccer browser audio, confirm a real trusted click/touch/key makes
     `data-audio-context="running"`, `data-audio-unlocked="true"`, and
-    `data-audio-played-events` increase; automation-only clicks may leave
-    Chromium `AudioContext` suspended.
-11. Confirm `/unsoccer/` never exposes a directory listing on local or
+    `data-audio-played-events` increase; also inspect
+    `data-audio-server-event-id` and `data-audio-server-primed`.
+    Automation-only clicks may leave Chromium `AudioContext` suspended.
+12. Confirm `/unsoccer/` never exposes a directory listing on local or
     production static hosts.

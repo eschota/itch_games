@@ -52,6 +52,12 @@ Use this file for work inside `/itch_games/sound_designer`.
 - `implementation/unsoccer-audio-pass-v0.0.002.md`: current UnSoccer
   procedural Web Audio map, provenance, mix, integration points, acceptance,
   and residual risks.
+- `implementation/unsoccer-audio-pass-v0.0.003.md`: current UnSoccer
+  network-authoritative audio sync, unlock diagnostics, browser smoke evidence,
+  and remaining trusted-activation risk.
+- `implementation/unsoccer-audio-pass-v0.0.008.md`: current UnSoccer
+  server-authored audioEvents ring buffer, client event-id cursor, acceptance
+  evidence, and remaining trusted-activation risk.
 
 ## Rules
 

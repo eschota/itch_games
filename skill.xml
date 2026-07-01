@@ -31,6 +31,7 @@
     <child path="sound_designer/implementation/audio-pass-v0.0.006.md" role="sound-v0.0.006-evidence" />
     <child path="sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md" role="unsoccer-audio-v0.0.002-evidence" />
     <child path="sound_designer/implementation/unsoccer-audio-pass-v0.0.003.md" role="unsoccer-audio-v0.0.003-evidence" />
+    <child path="sound_designer/implementation/unsoccer-audio-pass-v0.0.008.md" role="unsoccer-audio-v0.0.008-evidence" />
     <child path="ai_chat_skill.md" role="ai-chat-root" />
     <child path="ai_chat/ai_chat.skill.md" role="ai-chat-workspace" />
     <child path="ai_chat/deploy/deploy.skill.md" role="ai-chat-deploy-folder-skill" />
@@ -112,6 +113,7 @@
         <node path="sound_designer/implementation/audio-pass-v0.0.006.md" role="audio-pass-evidence" />
         <node path="sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md" role="unsoccer-audio-pass-evidence" />
         <node path="sound_designer/implementation/unsoccer-audio-pass-v0.0.003.md" role="unsoccer-audio-unlock-sync-evidence" />
+        <node path="sound_designer/implementation/unsoccer-audio-pass-v0.0.008.md" role="unsoccer-audio-server-events-evidence" />
       </node>
     </node>
   </hierarchy>
@@ -209,6 +211,7 @@
       <artifact path="sound_designer/implementation/audio-pass-v0.0.006.md" role="audio-pass-evidence" />
       <artifact path="sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md" role="unsoccer-audio-pass-evidence" />
       <artifact path="sound_designer/implementation/unsoccer-audio-pass-v0.0.003.md" role="unsoccer-audio-unlock-sync-evidence" />
+      <artifact path="sound_designer/implementation/unsoccer-audio-pass-v0.0.008.md" role="unsoccer-audio-server-events-evidence" />
     </workspace>
     <workspace name="ai_chat" rootSkill="ai_chat_skill.md" directorySkill="ai_chat/ai_chat.skill.md">
       <rule>Use ai_chat/ for the shared development-agent chat service code, static UI, deployment references, and server-only message storage.</rule>
@@ -222,11 +225,11 @@
     <rule>Generated package output belongs under dist/ and is not committed.</rule>
     <rule>Packaging fails if internal skill, role, agent coordination, deploy, or source-control docs leak into the public zip.</rule>
   </tooling>
-  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.008">
+  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.009">
     <client path="unsoccer/client" package="dist/unsoccer-itch.zip" productionPath="/unsoccer/" productionStatic="unsoccer/client/dist" />
     <server path="unsoccer/server" port="8787" health="/api/health" transport="plain-websocket-json" fallback="http-polling" productionApiPath="/unsoccer/api/" productionSocketPath="/unsoccer/socket/" />
     <shared path="unsoccer/shared" />
-    <audio path="unsoccer/client/src/audio.ts" evidence="sound_designer/implementation/unsoccer-audio-pass-v0.0.003.md" mode="procedural-web-audio" />
+    <audio path="unsoccer/client/src/audio.ts" evidence="sound_designer/implementation/unsoccer-audio-pass-v0.0.008.md" mode="procedural-web-audio server-authored-events" />
     <assetRules path="unsoccer/assets/licenses/free3d-provenance.json">
       <rule>Free3D downloads require FREE3D_API_TOKEN and exact format/lod/relativePath tuples.</rule>
       <rule>Runtime assets must be local optimized GLB files with provenance before shipping.</rule>
@@ -235,6 +238,8 @@
     <rule>Itch package is static client-only and requires a separately deployed multiplayer server.</rule>
     <rule>Production transport is plain WebSocket JSON under /unsoccer/socket/ with HTTP polling fallback and built-in Node http/net/crypto handling; geckos.io, ws, and native node-datachannel must not be required runtime dependencies on the Qwertystock host.</rule>
     <rule>v0.0.008 keeps the HUD version and client bundle weight visible and starts the residential courtyard visual pass around the field.</rule>
+    <rule>v0.0.008 server audioEvents synchronize roster, kick/body, goal, and countdown cues across WebSocket and HTTP fallback clients by authoritative event id.</rule>
+    <rule>v0.0.009 ships the Art Director runtime 3D/animation pass: expanded courtyard models, animated procedural footballer rigs, visible sun/moon/orbit marker, and 120-second lighting datasets.</rule>
   </game>
   <publicSurfaces owner="UI Designer">
     <surface path="index.html" url="https://io-games.mecharulez.com/" role="local-public-catalog" />
@@ -258,7 +263,7 @@
     <rule>Orbital Courier itch upload must include vendored Three.js and must not require cdn.jsdelivr.net at runtime.</rule>
     <rule>External itch.io pages remain incomplete until the public URL, uploaded zip, exact live copy, screenshots, publication date, and version match are recorded under ui_designer/public_pages/.</rule>
   </publicSurfaces>
-  <versioning initial="v0.0.001" current="v0.0.008">
+  <versioning initial="v0.0.001" current="v0.0.009">
     <rule>Every created game starts at v0.0.001.</rule>
     <rule>Every shipped bump increments the version.</rule>
     <rule>The current version is visible in the bottom-left corner.</rule>

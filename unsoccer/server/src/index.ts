@@ -38,6 +38,7 @@ import {
   type PlayerRole,
   type PlayerSnapshot,
   type ScoreState,
+  type ServerAudioEvent,
   type ServerInfo,
   type ServerState,
   type TeamId,
@@ -61,6 +62,12 @@ interface WireMessage {
   event?: unknown;
   data?: unknown;
 }
+
+type ServerAudioEventPayload = ServerAudioEvent extends infer Event
+  ? Event extends ServerAudioEvent
+    ? Omit<Event, "id" | "serverTime" | "tick">
+    : never
+  : never;
 
 const WEBSOCKET_ACCEPT_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 const MAX_WEBSOCKET_PAYLOAD_BYTES = 64 * 1024;
@@ -229,6 +236,7 @@ interface PlayerRuntime {
   lastBodyAt: number;
   lastAction: KickKind | null;
   lastActionAt: number;
+  lastAudioRole: PlayerRole | null;
   yaw: number;
   velocity: Vec3;
   lastSeenAt: number;
@@ -237,6 +245,8 @@ interface PlayerRuntime {
 const PORT = Number(process.env.UNSOCCER_PORT || 8787);
 const TEST_MODE = process.env.UNSOCCER_TEST_MODE === "1";
 const TEST_TOKEN = process.env.UNSOCCER_TEST_TOKEN || "";
+const AUDIO_EVENT_LIMIT = 80;
+const AUDIO_EVENT_TTL_MS = 5000;
 const WEATHER_HAZARDS: HazardSnapshot[] = [
   {
     id: "puddle-west-box",
@@ -328,6 +338,9 @@ class UnsoccerServer {
   private message = "\u0416\u0434\u0451\u043c \u0438\u0433\u0440\u043e\u043a\u043e\u0432";
   private countdownUntil = 0;
   private lastSnapshotAt = 0;
+  private nextAudioEventId = 0;
+  private lastCountdownAudioSecond: number | null = null;
+  private readonly audioEvents: ServerAudioEvent[] = [];
 
   async start(): Promise<void> {
     await RAPIER.init();
@@ -425,6 +438,7 @@ class UnsoccerServer {
       const body = this.requestBody(request);
       const player = this.players.get(String(body.clientId || ""));
       if (player && player.transport === "http") {
+        this.pushRosterAudioEvent(player, "leave");
         this.destroyBody(player);
         this.players.delete(player.id);
         this.rebalanceRoles();
@@ -543,6 +557,42 @@ class UnsoccerServer {
     };
   }
 
+  private pushAudioEvent(now: number, event: ServerAudioEventPayload): void {
+    this.audioEvents.push({
+      id: ++this.nextAudioEventId,
+      serverTime: now,
+      tick: this.tickCount,
+      ...event
+    } as ServerAudioEvent);
+    this.trimAudioEvents(now);
+  }
+
+  private trimAudioEvents(now: number): void {
+    const minTime = now - AUDIO_EVENT_TTL_MS;
+    while (this.audioEvents.length > AUDIO_EVENT_LIMIT || (this.audioEvents[0] && this.audioEvents[0].serverTime < minTime)) {
+      this.audioEvents.shift();
+    }
+  }
+
+  private runtimePosition(player: PlayerRuntime): Vec3 {
+    if (player.body) return vec3FromRapier(player.body.translation());
+    return { x: 0, y: 3, z: FIELD_LENGTH / 2 + 4 + player.index };
+  }
+
+  private ballSpeed(): number {
+    const velocity = this.ballBody.linvel();
+    return Math.hypot(velocity.x, velocity.y, velocity.z);
+  }
+
+  private pushRosterAudioEvent(player: PlayerRuntime, change: "join" | "leave" | "spectator", now = Date.now()): void {
+    this.pushAudioEvent(now, {
+      kind: "roster",
+      change,
+      playerId: player.id,
+      role: player.role
+    });
+  }
+
   private createTestPlayers(count: number): void {
     for (const player of this.players.values()) {
       this.destroyBody(player);
@@ -591,6 +641,7 @@ class UnsoccerServer {
       lastBodyAt: 0,
       lastAction: null,
       lastActionAt: 0,
+      lastAudioRole: null,
       yaw: 0,
       velocity: zeroVec(),
       lastSeenAt: Date.now()
@@ -602,6 +653,7 @@ class UnsoccerServer {
     this.score.orange = 0;
     this.resetBall(now);
     this.countdownUntil = 0;
+    this.lastCountdownAudioSecond = null;
     this.message = "\u0416\u0434\u0451\u043c \u0438\u0433\u0440\u043e\u043a\u043e\u0432";
     for (const player of this.players.values()) {
       player.input = { ...DEFAULT_INPUT };
@@ -614,8 +666,10 @@ class UnsoccerServer {
       player.lastBodyAt = 0;
       player.lastAction = null;
       player.lastActionAt = 0;
+      player.lastAudioRole = null;
       player.velocity = zeroVec();
     }
+    this.rebalanceRoles();
   }
 
   private applyTestPlayerPatch(player: PlayerRuntime, body: Record<string, unknown>): void {
@@ -664,31 +718,35 @@ class UnsoccerServer {
   }
 
   private onConnection(channel: TransportChannel): void {
-    if (this.players.size >= MAX_ROOM_CLIENTS) {
-      channel.emit("server-full", { maxRoomClients: MAX_ROOM_CLIENTS });
-      channel.close();
-      return;
-    }
-
     const id = channel.id;
-    const runtime = this.createRuntime({
-      id,
-      name: `\u0413\u043e\u0441\u0442\u044c ${this.players.size + 1}`,
-      channel,
-      transport: "websocket"
-    });
-
-    this.players.set(id, runtime);
-    this.rebalanceRoles();
+    let runtime: PlayerRuntime | null = null;
 
     channel.on("join", (data: unknown) => {
       const request = data as JoinRequest;
+      let firstJoin = false;
+      if (!runtime) {
+        if (this.players.size >= MAX_ROOM_CLIENTS) {
+          channel.emit("server-full", { maxRoomClients: MAX_ROOM_CLIENTS });
+          channel.close();
+          return;
+        }
+        runtime = this.createRuntime({
+          id,
+          name: sanitizePlayerName(request?.name),
+          channel,
+          transport: "websocket"
+        });
+        this.players.set(id, runtime);
+        this.rebalanceRoles();
+        firstJoin = true;
+      }
       runtime.name = sanitizePlayerName(request?.name);
-      this.sendJoin(runtime);
+      if (!firstJoin) this.sendJoin(runtime);
       this.message = `${runtime.name} \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0438\u043b\u0441\u044f ${runtime.role === "player" ? "\u043a \u043f\u043e\u043b\u044e" : "\u043a\u0430\u043a \u043d\u0430\u0431\u043b\u044e\u0434\u0430\u0442\u0435\u043b\u044c"}`;
     });
 
     channel.on("input", (data: unknown) => {
+      if (!runtime) return;
       const message = data as ClientInputMessage;
       if (!message || typeof message.sequence !== "number") return;
       if (message.sequence < runtime.inputSequence) return;
@@ -698,6 +756,8 @@ class UnsoccerServer {
     });
 
     channel.onDisconnect(() => {
+      if (!runtime) return;
+      this.pushRosterAudioEvent(runtime, "leave");
       this.destroyBody(runtime);
       this.players.delete(id);
       this.rebalanceRoles();
@@ -707,7 +767,9 @@ class UnsoccerServer {
 
   private rebalanceRoles(): void {
     const ordered = [...this.players.values()].sort((a, b) => a.joinOrder - b.joinOrder);
+    const now = Date.now();
     ordered.forEach((player, orderIndex) => {
+      const previousRole = player.lastAudioRole;
       const active = orderIndex < MAX_ACTIVE_PLAYERS;
       player.role = active ? "player" : "spectator";
       player.index = orderIndex;
@@ -715,6 +777,10 @@ class UnsoccerServer {
       player.characterId = CHARACTER_ROSTER[orderIndex % CHARACTER_ROSTER.length];
       if (active && !player.body) this.createBody(player);
       if (!active && player.body) this.destroyBody(player);
+      if (previousRole !== player.role) {
+        this.pushRosterAudioEvent(player, player.role === "spectator" ? "spectator" : "join", now);
+        player.lastAudioRole = player.role;
+      }
       this.sendJoin(player);
     });
   }
@@ -782,6 +848,7 @@ class UnsoccerServer {
     this.world.step();
     this.containBall();
     this.checkGoal(now);
+    this.emitCountdownAudio(now);
 
     if (emitSnapshot && now - this.lastSnapshotAt >= 1000 / SNAPSHOT_RATE) {
       this.lastSnapshotAt = now;
@@ -800,6 +867,7 @@ class UnsoccerServer {
     for (const player of this.players.values()) {
       if (player.transport !== "http") continue;
       if (now - player.lastSeenAt < 30000) continue;
+      this.pushRosterAudioEvent(player, "leave", now);
       this.destroyBody(player);
       this.players.delete(player.id);
       changed = true;
@@ -910,6 +978,13 @@ class UnsoccerServer {
     player.lastBodyAt = now;
     player.lastAction = "body";
     player.lastActionAt = now;
+    this.pushAudioEvent(now, {
+      kind: "kick",
+      kick: "body",
+      playerId: player.id,
+      position: this.runtimePosition(player),
+      speed: Math.max(speed, approachSpeed, this.ballSpeed())
+    });
     this.message = `${player.name} \u043f\u0440\u043e\u0434\u0430\u0432\u0438\u043b \u043c\u044f\u0447 \u043a\u043e\u0440\u043f\u0443\u0441\u043e\u043c`;
   }
 
@@ -976,6 +1051,13 @@ class UnsoccerServer {
     );
     player.lastAction = kind;
     player.lastActionAt = now;
+    this.pushAudioEvent(now, {
+      kind: "kick",
+      kick: kind,
+      playerId: player.id,
+      position: vec3FromRapier(this.ballBody.translation()),
+      speed: Math.max(strength, this.ballSpeed())
+    });
     this.message = `${player.name} ${this.actionLabel(kind)} \u043c\u044f\u0447`;
   }
 
@@ -1043,11 +1125,28 @@ class UnsoccerServer {
     if (position.z < -halfLength) {
       this.score.orange += 1;
       this.message = "\u041e\u0440\u0430\u043d\u0436\u0435\u0432\u044b\u0435 \u0437\u0430\u0431\u0438\u0432\u0430\u044e\u0442";
+      this.pushAudioEvent(now, { kind: "goal", team: 1 });
+      this.lastCountdownAudioSecond = null;
       this.resetBall(now);
     } else if (position.z > halfLength) {
       this.score.blue += 1;
       this.message = "\u0421\u0438\u043d\u0438\u0435 \u0437\u0430\u0431\u0438\u0432\u0430\u044e\u0442";
+      this.pushAudioEvent(now, { kind: "goal", team: 0 });
+      this.lastCountdownAudioSecond = null;
       this.resetBall(now);
+    }
+  }
+
+  private emitCountdownAudio(now: number): void {
+    const remainingMs = Math.max(0, this.countdownUntil - now);
+    if (remainingMs <= 0) {
+      this.lastCountdownAudioSecond = null;
+      return;
+    }
+    const remainingSeconds = Math.ceil(remainingMs / 1000);
+    if (remainingSeconds !== this.lastCountdownAudioSecond) {
+      this.lastCountdownAudioSecond = remainingSeconds;
+      this.pushAudioEvent(now, { kind: "countdown", remainingSeconds });
     }
   }
 
@@ -1064,6 +1163,7 @@ class UnsoccerServer {
   }
 
   private snapshot(now = Date.now()): ServerState {
+    this.trimAudioEvents(now);
     const ball: BallSnapshot = {
       position: vec3FromRapier(this.ballBody.translation()),
       velocity: vec3FromRapier(this.ballBody.linvel())
@@ -1080,7 +1180,7 @@ class UnsoccerServer {
       message: this.message,
       countdown: Math.max(0, this.countdownUntil - now),
       weather: WEATHER,
-      audioEvents: []
+      audioEvents: this.audioEvents.slice()
     };
   }
 

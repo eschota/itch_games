@@ -16,6 +16,7 @@ import {
   type JoinAccepted,
   type KickKind,
   type PlayerSnapshot,
+  type ServerAudioEvent,
   type ServerState,
   type WeatherSnapshot
 } from "@itch-games/unsoccer-shared";
@@ -122,6 +123,10 @@ declare global {
           delayMs: number;
           alpha: number;
           renderAgeMs: number;
+        };
+        serverAudio: {
+          lastEventId: number;
+          primed: boolean;
         };
         weather: {
           hazards: number;
@@ -315,9 +320,8 @@ let interpolationAlpha = 1;
 let interpolationRenderAgeMs = 0;
 let qaDayCycleSeconds: number | null = readQaDayCycleSeconds();
 const audio = new UnSoccerAudio();
-let audioObservedPlayers = new Map<string, { role: PlayerSnapshot["role"]; lastActionAt: number }>();
-let audioObservedScore: ServerState["score"] | null = null;
-let audioCountdownSecond: number | null = null;
+let lastConsumedAudioEventId = 0;
+let audioEventsPrimed = false;
 let audioUnlockAttempts = 0;
 let audioObservedLocalHazardId: string | null = null;
 let audioObservedBallHazardId: string | null = null;
@@ -365,6 +369,10 @@ window.unsoccerDebug = {
       alpha: Number(interpolationAlpha.toFixed(3)),
       renderAgeMs: Math.round(interpolationRenderAgeMs)
     },
+    serverAudio: {
+      lastEventId: lastConsumedAudioEventId,
+      primed: audioEventsPrimed
+    },
     weather: {
       hazards: latestState?.weather?.hazards.length ?? 0,
       localHazardId: audioObservedLocalHazardId,
@@ -389,6 +397,8 @@ function syncAudioDebugDataset() {
   document.documentElement.dataset.audioBlockedEvents = String(audioState.blockedEvents);
   document.documentElement.dataset.audioLastEvent = audioState.lastEvent || "none";
   document.documentElement.dataset.audioLastBlockedEvent = audioState.lastBlockedEvent || "none";
+  document.documentElement.dataset.audioServerEventId = String(lastConsumedAudioEventId);
+  document.documentElement.dataset.audioServerPrimed = String(audioEventsPrimed);
   document.documentElement.dataset.audioUnlockAttempts = String(audioUnlockAttempts);
   document.documentElement.dataset.audioUserActivation = audioUserActivationLabel();
   document.documentElement.dataset.hazardAudioPuddle = String(hazardAudioEvents.puddle);
@@ -911,6 +921,7 @@ function connect() {
 }
 
 function connectWebSocket(name: string) {
+  resetServerAudioCursor();
   resetStateInterpolation();
   transportMode = "websocket";
   const wsChannel = new WebSocketNetworkChannel(webSocketUrl());
@@ -948,9 +959,7 @@ function connectWebSocket(name: string) {
     channel = null;
     document.documentElement.dataset.transport = "none";
     audio.playConnection(false);
-    audioObservedPlayers.clear();
-    audioObservedScore = null;
-    audioCountdownSecond = null;
+    resetServerAudioCursor();
     resetStateInterpolation();
     statusEl.textContent = "\u041e\u0442\u043a\u043b\u044e\u0447\u0435\u043d\u043e. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0438\u0433\u0440\u043e\u0432\u043e\u0439 \u0441\u0435\u0440\u0432\u0435\u0440.";
   });
@@ -967,6 +976,7 @@ function connectWebSocket(name: string) {
 
 async function connectHttp(name: string, reason: string) {
   if (transportMode === "http" && httpClientId) return;
+  resetServerAudioCursor();
   resetStateInterpolation();
   channel = null;
   transportMode = "http";
@@ -1028,20 +1038,18 @@ function hydrateAudioAfterUnlock() {
 }
 
 function primeAudioObservation(state: ServerState) {
-  audioObservedPlayers = new Map(state.players.map((player) => [
-    player.id,
-    {
-      role: player.role,
-      lastActionAt: player.lastActionAt
-    }
-  ]));
-  audioObservedScore = { ...state.score };
-  audioCountdownSecond = state.countdown > 0 ? Math.ceil(state.countdown / 1000) : null;
+  lastConsumedAudioEventId = maxAudioEventId(state.audioEvents || []);
+  audioEventsPrimed = true;
   const localPlayer = localJoin
     ? state.players.find((player) => player.id === localJoin?.id && player.role === "player")
     : null;
   audioObservedLocalHazardId = localPlayer ? hazardAt(localPlayer.position, state.weather)?.id ?? null : null;
   audioObservedBallHazardId = hazardAt(state.ball.position, state.weather)?.id ?? null;
+}
+
+function resetServerAudioCursor(): void {
+  lastConsumedAudioEventId = 0;
+  audioEventsPrimed = false;
 }
 
 function resetStateInterpolation(): void {
@@ -1286,47 +1294,39 @@ function applyState(state: ServerState, time: number) {
 }
 
 function observeAudioState(state: ServerState) {
-  const nextPlayers = new Map<string, { role: PlayerSnapshot["role"]; lastActionAt: number }>();
-  const ballSpeed = Math.hypot(state.ball.velocity.x, state.ball.velocity.y, state.ball.velocity.z);
+  if (!audioEventsPrimed) {
+    primeAudioObservation(state);
+    return;
+  }
+  consumeServerAudioEvents(state.audioEvents || []);
+}
 
-  for (const player of state.players) {
-    const previous = audioObservedPlayers.get(player.id);
-    if (!previous) {
-      audio.playRosterChange(player.role === "spectator" ? "spectator" : "join");
-    } else {
-      if (previous.role !== player.role) {
-        audio.playRosterChange(player.role === "spectator" ? "spectator" : "join");
-      }
-      if (player.lastAction && player.lastActionAt > previous.lastActionAt) {
-        audio.playKick(player.lastAction, {
-          pan: player.position.x / (FIELD_WIDTH / 2),
-          isLocal: player.id === localJoin?.id,
-          speed: ballSpeed
-        });
-      }
+function maxAudioEventId(events: ServerAudioEvent[]): number {
+  let maxId = 0;
+  for (const event of events) maxId = Math.max(maxId, event.id);
+  return maxId;
+}
+
+function consumeServerAudioEvents(events: ServerAudioEvent[]): void {
+  const pending = events
+    .filter((event) => event.id > lastConsumedAudioEventId)
+    .sort((a, b) => a.id - b.id);
+  for (const event of pending) {
+    lastConsumedAudioEventId = Math.max(lastConsumedAudioEventId, event.id);
+    if (event.kind === "roster") {
+      audio.playRosterChange(event.change);
+    } else if (event.kind === "kick") {
+      audio.playKick(event.kick, {
+        pan: event.position.x / (FIELD_WIDTH / 2),
+        isLocal: event.playerId === localJoin?.id,
+        speed: event.speed
+      });
+    } else if (event.kind === "goal") {
+      audio.playGoal(event.team);
+    } else if (event.kind === "countdown" && event.remainingSeconds <= 3) {
+      audio.playCountdown(event.remainingSeconds);
     }
-    nextPlayers.set(player.id, {
-      role: player.role,
-      lastActionAt: Math.max(previous?.lastActionAt ?? 0, player.lastActionAt)
-    });
   }
-
-  for (const [id] of audioObservedPlayers) {
-    if (!nextPlayers.has(id)) audio.playRosterChange("leave");
-  }
-
-  if (audioObservedScore) {
-    if (state.score.blue > audioObservedScore.blue) audio.playGoal(0);
-    if (state.score.orange > audioObservedScore.orange) audio.playGoal(1);
-  }
-  const countdownSecond = state.countdown > 0 ? Math.ceil(state.countdown / 1000) : null;
-  if (audioObservedScore && countdownSecond !== null && countdownSecond <= 3 && countdownSecond !== audioCountdownSecond) {
-    audio.playCountdown(countdownSecond);
-  }
-
-  audioObservedScore = { ...state.score };
-  audioCountdownSecond = countdownSecond;
-  audioObservedPlayers = nextPlayers;
 }
 
 function hazardAt(position: { x: number; y: number; z: number }, weather: WeatherSnapshot | undefined): HazardSnapshot | null {

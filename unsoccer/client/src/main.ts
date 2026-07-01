@@ -10,13 +10,17 @@ import {
   GOAL_DEPTH,
   GOAL_WIDTH,
   PLAYER_HEIGHT,
+  type HazardSnapshot,
+  type HazardType,
   type TeamId,
   type InputState,
   type JoinAccepted,
   type PlayerSnapshot,
-  type ServerState
+  type ServerState,
+  type WeatherSnapshot
 } from "@itch-games/unsoccer-shared";
 import { UnSoccerAudio, type AudioRuntimeSnapshot } from "./audio";
+import { WeatherVisualLayer } from "./weather";
 import "./styles.css";
 
 declare global {
@@ -33,6 +37,12 @@ declare global {
         daylight: string;
         camera: { x: number; y: number; z: number };
         audio: AudioRuntimeSnapshot;
+        weather: {
+          hazards: number;
+          localHazardId: string | null;
+          ballHazardId: string | null;
+          hazardAudioEvents: Record<HazardType, number>;
+        };
       };
     };
   }
@@ -48,6 +58,7 @@ const canvas = requireElement<HTMLCanvasElement>("#game-canvas");
 const blueScoreEl = requireElement<HTMLElement>("#blue-score");
 const orangeScoreEl = requireElement<HTMLElement>("#orange-score");
 const statusEl = requireElement<HTMLElement>("#status");
+const weatherEl = requireElement<HTMLElement>("#weather");
 const rosterEl = requireElement<HTMLElement>("#roster");
 const versionBadge = requireElement<HTMLElement>("#version-badge");
 
@@ -59,7 +70,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x07110f);
@@ -69,6 +80,7 @@ const sunsetColor = new THREE.Color(0xff9b5a);
 const nightColor = new THREE.Color(0x07110f);
 const fogDayColor = new THREE.Color(0xb7ede0);
 const fogNightColor = new THREE.Color(0x07110f);
+const snowFogColor = new THREE.Color(0xd9f3ff);
 const sunColor = new THREE.Color();
 const skyColor = new THREE.Color();
 const fogColor = new THREE.Color();
@@ -135,6 +147,7 @@ for (const [x, z] of [
 const fieldGroup = new THREE.Group();
 scene.add(fieldGroup);
 buildField(fieldGroup);
+const weatherLayer = new WeatherVisualLayer({ scene, fieldWidth: FIELD_WIDTH, fieldLength: FIELD_LENGTH });
 
 const ballMaterial = new THREE.MeshStandardMaterial({ color: 0xf4f7fa, roughness: 0.5, metalness: 0.03 });
 const ballMesh = new THREE.Mesh(
@@ -172,6 +185,14 @@ const audio = new UnSoccerAudio();
 let audioObservedPlayers = new Map<string, { role: PlayerSnapshot["role"]; lastActionAt: number }>();
 let audioObservedScore: ServerState["score"] | null = null;
 let audioCountdownSecond: number | null = null;
+let audioUnlockAttempts = 0;
+let audioObservedLocalHazardId: string | null = null;
+let audioObservedBallHazardId: string | null = null;
+const hazardAudioEvents: Record<HazardType, number> = {
+  puddle: 0,
+  slush: 0,
+  snowbank: 0
+};
 
 function readQaDayCycleSeconds(): number | null {
   const value = Number(new URLSearchParams(location.search).get("qaTime"));
@@ -199,7 +220,13 @@ window.unsoccerDebug = {
       y: Number(camera.position.y.toFixed(2)),
       z: Number(camera.position.z.toFixed(2))
     },
-    audio: audio.snapshot()
+    audio: audio.snapshot(),
+    weather: {
+      hazards: latestState?.weather?.hazards.length ?? 0,
+      localHazardId: audioObservedLocalHazardId,
+      ballHazardId: audioObservedBallHazardId,
+      hazardAudioEvents: { ...hazardAudioEvents }
+    }
   })
 };
 setQaDayCycleSeconds(qaDayCycleSeconds);
@@ -213,6 +240,22 @@ function syncAudioDebugDataset() {
   document.documentElement.dataset.audioAmbience = String(audioState.ambienceReady);
   document.documentElement.dataset.audioRollGain = audioState.rollGain.toFixed(4);
   document.documentElement.dataset.audioCrowdGain = audioState.crowdGain.toFixed(4);
+  document.documentElement.dataset.audioWeatherGain = audioState.weatherGain.toFixed(4);
+  document.documentElement.dataset.audioPlayedEvents = String(audioState.playedEvents);
+  document.documentElement.dataset.audioBlockedEvents = String(audioState.blockedEvents);
+  document.documentElement.dataset.audioLastEvent = audioState.lastEvent || "none";
+  document.documentElement.dataset.audioLastBlockedEvent = audioState.lastBlockedEvent || "none";
+  document.documentElement.dataset.audioUnlockAttempts = String(audioUnlockAttempts);
+  document.documentElement.dataset.audioUserActivation = audioUserActivationLabel();
+  document.documentElement.dataset.hazardAudioPuddle = String(hazardAudioEvents.puddle);
+  document.documentElement.dataset.hazardAudioSlush = String(hazardAudioEvents.slush);
+  document.documentElement.dataset.hazardAudioSnowbank = String(hazardAudioEvents.snowbank);
+}
+
+function audioUserActivationLabel(): string {
+  const activation = navigator.userActivation;
+  if (!activation) return "unsupported";
+  return `${activation.isActive ? "active" : "inactive"}:${activation.hasBeenActive ? "used" : "fresh"}`;
 }
 
 function buildField(root: THREE.Group) {
@@ -533,7 +576,38 @@ function connect() {
 }
 
 function unlockAudio() {
-  void audio.unlock().then(syncAudioDebugDataset);
+  audioUnlockAttempts += 1;
+  syncAudioDebugDataset();
+  void audio.unlock().then((becameUnlocked) => {
+    if (becameUnlocked) hydrateAudioAfterUnlock();
+    syncAudioDebugDataset();
+  });
+}
+
+function hydrateAudioAfterUnlock() {
+  if (connected) audio.playConnection(true);
+  if (localJoin) audio.playJoin(localJoin.role);
+  if (latestState) {
+    primeAudioObservation(latestState);
+    updateAudioMix(latestState);
+  }
+}
+
+function primeAudioObservation(state: ServerState) {
+  audioObservedPlayers = new Map(state.players.map((player) => [
+    player.id,
+    {
+      role: player.role,
+      lastActionAt: player.lastActionAt
+    }
+  ]));
+  audioObservedScore = { ...state.score };
+  audioCountdownSecond = state.countdown > 0 ? Math.ceil(state.countdown / 1000) : null;
+  const localPlayer = localJoin
+    ? state.players.find((player) => player.id === localJoin?.id && player.role === "player")
+    : null;
+  audioObservedLocalHazardId = localPlayer ? hazardAt(localPlayer.position, state.weather)?.id ?? null : null;
+  audioObservedBallHazardId = hazardAt(state.ball.position, state.weather)?.id ?? null;
 }
 
 function sendInput(force = false) {
@@ -548,6 +622,7 @@ function sendInput(force = false) {
 function updateHud(state: ServerState) {
   blueScoreEl.textContent = String(state.score.blue);
   orangeScoreEl.textContent = String(state.score.orange);
+  updateWeatherHud(state.weather);
   const countdown = state.countdown > 0 ? ` \u0420\u043e\u0437\u044b\u0433\u0440\u044b\u0448 \u0447\u0435\u0440\u0435\u0437 ${(state.countdown / 1000).toFixed(1)}\u0441.` : "";
   const message = translateServerMessage(state.message);
   if (!localJoin || localJoin.role === "spectator") {
@@ -561,6 +636,33 @@ function updateHud(state: ServerState) {
     const self = player.id === localJoin?.id ? "\u0432\u044b" : role;
     return `<div class="roster-row"><i class="dot ${dot}"></i><span>${escapeHtml(player.name)}</span><small>${self}</small></div>`;
   }).join("");
+}
+
+function updateWeatherHud(weather: WeatherSnapshot | undefined) {
+  if (!weather) {
+    weatherEl.textContent = "\u041f\u043e\u0433\u043e\u0434\u0430: \u043e\u0436\u0438\u0434\u0430\u043d\u0438\u0435";
+    document.documentElement.dataset.weatherLabel = "";
+    document.documentElement.dataset.weatherHazards = "0";
+    return;
+  }
+  const counts = weather.hazards.reduce<Record<HazardType, number>>(
+    (total, hazard) => {
+      total[hazard.type] += 1;
+      return total;
+    },
+    { puddle: 0, slush: 0, snowbank: 0 }
+  );
+  const wind = Math.hypot(weather.wind.x, weather.wind.z);
+  document.documentElement.dataset.weatherLabel = weather.label;
+  document.documentElement.dataset.weatherHazards = String(weather.hazards.length);
+  document.documentElement.dataset.weatherPuddles = String(counts.puddle);
+  document.documentElement.dataset.weatherSlush = String(counts.slush);
+  document.documentElement.dataset.weatherSnowbanks = String(counts.snowbank);
+  weatherEl.textContent =
+    `\u041f\u043e\u0433\u043e\u0434\u0430: ${weather.label} ` +
+    `\u2022 ${Math.round(weather.intensity * 100)}% ` +
+    `\u2022 \u0432\u0435\u0442\u0435\u0440 ${wind.toFixed(1)} ` +
+    `\u2022 \u043b\u0443\u0436\u0438 ${counts.puddle}, \u0441\u043b\u044f\u043a\u043e\u0442\u044c ${counts.slush}, \u0441\u0443\u0433\u0440\u043e\u0431\u044b ${counts.snowbank}`;
 }
 
 function teamNameLabel(team: TeamId | null): string {
@@ -633,6 +735,8 @@ function applyState(state: ServerState, time: number) {
       players.delete(id);
     }
   }
+  weatherLayer.update(state.weather, time);
+  observeWeatherAudio(state);
   updateHud(state);
   updateAudioMix(state);
 }
@@ -681,14 +785,64 @@ function observeAudioState(state: ServerState) {
   audioObservedPlayers = nextPlayers;
 }
 
+function hazardAt(position: { x: number; y: number; z: number }, weather: WeatherSnapshot | undefined): HazardSnapshot | null {
+  if (!weather) return null;
+  let nearest: HazardSnapshot | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const hazard of weather.hazards) {
+    const distance = Math.hypot(position.x - hazard.position.x, position.z - hazard.position.z);
+    if (distance <= hazard.radius && distance < nearestDistance) {
+      nearest = hazard;
+      nearestDistance = distance;
+    }
+  }
+  return nearest;
+}
+
+function observeWeatherAudio(state: ServerState) {
+  const localPlayer = localJoin
+    ? state.players.find((player) => player.id === localJoin?.id && player.role === "player")
+    : null;
+  const localHazard = localPlayer ? hazardAt(localPlayer.position, state.weather) : null;
+  const nextLocalHazardId = localHazard?.id ?? null;
+  if (nextLocalHazardId !== audioObservedLocalHazardId) {
+    audioObservedLocalHazardId = nextLocalHazardId;
+    if (localHazard) {
+      hazardAudioEvents[localHazard.type] += 1;
+      audio.playWeatherHazard(localHazard.type, {
+        pan: localHazard.position.x / (FIELD_WIDTH / 2),
+        isLocal: true,
+        speed: localPlayer ? Math.hypot(localPlayer.velocity.x, localPlayer.velocity.z) : 0
+      });
+    }
+  }
+
+  const ballHazard = hazardAt(state.ball.position, state.weather);
+  const nextBallHazardId = ballHazard?.id ?? null;
+  const ballSpeed = Math.hypot(state.ball.velocity.x, state.ball.velocity.y, state.ball.velocity.z);
+  if (nextBallHazardId !== audioObservedBallHazardId) {
+    audioObservedBallHazardId = nextBallHazardId;
+    if (ballHazard && ballSpeed > 0.6) {
+      hazardAudioEvents[ballHazard.type] += 1;
+      audio.playWeatherHazard(ballHazard.type, {
+        pan: ballHazard.position.x / (FIELD_WIDTH / 2),
+        speed: ballSpeed
+      });
+    }
+  }
+}
+
 function updateAudioMix(state: ServerState) {
   const ballSpeed = Math.hypot(state.ball.velocity.x, state.ball.velocity.y, state.ball.velocity.z);
   const daylight = Number(document.documentElement.dataset.daylight || "0");
+  const ballHazard = hazardAt(state.ball.position, state.weather);
   audio.update({
     activePlayers: state.players.filter((player) => player.role === "player").length,
     ballSpeed,
     connected,
-    daylight
+    daylight,
+    weatherIntensity: state.weather?.intensity ?? 0,
+    hazardDrag: ballHazard ? ballHazard.strength : 0
   });
   syncAudioDebugDataset();
 }
@@ -704,7 +858,8 @@ function updateLighting(elapsedSeconds: number) {
   sunMesh.position.copy(sun.position).multiplyScalar(1.7);
   sunColor.copy(dayColor).lerp(sunsetColor, sunset).lerp(nightColor, 1 - daylight);
   skyColor.copy(nightColor).lerp(dayColor, daylight).lerp(sunsetColor, sunset * 0.36);
-  fogColor.copy(fogNightColor).lerp(fogDayColor, daylight).lerp(sunsetColor, sunset * 0.22);
+  const snowIntensity = latestState?.weather?.intensity ?? 0;
+  fogColor.copy(fogNightColor).lerp(fogDayColor, daylight).lerp(sunsetColor, sunset * 0.22).lerp(snowFogColor, snowIntensity * 0.14);
   sun.color.copy(sunColor);
   sun.intensity = 0.32 + daylight * 2.6 + sunset * 0.75;
   hemi.intensity = 0.38 + daylight * 1.45;
@@ -721,7 +876,7 @@ function updateLighting(elapsedSeconds: number) {
     const fog = scene.fog as THREE.Fog;
     fog.color.copy(fogColor);
     fog.near = 24 + daylight * 8;
-    fog.far = 54 + daylight * 18;
+    fog.far = 54 + daylight * 18 - snowIntensity * 6;
   }
   (sunMesh.material as THREE.MeshBasicMaterial).color.copy(sunColor);
   sunMesh.scale.setScalar(0.82 + daylight * 0.34 + sunset * 0.28);
@@ -804,8 +959,11 @@ addEventListener("keyup", (event) => {
 });
 
 canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+const audioUnlockOptions: AddEventListenerOptions = { capture: true, passive: true };
+addEventListener("pointerdown", unlockAudio, audioUnlockOptions);
+addEventListener("mousedown", unlockAudio, audioUnlockOptions);
+addEventListener("touchstart", unlockAudio, audioUnlockOptions);
 canvas.addEventListener("pointerdown", (event) => {
-  unlockAudio();
   canvas.focus();
   if (event.button === 0) input.kickLeft += 1;
   if (event.button === 2) input.kickRight += 1;

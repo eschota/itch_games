@@ -21,7 +21,7 @@ Orbital Courier is a tiny browser game built with Three.js for itch.io HTML5 upl
 
 ## unsoccer / Ragdoll Soccer II
 
-`unsoccer` is currently `v0.0.002` as a physical multiplayer soccer prototype:
+`unsoccer` is currently `v0.0.003` as a physical multiplayer soccer prototype:
 
 - MavonEngine-style client/server split with a headless authoritative server.
 - Three.js client rendering, Rapier3D server physics, and geckos.io WebRTC
@@ -30,6 +30,8 @@ Orbital Courier is a tiny browser game built with Three.js for itch.io HTML5 upl
   5-32 join as spectators/testers.
 - WASD moves, left mouse kicks left foot, right mouse kicks right foot, and the
   mouse wheel triggers a head hit.
+- Server-authoritative snow weather adds puddles, slush, and snowbank
+  obstacles that affect player movement and ball physics.
 - Free3D character candidates are tracked in `unsoccer/assets/`, but runtime
   ships procedural placeholders until per-model provenance is confirmed.
 
@@ -72,11 +74,22 @@ npm run dev:unsoccer
 Open `http://127.0.0.1:5174/?server=http://127.0.0.1:8787&name=p1` in up to
 four browser contexts.
 
+Before accepting UnSoccer mechanics, run the deterministic server gate:
+
+```bash
+npm run test:unsoccer:acceptance
+```
+
+The gate builds the workspaces, starts an isolated `UNSOCCER_TEST_MODE=1`
+server on a temporary port, then verifies spectator assignment, left/right/head
+kicks, body contact, goal scoring, reset, and countdown.
+
 ## Build Itch Package
 
 ```bash
 python3 tools/package_itch.py orbital-courier
 npm run build:unsoccer
+npm run test:unsoccer:acceptance
 python3 tools/package_itch.py unsoccer
 ```
 

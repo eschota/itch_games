@@ -1,4 +1,4 @@
-export const GAME_VERSION = "v0.0.002";
+export const GAME_VERSION = "v0.0.003";
 export const ROOM_ID = "unsoccer-default-room";
 export const MAX_ACTIVE_PLAYERS = 4;
 export const MAX_ROOM_CLIENTS = 32;
@@ -26,6 +26,8 @@ export const BODY_BUMP_COOLDOWN_MS = 140;
 export type TeamId = 0 | 1;
 export type PlayerRole = "player" | "spectator";
 export type KickKind = "left" | "right" | "head" | "body";
+export type WeatherKind = "snow";
+export type HazardType = "puddle" | "slush" | "snowbank";
 
 export interface Vec3 {
   x: number;
@@ -63,6 +65,22 @@ export interface BallSnapshot {
   velocity: Vec3;
 }
 
+export interface HazardSnapshot {
+  id: string;
+  type: HazardType;
+  position: Vec3;
+  radius: number;
+  strength: number;
+}
+
+export interface WeatherSnapshot {
+  kind: WeatherKind;
+  label: string;
+  intensity: number;
+  wind: Vec3;
+  hazards: HazardSnapshot[];
+}
+
 export interface ScoreState {
   blue: number;
   orange: number;
@@ -92,6 +110,7 @@ export interface ServerState {
   score: ScoreState;
   message: string;
   countdown: number;
+  weather: WeatherSnapshot;
 }
 
 export interface ClientInputMessage {

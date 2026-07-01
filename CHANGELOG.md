@@ -1,5 +1,16 @@
 # Changelog
 
+## unsoccer v0.0.003
+
+- Add server-authoritative snow weather, puddles, slush, and snowbank hazards.
+- Slow players and damp the ball in wet/slushy zones, and block/deflect around
+  snowbank obstacles.
+- Add client weather visuals, HUD weather status, snow particles, and
+  procedural weather audio/debug evidence.
+- Add an isolated `npm run test:unsoccer:acceptance` gate for server
+  health/version, 5-client spectator assignment, left/right/head kicks, body
+  contact, and goal score/reset/countdown.
+
 ## unsoccer v0.0.002
 
 - Synchronize public pages, package metadata, and skill maps with the current

@@ -1,0 +1,19 @@
+[Unit]
+Description=UnSoccer authoritative game server on qwertystock.com
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/generic/itch_games
+Environment=NODE_ENV=production
+Environment=UNSOCCER_PORT=8787
+EnvironmentFile=-/etc/itch-games-unsoccer.env
+ExecStart=/usr/bin/node /home/generic/itch_games/unsoccer/server/dist/index.js
+Restart=always
+RestartSec=3
+User=generic
+Group=generic
+
+[Install]
+WantedBy=multi-user.target

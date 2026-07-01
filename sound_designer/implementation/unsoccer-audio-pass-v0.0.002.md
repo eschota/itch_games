@@ -54,19 +54,30 @@ Runtime scope: `unsoccer/client/src/audio.ts`, `unsoccer/client/src/main.ts`
   - countdown second diffs for restart ticks.
 - Continuous mix is updated during render-state application from ball speed,
   active player count, current connection state, and day-cycle daylight.
-- `window.unsoccerDebug.snapshot().audio` exposes support/unlock/context/mix
-  state for browser QA.
+- `window.unsoccerDebug.snapshot().audio` and mirrored `html[data-audio-*]`
+  fields expose support/unlock/context/mix state, unlock attempt count, and
+  browser user-activation state for QA.
 
 ## Acceptance
 
 - `npm run typecheck:unsoccer`: passed on 2026-07-01 after implementation.
+- `npm run build:unsoccer`: passed on 2026-07-01; Vite still reports the
+  existing chunk-size warning above 500 kB.
+- `npm run package:unsoccer`: passed on 2026-07-01, wrote
+  `dist/unsoccer-itch.zip` at 140.5 KiB.
+- Zip listing after packaging: `index.html`, one CSS asset, one JS asset; no
+  `.mp3/.wav/.ogg/.m4a/.flac/.aac` files and no internal docs.
+- Browser QA against `http://127.0.0.1:5175/?name=AudioQA3&qaTime=30`:
+  - before gesture: `data-audio-context="missing"`,
+    `data-audio-unlocked="false"`, `data-audio-unlock-attempts="0"`;
+  - after automated canvas click: `data-audio-unlock-attempts="1"`,
+    `data-audio-context="suspended"`, `data-audio-user-activation="inactive:fresh"`;
+  - warning/error console logs: `0`.
 - Required remaining validation before release acceptance:
-  - `npm run build:unsoccer`,
-  - `npm run package:unsoccer`,
-  - browser gesture test proves `audio.unlocked === true` and context is
-    `running`,
+  - real browser/user-activation gesture proves `audio.unlocked === true` and
+    context is `running`; the current in-app automation click does not grant
+    Chromium user activation,
   - no console audio/autoplay errors,
-  - zip contains no unexpected remote audio files or internal docs,
   - multiplayer/browser smoke confirms server-state driven cues do not fire on
     missed local input.
 
@@ -76,8 +87,9 @@ Runtime scope: `unsoccer/client/src/audio.ts`, `unsoccer/client/src/main.ts`
 
 ## Risks
 
-- The current `unsoccer` tree is still untracked in git, so normal `git diff`
-  does not display the new files until they are intentionally added.
+- The final working tree still has parallel dirty files outside this audio QA
+  delta (`ai_chat/server_node.js`, `unsoccer/server`, `unsoccer/shared`, tester
+  evidence). Do not revert them from Sound Designer scope.
 - Deterministic kick/goal audio acceptance still needs server test-mode or a
   headless gameplay harness; current snapshot diffing is correct, but specific
   physics events are not deterministic without placement hooks.

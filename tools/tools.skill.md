@@ -17,6 +17,9 @@ Use this file for work inside `/itch_games/tools`.
 
 - `package_itch.py`: creates the player-facing Orbital Courier HTML5 upload zip
   under `dist/`.
+- `unsoccer_acceptance.mjs`: starts an isolated `UNSOCCER_TEST_MODE=1` server
+  and verifies authoritative spectator assignment, kick/body contacts, and
+  goal reset behavior.
 
 ## Rules
 
@@ -28,3 +31,5 @@ Use this file for work inside `/itch_games/tools`.
 - Orbital Courier packages include vendored Three.js runtime files so the
   upload remains playable without CDN dependency.
 - Generated output belongs under `dist/` and must not be committed.
+- `npm run test:unsoccer:acceptance` must use an isolated test server and must
+  stop it before finishing.

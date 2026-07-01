@@ -22,7 +22,7 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 
 ## Rules
 
-- Current release: `v0.0.002`.
+- Current release: `v0.0.003`.
 - Keep client and server separated; browser bundles must not import server-only
   modules.
 - The server is authoritative for room assignment, teams, player physics, ball
@@ -39,6 +39,13 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 - `v0.0.002` audio pass keeps sound client-only and driven by authoritative
   `ServerState` diffs: kicks/body contacts, score, countdown, roster changes,
   and ball speed.
+- `v0.0.003` weather pass keeps snow/puddle/slush/snowbank physics
+  server-authoritative and requires client visuals for any hazard that changes
+  movement or ball collision.
+- `v0.0.003` server acceptance uses `UNSOCCER_TEST_MODE=1` only on an isolated
+  local port. Never expose `/api/test/*` on a production multiplayer server.
+- Run `npm run test:unsoccer:acceptance` before claiming spectator assignment,
+  kick/body contacts, or goal/reset behavior is ready.
 - Keep the itch.io package static. The zip contains the built client only; live
   multiplayer requires a separately deployed HTTPS/geckos server.
 - Treat `index.html` as a UI Designer-owned public surface for catalog

@@ -20,6 +20,8 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
 - `itch-games-io-games-qwertystock.conf`: nginx reference for
   `io-games.mecharulez.com`.
 - `itch-games-ai-chat-qwertystock.service`: qwertystock target systemd service.
+- `itch-games-unsoccer-server-qwertystock.service`: qwertystock target systemd
+  service for the UnSoccer authoritative server on `127.0.0.1:8787`.
 - `itch-games-autodeploy-qwertystock.sh`: webhook-triggered deploy script.
 - `itch-games-ai-chat.service` and `nginx-ai-chat-location.conf`: previous or
   compatibility references.
@@ -33,3 +35,7 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
   catalog root, not a single game route.
 - Keep webhook and Telegram secrets only in server environment files.
 - Deployment changes must be reported to `/ai_chat` with validation status.
+- The production UnSoccer route serves `unsoccer/client/dist` at `/unsoccer/`,
+  proxies `/unsoccer/api/` to `127.0.0.1:8787/api/`, and strips
+  `/unsoccer/socket/` before forwarding geckos.io `/.wrtc/v2` requests to
+  `127.0.0.1:8787`.

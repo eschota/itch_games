@@ -41,6 +41,12 @@ Use this file for work inside `/itch_games/programmer`.
 - `checks/`: runtime validation logs and screenshots.
 - `temp/`: disposable scratch files and experiments.
 
+## Current Checks
+
+- `checks/2026-07-01-unsoccer-v0.0.003-acceptance.md`: deterministic
+  acceptance evidence for UnSoccer spectator roles, kicks, body contact, and
+  goal reset.
+
 ## Rules
 
 - Do not place runtime code here.

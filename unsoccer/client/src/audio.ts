@@ -1,4 +1,4 @@
-import type { KickKind, PlayerRole, TeamId } from "@itch-games/unsoccer-shared";
+import type { HazardType, KickKind, PlayerRole, TeamId } from "@itch-games/unsoccer-shared";
 
 type AudioWindow = Window & typeof globalThis & {
   webkitAudioContext?: typeof AudioContext;
@@ -15,6 +15,8 @@ export interface AudioMixFrame {
   ballSpeed: number;
   connected: boolean;
   daylight: number;
+  weatherIntensity: number;
+  hazardDrag: number;
 }
 
 export interface AudioRuntimeSnapshot {
@@ -24,9 +26,15 @@ export interface AudioRuntimeSnapshot {
   ambienceReady: boolean;
   rollGain: number;
   crowdGain: number;
+  weatherGain: number;
+  playedEvents: number;
+  blockedEvents: number;
+  lastEvent: AudioEventKind | null;
+  lastBlockedEvent: AudioEventKind | null;
 }
 
 const MIN_GAIN = 0.0001;
+type AudioEventKind = "connection" | "join" | "roster" | "kick" | "goal" | "countdown" | "weather" | "ui";
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -43,31 +51,41 @@ export class UnSoccerAudio {
   private rollFilter: BiquadFilterNode | null = null;
   private crowdGain: GainNode | null = null;
   private crowdFilter: BiquadFilterNode | null = null;
+  private weatherGain: GainNode | null = null;
+  private weatherFilter: BiquadFilterNode | null = null;
   private ambienceReady = false;
   private noiseBuffers = new Map<number, AudioBuffer>();
   private currentRollGain = 0;
   private currentCrowdGain = 0;
+  private currentWeatherGain = 0;
+  private playedEvents = 0;
+  private blockedEvents = 0;
+  private lastEvent: AudioEventKind | null = null;
+  private lastBlockedEvent: AudioEventKind | null = null;
 
-  async unlock(): Promise<void> {
+  async unlock(): Promise<boolean> {
+    const wasUnlocked = this.unlocked;
     const ctx = this.ensureContext();
-    if (!ctx) return;
+    if (!ctx) return false;
     try {
       if (ctx.state !== "running") await ctx.resume();
     } catch {
-      return;
+      return false;
     }
-    if (ctx.state !== "running") return;
+    if (ctx.state !== "running") return false;
     if (!this.unlocked) {
       this.unlocked = true;
       this.ensureAmbience();
+      this.markPlayed("ui");
       this.playUiConfirm();
     }
+    return !wasUnlocked && this.unlocked;
   }
 
   playConnection(isConnected: boolean): void {
-    const ctx = this.readyContext();
-    if (!ctx) return;
+    if (!this.canPlay("connection")) return;
     const notes = isConnected ? [392, 523] : [392, 247];
+    this.markPlayed("connection");
     notes.forEach((frequency, index) => {
       this.playTone({
         frequency,
@@ -81,17 +99,23 @@ export class UnSoccerAudio {
   }
 
   playJoin(role: PlayerRole): void {
+    if (!this.canPlay("join")) return;
+    this.markPlayed("join");
     const base = role === "player" ? 587 : 440;
     this.playTone({ frequency: base, duration: 0.08, peak: 0.05, type: "triangle", pan: 0 });
     this.playTone({ frequency: role === "player" ? 784 : 554, duration: 0.11, delay: 0.07, peak: 0.04, type: "triangle", pan: 0 });
   }
 
   playRosterChange(kind: "join" | "leave" | "spectator"): void {
+    if (!this.canPlay("roster")) return;
+    this.markPlayed("roster");
     const frequency = kind === "leave" ? 220 : kind === "spectator" ? 330 : 494;
     this.playTone({ frequency, duration: 0.08, peak: 0.032, type: "sine", pan: kind === "leave" ? -0.18 : 0.18 });
   }
 
   playKick(kind: KickKind, options: SpatialSoundOptions): void {
+    if (!this.canPlay("kick")) return;
+    this.markPlayed("kick");
     const localBoost = options.isLocal ? 1.2 : 0.82;
     const speedBoost = clamp((options.speed || 0) / 9, 0, 0.32);
     const peak = localBoost * (0.075 + speedBoost * 0.035);
@@ -129,6 +153,8 @@ export class UnSoccerAudio {
   }
 
   playGoal(team: TeamId): void {
+    if (!this.canPlay("goal")) return;
+    this.markPlayed("goal");
     const pan = team === 0 ? -0.18 : 0.18;
     const chord = team === 0 ? [392, 523, 659, 784] : [330, 440, 554, 659];
     this.playNoiseBurst({ duration: 0.62, peak: 0.085, pan, filterType: "bandpass", frequency: 620, q: 0.45 });
@@ -146,25 +172,61 @@ export class UnSoccerAudio {
   }
 
   playCountdown(remainingSeconds: number): void {
+    if (!this.canPlay("countdown")) return;
+    this.markPlayed("countdown");
     const pitch = remainingSeconds <= 1 ? 1175 : remainingSeconds === 2 ? 988 : 784;
     this.playTone({ frequency: pitch, duration: 0.06, peak: 0.045, type: "square", pan: 0 });
+  }
+
+  playWeatherHazard(kind: HazardType, options: SpatialSoundOptions): void {
+    if (!this.canPlay("weather")) return;
+    this.markPlayed("weather");
+    const speed = clamp((options.speed || 0) / 8, 0, 1);
+    const pan = clamp(options.pan, -0.92, 0.92);
+    const localBoost = options.isLocal ? 1.2 : 0.82;
+    if (kind === "puddle") {
+      this.playNoiseBurst({
+        duration: 0.18,
+        peak: localBoost * (0.035 + speed * 0.035),
+        pan,
+        filterType: "bandpass",
+        frequency: 980,
+        q: 1.35
+      });
+      return;
+    }
+    if (kind === "slush") {
+      this.playNoiseBurst({
+        duration: 0.2,
+        peak: localBoost * (0.028 + speed * 0.025),
+        pan,
+        filterType: "lowpass",
+        frequency: 720,
+        q: 0.95
+      });
+      return;
+    }
+    this.playPitchDrop({ start: 118, end: 58, duration: 0.13, peak: localBoost * 0.052, pan, type: "triangle" });
+    this.playNoiseBurst({ duration: 0.12, peak: localBoost * 0.034, pan, filterType: "lowpass", frequency: 420, q: 0.8 });
   }
 
   update(frame: AudioMixFrame): void {
     const ctx = this.readyContext();
     if (!ctx) return;
     this.ensureAmbience();
-    if (!this.rollGain || !this.rollFilter || !this.crowdGain || !this.crowdFilter) return;
+    if (!this.rollGain || !this.rollFilter || !this.crowdGain || !this.crowdFilter || !this.weatherGain || !this.weatherFilter) return;
 
     const visibility = document.visibilityState === "visible" ? 1 : 0.25;
     const ballAmount = clamp(frame.ballSpeed / 12, 0, 1);
     const activeAmount = clamp(frame.activePlayers / 4, 0, 1);
     const nightAmount = 1 - clamp(frame.daylight, 0, 1);
     const connectedAmount = frame.connected ? 1 : 0.25;
+    const weatherAmount = clamp(frame.weatherIntensity, 0, 1);
+    const hazardAmount = clamp(frame.hazardDrag, 0, 1);
     const now = ctx.currentTime;
 
-    const rollTarget = visibility * connectedAmount * ballAmount * (0.018 + activeAmount * 0.014);
-    const rollFrequency = 220 + ballAmount * 980;
+    const rollTarget = visibility * connectedAmount * ballAmount * (0.018 + activeAmount * 0.014) * (1 - hazardAmount * 0.22);
+    const rollFrequency = 220 + ballAmount * 980 - hazardAmount * 110;
     this.rollGain.gain.setTargetAtTime(rollTarget, now, 0.08);
     this.rollFilter.frequency.setTargetAtTime(rollFrequency, now, 0.08);
     this.currentRollGain = rollTarget;
@@ -173,6 +235,11 @@ export class UnSoccerAudio {
     this.crowdGain.gain.setTargetAtTime(crowdTarget, now, 0.65);
     this.crowdFilter.frequency.setTargetAtTime(260 + frame.daylight * 180, now, 0.65);
     this.currentCrowdGain = crowdTarget;
+
+    const weatherTarget = visibility * connectedAmount * weatherAmount * (0.008 + activeAmount * 0.008 + hazardAmount * 0.01);
+    this.weatherGain.gain.setTargetAtTime(weatherTarget, now, 0.8);
+    this.weatherFilter.frequency.setTargetAtTime(880 - weatherAmount * 260 + hazardAmount * 160, now, 0.8);
+    this.currentWeatherGain = weatherTarget;
   }
 
   snapshot(): AudioRuntimeSnapshot {
@@ -182,7 +249,12 @@ export class UnSoccerAudio {
       contextState: this.ctx?.state || "missing",
       ambienceReady: this.ambienceReady,
       rollGain: Number(this.currentRollGain.toFixed(4)),
-      crowdGain: Number(this.currentCrowdGain.toFixed(4))
+      crowdGain: Number(this.currentCrowdGain.toFixed(4)),
+      weatherGain: Number(this.currentWeatherGain.toFixed(4)),
+      playedEvents: this.playedEvents,
+      blockedEvents: this.blockedEvents,
+      lastEvent: this.lastEvent,
+      lastBlockedEvent: this.lastBlockedEvent
     };
   }
 
@@ -226,6 +298,18 @@ export class UnSoccerAudio {
     return this.ctx;
   }
 
+  private canPlay(kind: AudioEventKind): boolean {
+    if (this.readyContext()) return true;
+    this.blockedEvents += 1;
+    this.lastBlockedEvent = kind;
+    return false;
+  }
+
+  private markPlayed(kind: AudioEventKind): void {
+    this.playedEvents += 1;
+    this.lastEvent = kind;
+  }
+
   private ensureAmbience(): void {
     const ctx = this.readyContext();
     if (!ctx || this.ambienceReady || !this.ambienceGain) return;
@@ -254,10 +338,24 @@ export class UnSoccerAudio {
     rollSource.connect(rollFilter).connect(rollGain).connect(this.ambienceGain);
     rollSource.start();
 
+    const weatherSource = ctx.createBufferSource();
+    weatherSource.buffer = this.noiseBuffer(2.6);
+    weatherSource.loop = true;
+    const weatherFilter = ctx.createBiquadFilter();
+    weatherFilter.type = "bandpass";
+    weatherFilter.frequency.value = 720;
+    weatherFilter.Q.value = 0.85;
+    const weatherGain = ctx.createGain();
+    weatherGain.gain.value = 0;
+    weatherSource.connect(weatherFilter).connect(weatherGain).connect(this.ambienceGain);
+    weatherSource.start();
+
     this.crowdGain = crowdGain;
     this.crowdFilter = crowdFilter;
     this.rollGain = rollGain;
     this.rollFilter = rollFilter;
+    this.weatherGain = weatherGain;
+    this.weatherFilter = weatherFilter;
     this.ambienceReady = true;
   }
 

@@ -79,6 +79,7 @@ body {
 }
 
 #status,
+#weather,
 #roster {
   width: min(360px, calc(100vw - 28px));
   padding: 8px 10px;
@@ -89,6 +90,13 @@ body {
   font-size: 0.86rem;
   line-height: 1.35;
   backdrop-filter: blur(8px);
+}
+
+#weather {
+  border-color: rgba(209, 247, 255, 0.22);
+  background: linear-gradient(135deg, rgba(7, 18, 20, 0.72), rgba(28, 44, 46, 0.58));
+  color: #d6f6ff;
+  font-size: 0.8rem;
 }
 
 #roster {

@@ -1,6 +1,6 @@
 {
   "name": "@itch-games/unsoccer-server",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "type": "module",
   "private": true,
   "main": "dist/index.js",
@@ -13,7 +13,7 @@
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.18.2",
     "@geckos.io/server": "3.1.0",
-    "@itch-games/unsoccer-shared": "0.0.2",
+    "@itch-games/unsoccer-shared": "0.0.3",
     "@mavonengine/core": "0.0.20",
     "express": "5.1.0"
   },

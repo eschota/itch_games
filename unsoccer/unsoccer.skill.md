@@ -22,7 +22,7 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 
 ## Rules
 
-- Current release: `v0.0.003`.
+- Current release: `v0.0.006`.
 - Keep client and server separated; browser bundles must not import server-only
   modules.
 - The server is authoritative for room assignment, teams, player physics, ball
@@ -45,6 +45,9 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 - `v0.0.003` weather pass keeps snow/puddle/slush/snowbank physics
   server-authoritative and requires client visuals for any hazard that changes
   movement or ball collision.
+- `v0.0.006` production hotfix aligns the visible client/server version and
+  uses a dependency-free WebSocket JSON transport with HTTP polling fallback on
+  the Qwertystock host.
 - Server-confirmed left-foot, right-foot, head, and body contacts must stay
   visually distinguishable in the client and expose QA-readable
   `data-last-action-*` fields on `document.documentElement`.

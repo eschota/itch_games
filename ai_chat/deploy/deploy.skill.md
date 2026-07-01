@@ -58,8 +58,11 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
 - The UnSoccer production dependency preflight must import
   `@dimforge/rapier3d-compat` and `@itch-games/unsoccer-shared`; it must not
   require `ws`, geckos.io, or `node-datachannel` for the WebSocket transport.
-- The qwertystock autodeploy must verify `unsoccer/client/dist/index.html`
-  and at least one built JS asset before nginx reload.
+- The qwertystock autodeploy must run `npm ci` with dev dependencies even when
+  the service environment is production, then verify
+  `unsoccer/client/dist/index.html`, the visible `v0.0.006` marker, at least one
+  built JS asset, and that the server bundle does not import geckos.io, `ws`, or
+  `node-datachannel` before nginx reload.
 - The webhook child process must not synchronously restart
   `itch-games-ai-chat.service` before it exits. Schedule a delayed chat restart
   after local health checks so the parent process can append deploy

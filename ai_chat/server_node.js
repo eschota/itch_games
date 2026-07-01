@@ -25,6 +25,9 @@ const MAX_MEDIA_UPLOAD_BYTES = 80 * 1024 * 1024;
 const MAX_MEDIA_ATTACHMENTS = 8;
 let deployRunning = false;
 let unsoccerChild = null;
+let unsoccerLastStart = null;
+let unsoccerLastExit = null;
+let unsoccerOutputTail = [];
 let shuttingDown = false;
 
 const TASK_ROLES = [
@@ -1190,13 +1193,39 @@ function execFileReport(command, args, timeoutMs) {
   });
 }
 
+function unsoccerChildStatus() {
+  return {
+    pid: unsoccerChild && unsoccerChild.pid ? unsoccerChild.pid : null,
+    running: Boolean(unsoccerChild && unsoccerChild.exitCode === null && !unsoccerChild.killed),
+    last_start: unsoccerLastStart,
+    last_exit: unsoccerLastExit,
+    output_tail: unsoccerOutputTail.slice(-24),
+  };
+}
+
+function trackUnsoccerOutput(streamName, chunk) {
+  const text = String(chunk || "");
+  process[streamName === "stderr" ? "stderr" : "stdout"].write(`[unsoccer] ${text}`);
+  for (const line of text.split(/\r?\n/).map((item) => item.trim()).filter(Boolean)) {
+    unsoccerOutputTail.push({ time: nowIso(), stream: streamName, line: line.slice(0, 500) });
+  }
+  if (unsoccerOutputTail.length > 40) unsoccerOutputTail = unsoccerOutputTail.slice(-40);
+}
+
 async function deployHealthSnapshot() {
   const distHtml = readTextFileSlice(["unsoccer", "client", "dist", "index.html"], 16000);
   const distAssets = unsoccerDistAssetReports(distHtml);
   const serverHealth = await localHttpJson(Number(process.env.UNSOCCER_PORT || 8787), "/api/health", 1800);
   const systemd = await execFileReport("systemctl", ["is-active", "itch-games-unsoccer-server.service"], 1800);
+  const processList = await execFileReport("pgrep", ["-af", "unsoccer/server/dist/index.js"], 1800);
+  const dependencyCheck = await execFileReport(process.execPath, [
+    "--input-type=module",
+    "-e",
+    "await import('@dimforge/rapier3d-compat'); await import('@geckos.io/server'); await import('@itch-games/unsoccer-shared'); console.log('unsoccer dependencies ok')",
+  ], 5000);
   const hasBuiltHtml = /(?:src|href)="\.\/assets\/index-[^"]+\.(?:js|css)"/.test(distHtml);
   const hasJsAsset = distAssets.some((asset) => asset.exists && /\.js$/i.test(asset.path));
+  const requiresSystemd = process.platform === "linux";
   return {
     ok: true,
     ready: Boolean(hasBuiltHtml && hasJsAsset && serverHealth.ok),
@@ -1219,8 +1248,12 @@ async function deployHealthSnapshot() {
       },
       dist_assets: distAssets,
       local_api_health: serverHealth,
+      requires_systemd: requiresSystemd,
       systemd_service: systemd,
-      autostart_child_pid: unsoccerChild && unsoccerChild.pid ? unsoccerChild.pid : null,
+      process_list: processList,
+      dependency_check: dependencyCheck,
+      autostart_env: String(process.env.UNSOCCER_AUTOSTART || ""),
+      autostart_child: unsoccerChildStatus(),
     },
   };
 }
@@ -1397,6 +1430,9 @@ function spawnUnsoccerServer(port) {
     console.warn(`unsoccer autostart skipped: missing ${entry}`);
     return;
   }
+  unsoccerLastStart = { time: nowIso(), port, entry };
+  unsoccerLastExit = null;
+  unsoccerOutputTail = [];
   unsoccerChild = childProcess.spawn(process.execPath, [entry], {
     cwd: ROOT,
     env: {
@@ -1406,10 +1442,11 @@ function spawnUnsoccerServer(port) {
     },
     stdio: ["ignore", "pipe", "pipe"]
   });
-  unsoccerChild.stdout.on("data", (chunk) => process.stdout.write(`[unsoccer] ${chunk}`));
-  unsoccerChild.stderr.on("data", (chunk) => process.stderr.write(`[unsoccer] ${chunk}`));
+  unsoccerChild.stdout.on("data", (chunk) => trackUnsoccerOutput("stdout", chunk));
+  unsoccerChild.stderr.on("data", (chunk) => trackUnsoccerOutput("stderr", chunk));
   unsoccerChild.on("exit", (code, signal) => {
     console.error(`unsoccer server exited code=${code} signal=${signal || ""}`);
+    unsoccerLastExit = { time: nowIso(), code, signal: signal || "" };
     unsoccerChild = null;
     if (!shuttingDown) {
       const timer = setTimeout(startUnsoccerServer, 3000);
@@ -1720,6 +1757,8 @@ function main() {
   ensureDataDir();
   installShutdownHandlers();
   startUnsoccerServer();
+  const unsoccerWatchdog = setInterval(startUnsoccerServer, 15000);
+  unsoccerWatchdog.unref();
   console.log(`telegram bridge ${telegramConfig().enabled ? "enabled" : "disabled"}`);
   http.createServer(handleRequest).listen(port, host, () => {
     console.log(`ai_chat node server listening on http://${host}:${port}`);

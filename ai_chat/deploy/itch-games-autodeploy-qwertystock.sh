@@ -18,15 +18,15 @@ sudo -n ln -sfn /etc/nginx/sites-available/itch-games-io-games.conf /etc/nginx/s
 sudo -n rm -f /etc/nginx/sites-enabled/itch-games-orbital-courier.conf
 sudo -n nginx -t
 sudo -n systemctl daemon-reload
-sudo -n systemctl enable --now itch-games-unsoccer-server.service || true
-sudo -n systemctl restart itch-games-unsoccer-server.service || true
+sudo -n systemctl enable --now itch-games-unsoccer-server.service
+sudo -n systemctl restart itch-games-unsoccer-server.service
 sleep 2
-sudo -n systemctl enable --now itch-games-ai-chat.service
 if ! curl -fsS http://127.0.0.1:8787/api/health; then
-  sudo -n systemctl restart itch-games-ai-chat.service
+  sudo -n systemctl restart itch-games-unsoccer-server.service
   sleep 3
 fi
 curl -fsS http://127.0.0.1:8787/api/health
+sudo -n systemctl enable --now itch-games-ai-chat.service
 curl -fsS http://127.0.0.1:8765/api/health
 sudo -n systemctl reload nginx
 (sleep 2; sudo -n systemctl restart itch-games-ai-chat.service) >/dev/null 2>&1 &

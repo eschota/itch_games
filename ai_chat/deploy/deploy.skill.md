@@ -47,6 +47,9 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
   `itch-games-ai-chat-qwertystock.service` as the active
   `itch-games-ai-chat.service` before restart, so Node `server_node.js` owns
   Task Queue, Telegram, deploy webhook, and `/api/media`.
+- The qwertystock chat unit must force `UNSOCCER_AUTOSTART=1` after loading
+  `/etc/itch-games-ai-chat.env`; otherwise an old server env can keep the
+  fallback child disabled while `/unsoccer/api/health` stays 502.
 - The qwertystock autodeploy must verify `unsoccer/client/dist/index.html`
   and at least one built JS asset before nginx reload.
 - The webhook child process must not synchronously restart

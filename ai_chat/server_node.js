@@ -1460,12 +1460,16 @@ async function deployHealthSnapshot() {
   ], 5000);
   const hasBuiltHtml = /(?:src|href)="\.\/assets\/index-[^"]+\.(?:js|css)"/.test(distHtml);
   const hasJsAsset = distAssets.some((asset) => asset.exists && /\.js$/i.test(asset.path));
+  const expectedVersion = projectVersion();
+  const distHtmlVersionMatches = Boolean(expectedVersion && distHtml.includes(expectedVersion));
+  const localApiVersion = String(serverHealth.json?.version || "");
+  const localApiVersionMatches = Boolean(localApiVersion && localApiVersion === expectedVersion);
   const requiresSystemd = process.platform === "linux";
   return {
     ok: true,
-    ready: Boolean(hasBuiltHtml && hasJsAsset && serverHealth.ok),
+    ready: Boolean(hasBuiltHtml && hasJsAsset && serverHealth.ok && distHtmlVersionMatches && localApiVersionMatches),
     time: nowIso(),
-    project_version: projectVersion(),
+    project_version: expectedVersion,
     git: gitContext(),
     deploy_running: deployRunning,
     urls: {
@@ -1475,6 +1479,8 @@ async function deployHealthSnapshot() {
     },
     unsoccer: {
       built_html_detected: hasBuiltHtml,
+      dist_html_version_matches: distHtmlVersionMatches,
+      local_api_version_matches: localApiVersionMatches,
       files: {
         public_page: fileReport("unsoccer", "index.html"),
         client_dev_html: fileReport("unsoccer", "client", "index.html"),

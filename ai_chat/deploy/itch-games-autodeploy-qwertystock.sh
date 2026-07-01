@@ -22,12 +22,18 @@ NODE_ENV=development npm ci --include=dev
 stage "dependency check"
 node --input-type=module -e "await import('@dimforge/rapier3d-compat'); await import('@itch-games/unsoccer-shared'); console.log('unsoccer required dependencies ok')"
 stage "build unsoccer"
+rm -rf unsoccer/client/dist
 npm run build:unsoccer
 stage "artifact checks"
-test -s unsoccer/client/dist/index.html
-test -d unsoccer/client/dist/assets
-find unsoccer/client/dist/assets -maxdepth 1 -type f -name '*.js' -print -quit | grep -q .
-grep -R -q 'v0.0.008' unsoccer/client/dist
+dist_html="unsoccer/client/dist/index.html"
+dist_assets="unsoccer/client/dist/assets"
+test -s "$dist_html"
+test -d "$dist_assets"
+find "$dist_assets" -maxdepth 1 -type f -name '*.js' -print -quit | grep -q .
+grep -q 'v0.0.008' "$dist_html"
+grep -q '0.56 MB' "$dist_html"
+grep -R -q 'residential-courtyard' "$dist_assets"
+grep -R -q '0.56 MB' "$dist_assets"
 ! grep -Eq 'geckos|node-datachannel|@geckos.io|from ["'\'']ws["'\'']|import\(["'\'']ws["'\'']\)' unsoccer/server/dist/index.js
 stage "install service references"
 sudo -n install -m 0644 ai_chat/deploy/itch-games-io-games-qwertystock.conf /etc/nginx/sites-available/itch-games-io-games.conf
@@ -50,4 +56,10 @@ stage "restart chat and reload nginx"
 sudo -n systemctl enable --now itch-games-ai-chat.service
 curl -fsS http://127.0.0.1:8765/api/health
 sudo -n systemctl reload nginx
+stage "public unsoccer smoke"
+public_html="$(curl -fsS https://io-games.mecharulez.com/unsoccer/)"
+grep -q 'v0.0.008' <<< "$public_html"
+grep -q '0.56 MB' <<< "$public_html"
+api_health="$(curl -fsS https://io-games.mecharulez.com/unsoccer/api/health)"
+grep -q '"version":"v0.0.008"' <<< "$api_health"
 (sleep 2; sudo -n systemctl restart itch-games-ai-chat.service) >/dev/null 2>&1 &

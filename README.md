@@ -21,17 +21,20 @@ Orbital Courier is a tiny browser game built with Three.js for itch.io HTML5 upl
 
 ## unsoccer / Ragdoll Soccer II
 
-`unsoccer` is currently `v0.0.003` as a physical multiplayer soccer prototype:
+`unsoccer` is currently `v0.0.006` as a physical multiplayer soccer prototype:
 
 - MavonEngine-style client/server split with a headless authoritative server.
-- Three.js client rendering, Rapier3D server physics, and geckos.io WebRTC
-  transport.
+- Three.js client rendering, Rapier3D server physics, WebSocket transport, and
+  HTTP polling fallback.
 - First 4 connected clients become players in one auto-created room; clients
   5-32 join as spectators/testers.
 - WASD moves, left mouse kicks left foot, right mouse kicks right foot, and the
   mouse wheel triggers a head hit.
 - Server-authoritative snow weather adds puddles, slush, and snowbank
   obstacles that affect player movement and ball physics.
+- Procedural Web Audio follows authoritative server snapshots for contacts,
+  goals, roster changes, ball rolling, and weather; debug fields expose played
+  and blocked audio events for browser unlock QA.
 - Free3D character candidates are tracked in `unsoccer/assets/`, but runtime
   ships procedural placeholders until per-model provenance is confirmed.
 
@@ -83,6 +86,11 @@ npm run test:unsoccer:acceptance
 The gate builds the workspaces, starts an isolated `UNSOCCER_TEST_MODE=1`
 server on a temporary port, then verifies spectator assignment, left/right/head
 kicks, body contact, goal scoring, reset, and countdown.
+
+For audio acceptance, use a real trusted click/touch/key gesture and confirm
+`data-audio-context="running"`, `data-audio-unlocked="true"`, and increasing
+`data-audio-played-events`. Automation-only clicks may still leave Chromium
+`AudioContext` suspended.
 
 ## Build Itch Package
 

@@ -10,20 +10,30 @@
     <child path="ui_designer/ui_designer.skill.md" role="ui-designer-workspace" />
     <child path="ui_designer/public_pages/public_pages.skill.md" role="ui-public-pages-folder-skill" />
     <child path="ui_designer/public_pages/orbital-courier-public-pages.md" role="ui-public-pages-brief" />
+    <child path="ui_designer/public_pages/orbital-courier-itch-page-copy.md" role="orbital-courier-itch-copy" />
+    <child path="ui_designer/public_pages/orbital-courier-itch-publishing-checklist.md" role="orbital-courier-itch-publish-checklist" />
+    <child path="ui_designer/public_pages/orbital-courier-itch-assets" role="orbital-courier-itch-storefront-assets" />
+    <child path="ui_designer/public_pages/itch-publication-ledger.md" role="itch-publication-ledger" />
     <child path="ui_designer/public_pages/unsoccer-public-pages.md" role="unsoccer-public-pages-brief" />
+    <child path="ui_designer/public_pages/unsoccer-itch-page-copy.md" role="unsoccer-itch-copy" />
+    <child path="ui_designer/public_pages/unsoccer-itch-publishing-checklist.md" role="unsoccer-itch-publish-checklist" />
+    <child path="ui_designer/public_pages/unsoccer-itch-assets" role="unsoccer-itch-storefront-assets" />
     <child path="game_designer_skill.md" role="game-designer-root" />
     <child path="game_designer/game_designer.skill.md" role="game-designer-workspace" />
     <child path="programmer_skill.md" role="programmer-root" />
     <child path="programmer/programmer.skill.md" role="programmer-workspace" />
+    <child path="programmer/checks/2026-07-01-unsoccer-v0.0.003-acceptance.md" role="unsoccer-v0.0.003-acceptance-evidence" />
     <child path="tester_skill.md" role="tester-root" />
     <child path="tester/tester.skill.md" role="tester-workspace" />
     <child path="sound_designer_skill.md" role="sound-designer-root" />
     <child path="sound_designer/sound_designer.skill.md" role="sound-designer-workspace" />
     <child path="sound_designer/implementation/audio-pass-v0.0.006.md" role="sound-v0.0.006-evidence" />
     <child path="sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md" role="unsoccer-audio-v0.0.002-evidence" />
+    <child path="sound_designer/implementation/unsoccer-audio-pass-v0.0.003.md" role="unsoccer-audio-v0.0.003-evidence" />
     <child path="ai_chat_skill.md" role="ai-chat-root" />
     <child path="ai_chat/ai_chat.skill.md" role="ai-chat-workspace" />
     <child path="ai_chat/deploy/deploy.skill.md" role="ai-chat-deploy-folder-skill" />
+    <child path="ai_chat/deploy/itch-games-unsoccer-server-qwertystock.service" role="unsoccer-production-systemd-service" />
     <child path="skill.xml" role="machine-map" />
     <child path="index.html" role="games-catalog" />
     <child path="orbital-courier/index.html" role="current-game-entry" />
@@ -44,6 +54,7 @@
     <child path="orbital-courier/src/styles.css" role="game-style" />
     <child path="tools/tools.skill.md" role="tools-folder-skill" />
     <child path="tools/package_itch.py" role="itch-package-helper" />
+    <child path="tools/unsoccer_acceptance.mjs" role="unsoccer-authoritative-acceptance-gate" />
   </skill>
   <hierarchy>
     <node path="." skill="itch_games.skill.md" map="skill.xml">
@@ -62,14 +73,21 @@
         <node path="unsoccer/client" role="vite-threejs-client" owner="Programmer">
           <node path="unsoccer/client/src/audio.ts" role="procedural-web-audio-runtime" owner="Sound Designer Programmer" />
         </node>
-        <node path="unsoccer/server" role="node-rapier-geckos-authoritative-server" owner="Programmer" />
+        <node path="unsoccer/server" role="node-rapier-websocket-authoritative-server" owner="Programmer" />
         <node path="unsoccer/shared" role="shared-protocol-tuning" owner="Programmer Game Designer" />
         <node path="unsoccer/assets" role="free3d-roster-provenance" owner="Art Director" />
       </node>
       <node path="ui_designer" skill="ui_designer/ui_designer.skill.md">
         <node path="ui_designer/public_pages" skill="ui_designer/public_pages/public_pages.skill.md">
           <node path="ui_designer/public_pages/orbital-courier-public-pages.md" role="public-page-brief" owner="UI Designer" />
+          <node path="ui_designer/public_pages/orbital-courier-itch-page-copy.md" role="itch-page-copy" owner="UI Designer" />
+          <node path="ui_designer/public_pages/orbital-courier-itch-publishing-checklist.md" role="itch-publish-checklist" owner="UI Designer" />
+          <node path="ui_designer/public_pages/orbital-courier-itch-assets" role="itch-storefront-assets" owner="UI Designer" />
+          <node path="ui_designer/public_pages/itch-publication-ledger.md" role="itch-publication-ledger" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-public-pages.md" role="public-page-brief" owner="UI Designer" />
+          <node path="ui_designer/public_pages/unsoccer-itch-page-copy.md" role="itch-page-copy" owner="UI Designer" />
+          <node path="ui_designer/public_pages/unsoccer-itch-publishing-checklist.md" role="itch-publish-checklist" owner="UI Designer" />
+          <node path="ui_designer/public_pages/unsoccer-itch-assets" role="itch-storefront-assets" owner="UI Designer" />
         </node>
       </node>
       <node path="art_director" skill="art_director/art_director.skill.md">
@@ -81,10 +99,15 @@
       </node>
       <node path="tools" skill="tools/tools.skill.md">
         <node path="tools/package_itch.py" role="itch-package-helper" />
+        <node path="tools/unsoccer_acceptance.mjs" role="unsoccer-authoritative-acceptance-gate" />
+      </node>
+      <node path="programmer" skill="programmer/programmer.skill.md">
+        <node path="programmer/checks/2026-07-01-unsoccer-v0.0.003-acceptance.md" role="unsoccer-v0.0.003-acceptance-evidence" owner="Programmer" />
       </node>
       <node path="sound_designer" skill="sound_designer/sound_designer.skill.md">
         <node path="sound_designer/implementation/audio-pass-v0.0.006.md" role="audio-pass-evidence" />
         <node path="sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md" role="unsoccer-audio-pass-evidence" />
+        <node path="sound_designer/implementation/unsoccer-audio-pass-v0.0.003.md" role="unsoccer-audio-unlock-sync-evidence" />
       </node>
     </node>
   </hierarchy>
@@ -92,7 +115,7 @@
     <server alias="freestock-moscow" path="/itch_games" role="previous-origin rollback" />
     <server host="145.239.0.57" user="generic" port="22744" path="/home/generic/itch_games" role="qwertystock-target" />
     <github repository="eschota/itch_games" visibility="public" />
-    <domain host="io-games.mecharulez.com" aiChatPath="/ai_chat/" />
+    <domain host="io-games.mecharulez.com" aiChatPath="/ai_chat/" unsoccerPath="/unsoccer/" unsoccerApiPath="/unsoccer/api/" unsoccerSocketPath="/unsoccer/socket/" />
   </transport>
   <coordination>
     <aiChat url="https://io-games.mecharulez.com/ai_chat/" service="itch-games-ai-chat.service" port="8765" webhookPath="/ai_chat/api/deploy-webhook">
@@ -149,7 +172,14 @@
       <rule>Do not place shipped game code or final UI assets in ui_designer/.</rule>
       <folder path="ui_designer/public_pages" skill="ui_designer/public_pages/public_pages.skill.md" role="public-page-briefs" />
       <artifact path="ui_designer/public_pages/orbital-courier-public-pages.md" role="public-page-source-of-truth" />
+      <artifact path="ui_designer/public_pages/orbital-courier-itch-page-copy.md" role="orbital-courier-itch-copy" />
+      <artifact path="ui_designer/public_pages/orbital-courier-itch-publishing-checklist.md" role="orbital-courier-itch-publish-checklist" />
+      <artifact path="ui_designer/public_pages/orbital-courier-itch-assets" role="orbital-courier-itch-storefront-assets" />
+      <artifact path="ui_designer/public_pages/itch-publication-ledger.md" role="itch-publication-ledger" />
       <artifact path="ui_designer/public_pages/unsoccer-public-pages.md" role="unsoccer-public-page-source-of-truth" />
+      <artifact path="ui_designer/public_pages/unsoccer-itch-page-copy.md" role="unsoccer-itch-copy" />
+      <artifact path="ui_designer/public_pages/unsoccer-itch-publishing-checklist.md" role="unsoccer-itch-publish-checklist" />
+      <artifact path="ui_designer/public_pages/unsoccer-itch-assets" role="unsoccer-itch-storefront-assets" />
     </workspace>
     <workspace name="game_designer" rootSkill="game_designer_skill.md" directorySkill="game_designer/game_designer.skill.md">
       <rule>Use game_designer/ for non-runtime ideas, systems, tuning, level notes, playtests, and briefs.</rule>
@@ -160,6 +190,7 @@
       <rule>Use programmer/ for non-runtime investigations, profiling, compatibility notes, plans, and validation checks.</rule>
       <rule>Programmer occasionally posts concise Idea messages for project development when a concrete technical opportunity appears, without constant idea spam.</rule>
       <rule>Do not import programmer/ files into the game runtime.</rule>
+      <artifact path="programmer/checks/2026-07-01-unsoccer-v0.0.003-acceptance.md" role="unsoccer-v0.0.003-acceptance-evidence" />
     </workspace>
     <workspace name="tester" rootSkill="tester_skill.md" directorySkill="tester/tester.skill.md">
       <rule>Use tester/ for non-runtime plans, bug notes, evidence, playtests, regression checks, and creative QA ideas.</rule>
@@ -172,6 +203,7 @@
       <rule>Sound Designer occasionally posts concise Idea messages for project development when a concrete audio opportunity appears, without constant idea spam.</rule>
       <artifact path="sound_designer/implementation/audio-pass-v0.0.006.md" role="audio-pass-evidence" />
       <artifact path="sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md" role="unsoccer-audio-pass-evidence" />
+      <artifact path="sound_designer/implementation/unsoccer-audio-pass-v0.0.003.md" role="unsoccer-audio-unlock-sync-evidence" />
     </workspace>
     <workspace name="ai_chat" rootSkill="ai_chat_skill.md" directorySkill="ai_chat/ai_chat.skill.md">
       <rule>Use ai_chat/ for the shared development-agent chat service code, static UI, deployment references, and server-only message storage.</rule>
@@ -181,32 +213,44 @@
   </roleWorkspaces>
   <tooling workspace="tools" directorySkill="tools/tools.skill.md">
     <tool path="tools/package_itch.py" role="player-facing-itch-package" />
+    <tool path="tools/unsoccer_acceptance.mjs" role="unsoccer-authoritative-acceptance-gate" />
     <rule>Generated package output belongs under dist/ and is not committed.</rule>
     <rule>Packaging fails if internal skill, role, agent coordination, deploy, or source-control docs leak into the public zip.</rule>
   </tooling>
-  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.002">
-    <client path="unsoccer/client" package="dist/unsoccer-itch.zip" />
-    <server path="unsoccer/server" port="8787" health="/api/health" />
+  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.006">
+    <client path="unsoccer/client" package="dist/unsoccer-itch.zip" productionPath="/unsoccer/" productionStatic="unsoccer/client/dist" />
+    <server path="unsoccer/server" port="8787" health="/api/health" transport="plain-websocket-json" fallback="http-polling" productionApiPath="/unsoccer/api/" productionSocketPath="/unsoccer/socket/" />
     <shared path="unsoccer/shared" />
-    <audio path="unsoccer/client/src/audio.ts" evidence="sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md" mode="procedural-web-audio" />
+    <audio path="unsoccer/client/src/audio.ts" evidence="sound_designer/implementation/unsoccer-audio-pass-v0.0.003.md" mode="procedural-web-audio" />
     <assetRules path="unsoccer/assets/licenses/free3d-provenance.json">
       <rule>Free3D downloads require FREE3D_API_TOKEN and exact format/lod/relativePath tuples.</rule>
       <rule>Runtime assets must be local optimized GLB files with provenance before shipping.</rule>
     </assetRules>
     <rule>First 4 connected clients are players; clients 5-32 are spectators/testers.</rule>
     <rule>Itch package is static client-only and requires a separately deployed multiplayer server.</rule>
+    <rule>Production transport is plain WebSocket JSON under /unsoccer/socket/ with HTTP polling fallback and built-in Node http/net/crypto handling; geckos.io, ws, and native node-datachannel must not be required runtime dependencies on the Qwertystock host.</rule>
   </game>
   <publicSurfaces owner="UI Designer">
     <surface path="index.html" url="https://io-games.mecharulez.com/" role="local-public-catalog" />
     <surface path="orbital-courier/index.html" url="https://io-games.mecharulez.com/orbital-courier/" role="game-entry-shell" />
-    <surface path="unsoccer/index.html" url="https://io-games.mecharulez.com/unsoccer/" role="unsoccer-public-page" />
-    <surface path="unsoccer/client/index.html" role="unsoccer-client-entry-source" />
+    <surface path="unsoccer/index.html" role="unsoccer-public-page-source" />
+    <surface path="unsoccer/client/index.html" url="https://io-games.mecharulez.com/unsoccer/" role="unsoccer-client-entry-source" />
+    <staticServing owner="UI Designer Programmer" nginx="direct-static" rule="Each game keeps a public static directory with relative links so nginx can map /game-name/ without backend static routes." />
     <surface path="dist/orbital-courier-itch.zip" role="itch-html5-upload-package" generated="true" />
     <surface path="dist/unsoccer-itch.zip" role="unsoccer-itch-html5-upload-package" generated="true" />
     <surface path="ui_designer/public_pages/orbital-courier-public-pages.md" role="itch-and-local-page-brief" />
+    <surface path="ui_designer/public_pages/orbital-courier-itch-page-copy.md" role="itch-page-copy" />
+    <surface path="ui_designer/public_pages/orbital-courier-itch-publishing-checklist.md" role="itch-publish-checklist" />
+    <surface path="ui_designer/public_pages/orbital-courier-itch-assets" role="itch-storefront-assets" />
+    <surface path="ui_designer/public_pages/itch-publication-ledger.md" role="itch-publication-ledger" />
     <surface path="ui_designer/public_pages/unsoccer-public-pages.md" role="unsoccer-itch-and-local-page-brief" />
+    <surface path="ui_designer/public_pages/unsoccer-itch-page-copy.md" role="unsoccer-itch-page-copy" />
+    <surface path="ui_designer/public_pages/unsoccer-itch-publishing-checklist.md" role="unsoccer-itch-publish-checklist" />
+    <surface path="ui_designer/public_pages/unsoccer-itch-assets" role="unsoccer-itch-storefront-assets" />
     <rule>Itch upload packages must exclude internal skill, role, agent coordination, server, and source-control docs.</rule>
+    <rule>Public game pages, clients, screenshots, and assets are static bundles served directly by nginx from each game public directory; do not add app-server routes for static games or assets unless the Producer explicitly asks for dynamic behavior.</rule>
     <rule>Orbital Courier itch upload must include vendored Three.js and must not require cdn.jsdelivr.net at runtime.</rule>
+    <rule>External itch.io pages remain incomplete until the public URL, uploaded zip, exact live copy, screenshots, publication date, and version match are recorded under ui_designer/public_pages/.</rule>
   </publicSurfaces>
   <versioning initial="v0.0.001" current="v0.0.006">
     <rule>Every created game starts at v0.0.001.</rule>

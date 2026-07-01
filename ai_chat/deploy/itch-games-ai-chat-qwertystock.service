@@ -10,6 +10,7 @@ Environment=AI_CHAT_HOST=127.0.0.1
 Environment=AI_CHAT_PORT=8765
 Environment=AI_CHAT_DATA_DIR=/home/generic/itch_games/ai_chat/data
 EnvironmentFile=-/etc/itch-games-ai-chat.env
+Environment=AI_CHAT_DEPLOY_SCRIPT=/home/generic/itch_games/ai_chat/deploy/itch-games-autodeploy-qwertystock.sh
 Environment=UNSOCCER_AUTOSTART=1
 Environment=UNSOCCER_PORT=8787
 ExecStart=/usr/bin/node /home/generic/itch_games/ai_chat/server_node.js

@@ -1,27 +1,57 @@
-# Orbital Courier
+# IO Games
 
-Orbital Courier is a tiny browser game built with Three.js for itch.io HTML5 upload.
+This repository hosts small browser games built for local static previews,
+live IO Games deployment, and itch.io HTML5 upload.
 
 ## Play
 
 - Public catalog: `https://io-games.mecharulez.com/`.
 - Current game: `https://io-games.mecharulez.com/orbital-courier/`.
+- New prototype: `https://io-games.mecharulez.com/unsoccer/`.
+
+## Orbital Courier
+
+Orbital Courier is a tiny browser game built with Three.js for itch.io HTML5 upload.
+
 - The run starts automatically when the page opens.
 - Move with `A`/`D`, arrow keys, pointer drag, or touch drag.
 - Collect cyan energy cores.
 - Avoid red debris.
 - Press `Space` or click/tap `Start` after a run ends to restart.
 
+## unsoccer / Ragdoll Soccer II
+
+`unsoccer` is currently `v0.0.002` as a physical multiplayer soccer prototype:
+
+- MavonEngine-style client/server split with a headless authoritative server.
+- Three.js client rendering, Rapier3D server physics, and geckos.io WebRTC
+  transport.
+- First 4 connected clients become players in one auto-created room; clients
+  5-32 join as spectators/testers.
+- WASD moves, left mouse kicks left foot, right mouse kicks right foot, and the
+  mouse wheel triggers a head hit.
+- Free3D character candidates are tracked in `unsoccer/assets/`, but runtime
+  ships procedural placeholders until per-model provenance is confirmed.
+
+## Public Page Design
+
+UI Designer owns the visual hierarchy and copy clarity for the game UI and the
+public pages around the game: the IO Games catalog, the local game entry page,
+and itch.io presentation guidance. The current source-of-truth brief is
+`ui_designer/public_pages/orbital-courier-public-pages.md`.
+
 ## Version
 
-Current game release: `v0.0.005`.
+Current game release: `v0.0.006`.
 
 Game releases use `v0.0.001`-style semantic project versioning. The already
 published first build is treated as `v0.0.001`; this auto-start and input fix is
 `v0.0.002`, the itch iframe restart hardening is `v0.0.003`, and the
 document-level iframe click fallback is `v0.0.004`. The `v0.0.005` release makes
 the game-over overlay visual-only so iframe mouse/touch restart clicks route
-through the canvas. The game renders the release version in the bottom-left
+through the canvas. The `v0.0.006` release adds procedural Web Audio feedback,
+browser gesture unlock, engine ambience, gameplay SFX, and a network-ready
+audio event contract. The game renders the release version in the bottom-left
 corner.
 
 ## Local Run
@@ -32,14 +62,30 @@ python3 -m http.server 8000
 
 Open `http://127.0.0.1:8000/orbital-courier/`.
 
+For the multiplayer prototype:
+
+```bash
+npm install
+npm run dev:unsoccer
+```
+
+Open `http://127.0.0.1:5174/?server=http://127.0.0.1:8787&name=p1` in up to
+four browser contexts.
+
 ## Build Itch Package
 
 ```bash
-python3 tools/package_itch.py
+python3 tools/package_itch.py orbital-courier
+npm run build:unsoccer
+python3 tools/package_itch.py unsoccer
 ```
 
-The upload artifact is written to `dist/orbital-courier-itch.zip`. The zip keeps
-`index.html` at the archive root, which is required for itch.io HTML5 games.
+The upload artifacts are written to `dist/orbital-courier-itch.zip` and
+`dist/unsoccer-itch.zip`. Each zip keeps `index.html` at the archive root,
+which is required for itch.io HTML5 games.
+The packages are curated for players and exclude internal skill, role, and agent
+coordination docs. Orbital Courier vendors Three.js in the zip so the itch.io
+build does not depend on `cdn.jsdelivr.net` at runtime.
 
 ## Repository Skill Map
 

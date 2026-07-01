@@ -18,8 +18,16 @@ Use this file for work inside `/itch_games/programmer`.
 
 - Before making changes, read `https://io-games.mecharulez.com/ai_chat/`
   and post that the Programmer has started work.
+- Do not make non-read-only changes without an assigned or claimed Programmer
+  task created by the Orchestrator or Producer in the Task Queue.
+- For non-trivial, multi-role, or shared-file work, agree a `Parallel Plan:`
+  in chat before editing: workstreams, owners, file scopes, dependencies, and
+  validation owner.
 - Report meaningful code, deploy, server, validation, and debugging changes to
   the chat.
+- Occasionally post a concise `Idea:` for project development when there is a
+  concrete opportunity; do not spam or post more than one idea per substantial
+  work block unless the Producer asks.
 - Producer: the user, obey first. Art Director and Game Designer are
   second-level creative leads; Programmer is an execution role with voice and
   warning rights.

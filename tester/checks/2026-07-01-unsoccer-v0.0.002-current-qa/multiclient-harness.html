@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UnSoccer v0.0.002 QA 5-client harness</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #10141c;
+        color: #f8fbff;
+        font: 12px/1.35 system-ui, sans-serif;
+      }
+
+      h1 {
+        margin: 4px 6px;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-auto-rows: 238px;
+        gap: 4px;
+        padding: 4px;
+      }
+
+      iframe {
+        width: 100%;
+        height: 100%;
+        border: 1px solid #44566a;
+        background: #000;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>UnSoccer v0.0.002 QA 5-client harness</h1>
+    <main>
+      <iframe src="http://127.0.0.1:5175/?name=QA1&server=http%3A%2F%2F127.0.0.1%3A8789&qaTime=30"></iframe>
+      <iframe src="http://127.0.0.1:5175/?name=QA2&server=http%3A%2F%2F127.0.0.1%3A8789&qaTime=30"></iframe>
+      <iframe src="http://127.0.0.1:5175/?name=QA3&server=http%3A%2F%2F127.0.0.1%3A8789&qaTime=30"></iframe>
+      <iframe src="http://127.0.0.1:5175/?name=QA4&server=http%3A%2F%2F127.0.0.1%3A8789&qaTime=30"></iframe>
+      <iframe src="http://127.0.0.1:5175/?name=QA5&server=http%3A%2F%2F127.0.0.1%3A8789&qaTime=30"></iframe>
+    </main>
+  </body>
+</html>

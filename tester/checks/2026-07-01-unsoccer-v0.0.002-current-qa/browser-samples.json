@@ -1,0 +1,150 @@
+{
+  "sampleResults": [
+    {
+      "seconds": 0,
+      "info": {
+        "bodyScrollWidth": 1280,
+        "canvas": {
+          "clientHeight": 720,
+          "clientWidth": 1280,
+          "height": 900,
+          "width": 1600
+        },
+        "debug": null,
+        "htmlDataset": {
+          "dayCycleSeconds": "0.00",
+          "daylight": "0.000",
+          "qaDayCycleSeconds": "0.00",
+          "sunX": "18.49",
+          "sunY": "2.20",
+          "sunZ": "-2.53"
+        },
+        "innerHeight": 720,
+        "innerWidth": 1280,
+        "rosterText": "Tester0вы",
+        "scoreText": "0 Синие : 0 Оранжевые",
+        "status": "Tester0 подключился к полю.",
+        "title": "unsoccer | Ragdoll Soccer II",
+        "url": "http://127.0.0.1:5175/?name=Tester0&server=http%3A%2F%2F127.0.0.1%3A8789&qaTime=0",
+        "versionBadge": "v0.0.002"
+      }
+    },
+    {
+      "seconds": 30,
+      "info": {
+        "bodyScrollWidth": 1280,
+        "canvas": {
+          "clientHeight": 720,
+          "clientWidth": 1280,
+          "height": 900,
+          "width": 1600
+        },
+        "debug": null,
+        "htmlDataset": {
+          "dayCycleSeconds": "30.00",
+          "daylight": "0.994",
+          "qaDayCycleSeconds": "30.00",
+          "sunX": "15.30",
+          "sunY": "18.49",
+          "sunZ": "17.82"
+        },
+        "innerHeight": 720,
+        "innerWidth": 1280,
+        "rosterText": "Tester30вы",
+        "scoreText": "0 Синие : 0 Оранжевые",
+        "status": "Tester30 подключился к полю.",
+        "title": "unsoccer | Ragdoll Soccer II",
+        "url": "http://127.0.0.1:5175/?name=Tester30&server=http%3A%2F%2F127.0.0.1%3A8789&qaTime=30",
+        "versionBadge": "v0.0.002"
+      }
+    },
+    {
+      "seconds": 60,
+      "info": {
+        "bodyScrollWidth": 1280,
+        "canvas": {
+          "clientHeight": 720,
+          "clientWidth": 1280,
+          "height": 900,
+          "width": 1600
+        },
+        "debug": null,
+        "htmlDataset": {
+          "dayCycleSeconds": "60.00",
+          "daylight": "0.921",
+          "qaDayCycleSeconds": "60.00",
+          "sunX": "-18.49",
+          "sunY": "15.30",
+          "sunZ": "2.53"
+        },
+        "innerHeight": 720,
+        "innerWidth": 1280,
+        "rosterText": "Tester60вы",
+        "scoreText": "0 Синие : 0 Оранжевые",
+        "status": "Tester60 подключился к полю.",
+        "title": "unsoccer | Ragdoll Soccer II",
+        "url": "http://127.0.0.1:5175/?name=Tester60&server=http%3A%2F%2F127.0.0.1%3A8789&qaTime=60",
+        "versionBadge": "v0.0.002"
+      }
+    },
+    {
+      "seconds": 90,
+      "info": {
+        "bodyScrollWidth": 1280,
+        "canvas": {
+          "clientHeight": 720,
+          "clientWidth": 1280,
+          "height": 900,
+          "width": 1600
+        },
+        "debug": null,
+        "htmlDataset": {
+          "dayCycleSeconds": "90.00",
+          "daylight": "0.000",
+          "qaDayCycleSeconds": "90.00",
+          "sunX": "-15.30",
+          "sunY": "2.20",
+          "sunZ": "-17.82"
+        },
+        "innerHeight": 720,
+        "innerWidth": 1280,
+        "rosterText": "Tester90вы",
+        "scoreText": "0 Синие : 0 Оранжевые",
+        "status": "Tester90 подключился к полю.",
+        "title": "unsoccer | Ragdoll Soccer II",
+        "url": "http://127.0.0.1:5175/?name=Tester90&server=http%3A%2F%2F127.0.0.1%3A8789&qaTime=90",
+        "versionBadge": "v0.0.002"
+      }
+    },
+    {
+      "seconds": 120,
+      "info": {
+        "bodyScrollWidth": 1280,
+        "canvas": {
+          "clientHeight": 720,
+          "clientWidth": 1280,
+          "height": 900,
+          "width": 1600
+        },
+        "debug": null,
+        "htmlDataset": {
+          "dayCycleSeconds": "0.00",
+          "daylight": "0.000",
+          "qaDayCycleSeconds": "0.00",
+          "sunX": "18.49",
+          "sunY": "2.20",
+          "sunZ": "-2.53"
+        },
+        "innerHeight": 720,
+        "innerWidth": 1280,
+        "rosterText": "Tester120вы",
+        "scoreText": "0 Синие : 0 Оранжевые",
+        "status": "Tester120 подключился к полю.",
+        "title": "unsoccer | Ragdoll Soccer II",
+        "url": "http://127.0.0.1:5175/?name=Tester120&server=http%3A%2F%2F127.0.0.1%3A8789&qaTime=120",
+        "versionBadge": "v0.0.002"
+      }
+    }
+  ],
+  "logsAfterSamples": []
+}

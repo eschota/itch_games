@@ -17,8 +17,23 @@ communication.
 - Keep `/ai_chat` as the open coordination room for all game-development agents.
 - Require every agent to read the recent chat before changing the project.
 - Require every agent to post that it has started work before making changes.
+- Require the Orchestrator or Producer to create clear Task Queue items before
+  role implementation starts.
+- Block execution roles from non-read-only project changes unless they have an
+  assigned or claimed task for their role; reading, questions, blockers, and
+  concise `Idea:` messages remain allowed without a claim.
+- Require agents to agree a `Parallel Plan:` in chat before non-trivial,
+  multi-role, or shared-file work. The plan must define workstreams, owners,
+  exact file scopes, branch/task id, dependencies, merge order, and validation
+  owner before implementation starts.
+- Prevent agents from editing outside the agreed scope until the Orchestrator,
+  Producer, or affected roles acknowledge the split.
 - Require every agent to report any code, art, design, test, deploy, or server
   changes to the chat with role, project version, branch, and commit when known.
+- Require every role to occasionally propose concise, actionable `Idea:`
+  messages for project development when a concrete opportunity appears, while
+  preventing chat spam, repeated ideas, or more than one idea per substantial
+  work block unless the Producer asks.
 - Keep commits visible in a separate service menu, not mixed into the main chat.
 - Bridge the configured private Telegram group into the same chat so the
   Producer can read and write from Telegram.
@@ -43,8 +58,11 @@ communication.
   branch, and commit when available.
 - The service must expose recent messages, project status, and recent git
   commits from local and remote branches.
-- Data storage lives in `ai_chat/data/messages.jsonl` on the server and is
-  ignored by git.
+- The service must expose a Task Queue with role assignment, claim/lease,
+  status, comments, scope, dependencies, acceptance, and validation ownership.
+- Data storage lives in `ai_chat/data/messages.jsonl`,
+  `ai_chat/data/tasks.json`, and `ai_chat/data/tasks.jsonl` on the server and
+  is ignored by git.
 - Service code uses Python standard library only to avoid server dependency
   drift.
 - Autodeploy uses a GitHub push webhook at
@@ -65,9 +83,17 @@ communication.
    matters.
 3. Post a start message with role, task summary, current project version, and
    branch/commit if known.
-4. Before or immediately after any meaningful change, post what changed and what
+4. If doing non-read-only work, find an assigned task or claim a task for your
+   role in the Task Queue. If no task exists, ask the Orchestrator or Producer
+   to create one instead of editing files.
+5. For non-trivial, multi-role, or shared-file work, wait for a `Parallel Plan:`
+   agreement before editing. The agreement must assign workstreams, owners,
+   file scopes, branch/task id, dependencies, merge order, and validation owner.
+6. Before or immediately after any meaningful change, post what changed and what
    validation is planned.
-5. After validation or deployment, post the result, URL, command, or residual
+7. When a concrete improvement opportunity appears, optionally post one
+   concise `Idea:` message; keep it actionable and avoid repeating ideas.
+8. After validation or deployment, post the result, URL, command, or residual
    risk.
 
 ## Deployment

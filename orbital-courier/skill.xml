@@ -4,10 +4,16 @@
   <parent path="../itch_games.skill.md" />
   <entry file="orbital-courier.skill.md" />
   <runtime url="https://io-games.mecharulez.com/orbital-courier/" />
+  <publicSurface owner="UI Designer" localUrl="http://127.0.0.1:8000/orbital-courier/" itchEntry="index.html">
+    <rule>index.html is both the local game entry shell and the itch.io HTML5 entry after packaging.</rule>
+    <rule>UI Designer owns shell hierarchy, metadata, public copy clarity, iframe readability, and store-page fit.</rule>
+  </publicSurface>
   <files>
-    <file path="index.html" role="game-entry" />
+    <file path="index.html" role="game-entry public-surface itch-entry" />
     <file path="src/main.js" role="threejs-game-loop" />
     <file path="src/styles.css" role="game-style" />
+    <file path="vendor/three.module.js" role="vendored-threejs-runtime" version="0.165.0" />
+    <file path="vendor/three-LICENSE.txt" role="vendored-threejs-license" />
   </files>
   <rules>
     <rule>Keep game-specific runtime files inside orbital-courier/.</rule>

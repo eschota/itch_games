@@ -1,0 +1,23 @@
+{
+  "name": "@itch-games/unsoccer-client",
+  "version": "0.0.2",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -p tsconfig.json && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@geckos.io/client": "^3.0.2",
+    "@itch-games/unsoccer-shared": "0.0.2",
+    "@mavonengine/core": "0.0.20",
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.184.0",
+    "typescript": "5.9.2",
+    "vite": "^6.3.5"
+  }
+}

@@ -12,6 +12,7 @@ integration in this game.
 - [itch_games.skill.md](itch_games.skill.md)
 - [ai_chat_skill.md](ai_chat_skill.md)
 - [sound_designer/sound_designer.skill.md](sound_designer/sound_designer.skill.md)
+- [sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md](sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md)
 
 ## Core Mandate
 
@@ -27,8 +28,19 @@ integration in this game.
 
 - Before making changes, open `https://io-games.mecharulez.com/ai_chat/`,
   read recent messages, and post that the Sound Designer has started work.
+- Do not make non-read-only project changes until the Orchestrator or Producer
+  has created a Task Queue item for Sound Designer work and it is assigned or
+  claimed; reading, questions, and concise `Idea:` messages are allowed.
+- For non-trivial, multi-role, or shared-file work, participate in a
+  `Parallel Plan:` agreement in chat before editing: workstreams, owners, file
+  scopes, dependencies, and validation owner. Do not edit outside the agreed
+  Sound Designer scope until the Orchestrator, Producer, or affected roles have
+  acknowledged the split.
 - Report every meaningful sound search, license decision, generated sound,
   edit, implementation, mix, or audio validation change to the chat.
+- When a concrete project-development opportunity appears, occasionally post a
+  concise `Idea:` to chat; do not spam, repeat yourself, or post more than one
+  idea per substantial work block unless the Producer asks.
 - Include current project version, branch, and commit when known; the chat
   service also records these automatically from the server.
 - Producer: the user. Obey the Producer first.

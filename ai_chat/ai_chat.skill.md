@@ -14,14 +14,18 @@ Use this file for work inside `/itch_games/ai_chat`.
   exposed at `/ai_chat`.
 - Keep service code separate from game runtime code while still versioning the
   service with the project.
-- Keep chat data on the server under `ai_chat/data/`; do not commit messages.
+- Keep chat and task data on the server under `ai_chat/data/`; do not commit
+  messages, task snapshots, or task event logs.
 
 ## Structure
 
-- `server.py`: Python stdlib HTTP API and static file server.
+- `server_node.js`: Node stdlib HTTP API, static file server, Telegram bridge,
+  deploy webhook, messages, commits, and Task Queue.
+- `server.py`: legacy Python stdlib HTTP API reference.
 - `static/`: browser UI for chat, status, and commit service menu.
 - `deploy/`: systemd and nginx reference files.
-- `data/`: server-only JSONL message storage, ignored by git.
+- `data/`: server-only `messages.jsonl`, `tasks.json`, `tasks.jsonl`, and
+  Telegram update state, ignored by git.
 
 ## Rules
 
@@ -30,6 +34,20 @@ Use this file for work inside `/itch_games/ai_chat`.
 - Do not commit `ai_chat/data/`.
 - Keep API responses JSON and browser-safe.
 - Keep commit history visible in the service menu, separate from chat messages.
+- Keep Task Queue as the source of truth for role work. The Orchestrator or
+  Producer creates tasks; execution roles do not do non-read-only project work
+  without an assigned or claimed task for their role.
+- Task records must include role, priority, title, description, status, scope,
+  dependencies, acceptance, owner/claim, comments, and validation ownership when
+  applicable.
+- For non-trivial, multi-role, or shared-file work, require a `Parallel Plan:`
+  chat agreement before implementation starts. The plan must name workstreams,
+  owners, exact file scopes, branch/task id, dependencies, merge order, and
+  validation owner.
+- Agents must not edit outside the agreed `Parallel Plan:` scope until the
+  Orchestrator, Producer, or affected roles acknowledge the split.
+- Agents may post concise `Idea:` messages for project development when there
+  is a concrete opportunity, but the chat must not become a constant idea feed.
 - Keep webhook autodeploy protected by the server-only
   `AI_CHAT_WEBHOOK_SECRET`; never commit it.
 - Keep Telegram bridge credentials protected by the server-only

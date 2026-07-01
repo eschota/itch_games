@@ -1,4 +1,9 @@
 dist/
+node_modules/
+.vite/
+unsoccer/client/dist/
+unsoccer/server/dist/
+unsoccer/shared/dist/
 .DS_Store
 Thumbs.db
 *.log

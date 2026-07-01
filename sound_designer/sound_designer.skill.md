@@ -19,8 +19,16 @@ Use this file for work inside `/itch_games/sound_designer`.
 
 - Before making changes, read `https://io-games.mecharulez.com/ai_chat/`
   and post that the Sound Designer has started work.
+- Do not make non-read-only changes without an assigned or claimed Sound
+  Designer task created by the Orchestrator or Producer in the Task Queue.
+- For non-trivial, multi-role, or shared-file work, agree a `Parallel Plan:`
+  in chat before editing: workstreams, owners, file scopes, dependencies, and
+  validation owner.
 - Report sound searches, license decisions, generated audio, edits,
   implementation, mix, and validation results to the chat.
+- Occasionally post a concise `Idea:` for project development when there is a
+  concrete opportunity; do not spam or post more than one idea per substantial
+  work block unless the Producer asks.
 - Producer: the user, obey first. Art Director and Game Designer are
   second-level creative leads; Sound Designer is an execution role with voice
   and warning rights.
@@ -35,6 +43,12 @@ Use this file for work inside `/itch_games/sound_designer`.
 - `implementation/`: audio event maps and integration notes.
 - `checks/`: browser audio QA notes, package listings, trigger evidence.
 - `temp/`: disposable audio experiments.
+
+## Implementation Notes
+
+- `implementation/unsoccer-audio-pass-v0.0.002.md`: current UnSoccer
+  procedural Web Audio map, provenance, mix, integration points, acceptance,
+  and residual risks.
 
 ## Rules
 

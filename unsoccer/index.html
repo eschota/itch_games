@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ragdoll Soccer II | IO Games</title>
+    <meta
+      name="description"
+      content="Ragdoll Soccer II is a multiplayer physics soccer prototype for browser play."
+    />
+    <meta property="og:title" content="Ragdoll Soccer II" />
+    <meta
+      property="og:description"
+      content="A server-backed browser soccer prototype with ragdoll players and physics goals."
+    />
+    <meta property="og:type" content="website" />
+    <link rel="icon" href="data:," />
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        background: #07110f;
+        color: #f5fff9;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-width: 320px;
+        min-height: 100vh;
+        margin: 0;
+        background: #07110f;
+      }
+
+      main {
+        width: min(1080px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 28px 0 40px;
+      }
+
+      .masthead {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+        gap: 28px;
+        align-items: end;
+        min-height: 144px;
+        padding-bottom: 24px;
+        border-bottom: 1px solid rgba(245, 255, 249, 0.14);
+      }
+
+      .kicker,
+      .meta {
+        margin: 0;
+        color: #ffbf7c;
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 3.35rem;
+        line-height: 1;
+      }
+
+      .summary,
+      .copy p {
+        color: #c7d7cf;
+        font-size: 1rem;
+        line-height: 1.55;
+      }
+
+      .panel {
+        display: grid;
+        grid-template-columns: minmax(0, 1.12fr) minmax(280px, 0.88fr);
+        gap: 18px;
+        margin-top: 24px;
+      }
+
+      .field {
+        position: relative;
+        min-height: 420px;
+        overflow: hidden;
+        border: 1px solid rgba(245, 255, 249, 0.16);
+        border-radius: 8px;
+        background:
+          linear-gradient(90deg, rgba(245, 255, 249, 0.1) 1px, transparent 1px),
+          linear-gradient(180deg, #229066 0%, #0b3b33 100%);
+        background-size: 72px 100%, auto;
+      }
+
+      .field::before {
+        position: absolute;
+        inset: 28px;
+        border: 4px solid rgba(245, 255, 249, 0.75);
+        content: "";
+      }
+
+      .field::after {
+        position: absolute;
+        top: 28px;
+        bottom: 28px;
+        left: 50%;
+        width: 4px;
+        background: rgba(245, 255, 249, 0.75);
+        content: "";
+      }
+
+      .ball,
+      .player {
+        position: absolute;
+        z-index: 1;
+      }
+
+      .ball {
+        top: 48%;
+        left: 50%;
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: #f5fff9;
+        box-shadow: inset -10px -10px 0 rgba(7, 17, 15, 0.2);
+        transform: translate(-50%, -50%);
+      }
+
+      .player {
+        width: 48px;
+        height: 76px;
+        border-radius: 24px 24px 14px 14px;
+        box-shadow: 0 18px 24px rgba(7, 17, 15, 0.24);
+      }
+
+      .player.blue {
+        top: 42%;
+        left: 27%;
+        background: #58a8ff;
+        transform: rotate(-12deg);
+      }
+
+      .player.orange {
+        top: 34%;
+        right: 27%;
+        background: #ff9d42;
+        transform: rotate(15deg);
+      }
+
+      .copy {
+        display: grid;
+        align-content: start;
+        gap: 14px;
+        padding: 22px;
+        border: 1px solid rgba(245, 255, 249, 0.14);
+        border-radius: 8px;
+        background: #0c1715;
+      }
+
+      h2 {
+        font-size: 1.85rem;
+        line-height: 1.1;
+      }
+
+      .status-list {
+        display: grid;
+        gap: 10px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .status-list li {
+        display: grid;
+        grid-template-columns: 12px minmax(0, 1fr);
+        gap: 10px;
+        align-items: start;
+        color: #dce8df;
+        line-height: 1.45;
+      }
+
+      .status-list li::before {
+        width: 10px;
+        height: 10px;
+        margin-top: 6px;
+        border-radius: 50%;
+        background: #ffbf7c;
+        content: "";
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 6px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 128px;
+        min-height: 44px;
+        padding: 10px 16px;
+        border: 1px solid #58a8ff;
+        border-radius: 8px;
+        background: #58a8ff;
+        color: #031016;
+        font-weight: 800;
+        text-decoration: none;
+      }
+
+      .button.secondary {
+        border-color: rgba(245, 255, 249, 0.22);
+        background: transparent;
+        color: #f5fff9;
+      }
+
+      .button:focus-visible,
+      .button:hover {
+        outline: 2px solid #ffbf7c;
+        outline-offset: 2px;
+      }
+
+      @media (max-width: 780px) {
+        .masthead,
+        .panel {
+          grid-template-columns: 1fr;
+        }
+
+        h1 {
+          font-size: 2.45rem;
+        }
+
+        .field {
+          min-height: 300px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="masthead">
+        <div>
+          <p class="kicker">IO Games prototype</p>
+          <h1>Ragdoll Soccer II</h1>
+        </div>
+        <p class="summary">
+          A browser multiplayer soccer prototype with ragdoll players, physics
+          contact, team goals, and a separate authoritative server.
+        </p>
+      </header>
+      <section class="panel" aria-label="Ragdoll Soccer II public page">
+        <div class="field" aria-hidden="true">
+          <span class="player blue"></span>
+          <span class="player orange"></span>
+          <span class="ball"></span>
+        </div>
+        <div class="copy">
+          <p class="meta">unsoccer / v0.0.002</p>
+          <h2>Server-backed physics soccer</h2>
+          <p>
+            The public client is being prepared for deployment. The route stays
+            player-facing now so the local and production server never expose
+            internal project folders.
+          </p>
+          <ul class="status-list">
+            <li>Static itch.io build target: dist/unsoccer-itch.zip.</li>
+            <li>Live multiplayer requires the separate geckos/Rapier server.</li>
+            <li>First four connections play; later connections spectate.</li>
+          </ul>
+          <div class="actions">
+            <a class="button" href="/">Catalog</a>
+            <a class="button secondary" href="/ai_chat/">Project Chat</a>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

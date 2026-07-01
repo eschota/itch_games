@@ -1,5 +1,41 @@
 # Changelog
 
+## unsoccer v0.0.002
+
+- Synchronize public pages, package metadata, and skill maps with the current
+  server/client runtime version.
+- Keep the local `/unsoccer/` page prototype-facing while the multiplayer
+  server URL strategy is still separate from the static itch package.
+- Add procedural Web Audio for server-confirmed kicks, body contacts, goals,
+  countdown, roster changes, crowd bed, and ball rolling.
+
+## unsoccer v0.0.001
+
+- Add the Ragdoll Soccer II prototype scaffold under `unsoccer/`.
+- Add TypeScript client/server/shared workspaces using Three.js, Rapier3D, and
+  geckos.io in a MavonEngine-style multiplayer split.
+- Add authoritative auto-room assignment for 4 active players plus spectator
+  overflow, team scoring, server physics, WASD movement, and mouse kick inputs.
+- Add Free3D candidate roster/provenance rules without downloading assets when
+  `FREE3D_API_TOKEN` is unavailable.
+- Add public `/unsoccer/` prototype page so static hosts do not expose directory
+  listings.
+
+## v0.0.006
+
+- Add procedural Web Audio for run start, engine ambience, core collection,
+  shield hits, near misses, and run completion.
+- Add browser-safe gesture unlock for keyboard, pointer, touch, and restart
+  flows.
+- Expose `window.orbitalCourierAudio` and `orbital-courier:audio-event` for
+  future network replication of semantic audio events.
+- Vendor Three.js in the Orbital Courier itch package so the HTML5 upload does
+  not depend on a CDN at runtime.
+- Redesign the local IO Games catalog as a public Orbital Courier entry surface
+  and document UI Designer ownership for local and itch.io public pages.
+- Curate the itch.io zip so it excludes internal skill and agent coordination
+  files.
+
 ## v0.0.005
 
 - Make the game-over overlay visual-only so iframe mouse/touch restart clicks

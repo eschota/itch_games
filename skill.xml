@@ -4,8 +4,13 @@
     <child path="itch_games.skill.md" role="directory" />
     <child path="art_director_skill.md" role="art-director-root" />
     <child path="art_director/art_director.skill.md" role="art-director-workspace" />
+    <child path="art_director/style_guides/unsoccer-hdr-day-cycle-camera.md" role="unsoccer-art-direction-target" />
+    <child path="art_director/briefs/unsoccer-v0.0.001-visual-vertical-slice.md" role="unsoccer-visual-vertical-slice-brief" />
     <child path="ui_designer_skill.md" role="ui-designer-root" />
     <child path="ui_designer/ui_designer.skill.md" role="ui-designer-workspace" />
+    <child path="ui_designer/public_pages/public_pages.skill.md" role="ui-public-pages-folder-skill" />
+    <child path="ui_designer/public_pages/orbital-courier-public-pages.md" role="ui-public-pages-brief" />
+    <child path="ui_designer/public_pages/unsoccer-public-pages.md" role="unsoccer-public-pages-brief" />
     <child path="game_designer_skill.md" role="game-designer-root" />
     <child path="game_designer/game_designer.skill.md" role="game-designer-workspace" />
     <child path="programmer_skill.md" role="programmer-root" />
@@ -14,18 +19,75 @@
     <child path="tester/tester.skill.md" role="tester-workspace" />
     <child path="sound_designer_skill.md" role="sound-designer-root" />
     <child path="sound_designer/sound_designer.skill.md" role="sound-designer-workspace" />
+    <child path="sound_designer/implementation/audio-pass-v0.0.006.md" role="sound-v0.0.006-evidence" />
+    <child path="sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md" role="unsoccer-audio-v0.0.002-evidence" />
     <child path="ai_chat_skill.md" role="ai-chat-root" />
     <child path="ai_chat/ai_chat.skill.md" role="ai-chat-workspace" />
+    <child path="ai_chat/deploy/deploy.skill.md" role="ai-chat-deploy-folder-skill" />
     <child path="skill.xml" role="machine-map" />
     <child path="index.html" role="games-catalog" />
     <child path="orbital-courier/index.html" role="current-game-entry" />
     <child path="orbital-courier/orbital-courier.skill.md" role="current-game-folder-skill" />
     <child path="orbital-courier/skill.xml" role="current-game-folder-map" />
+    <child path="orbital-courier/vendor/vendor.skill.md" role="orbital-courier-vendor-folder-skill" />
+    <child path="orbital-courier/vendor/three.module.js" role="vendored-threejs-runtime" />
+    <child path="unsoccer/unsoccer.skill.md" role="unsoccer-folder-skill" />
+    <child path="unsoccer/skill.xml" role="unsoccer-folder-map" />
+    <child path="unsoccer/index.html" role="unsoccer-public-page" />
+    <child path="unsoccer/client" role="unsoccer-client" />
+    <child path="unsoccer/client/src/audio.ts" role="unsoccer-procedural-audio-runtime" />
+    <child path="unsoccer/server" role="unsoccer-authoritative-server" />
+    <child path="unsoccer/shared" role="unsoccer-shared-protocol" />
+    <child path="unsoccer/assets" role="unsoccer-assets-provenance" />
     <child path="package.json" role="package-metadata" />
     <child path="orbital-courier/src/main.js" role="game-code" />
     <child path="orbital-courier/src/styles.css" role="game-style" />
+    <child path="tools/tools.skill.md" role="tools-folder-skill" />
     <child path="tools/package_itch.py" role="itch-package-helper" />
   </skill>
+  <hierarchy>
+    <node path="." skill="itch_games.skill.md" map="skill.xml">
+      <node path="index.html" role="public-catalog" owner="UI Designer" />
+      <node path="orbital-courier" skill="orbital-courier/orbital-courier.skill.md" map="orbital-courier/skill.xml">
+        <node path="orbital-courier/index.html" role="game-entry public-surface itch-entry" owner="UI Designer" />
+        <node path="orbital-courier/src/main.js" role="runtime-code" />
+        <node path="orbital-courier/src/styles.css" role="runtime-style" owner="UI Designer" />
+        <node path="orbital-courier/vendor" skill="orbital-courier/vendor/vendor.skill.md">
+          <node path="orbital-courier/vendor/three.module.js" role="vendored-threejs-runtime" version="0.165.0" />
+          <node path="orbital-courier/vendor/three-LICENSE.txt" role="vendored-threejs-license" />
+        </node>
+      </node>
+      <node path="unsoccer" skill="unsoccer/unsoccer.skill.md" map="unsoccer/skill.xml">
+        <node path="unsoccer/index.html" role="public-page prototype-status" owner="UI Designer" />
+        <node path="unsoccer/client" role="vite-threejs-client" owner="Programmer">
+          <node path="unsoccer/client/src/audio.ts" role="procedural-web-audio-runtime" owner="Sound Designer Programmer" />
+        </node>
+        <node path="unsoccer/server" role="node-rapier-geckos-authoritative-server" owner="Programmer" />
+        <node path="unsoccer/shared" role="shared-protocol-tuning" owner="Programmer Game Designer" />
+        <node path="unsoccer/assets" role="free3d-roster-provenance" owner="Art Director" />
+      </node>
+      <node path="ui_designer" skill="ui_designer/ui_designer.skill.md">
+        <node path="ui_designer/public_pages" skill="ui_designer/public_pages/public_pages.skill.md">
+          <node path="ui_designer/public_pages/orbital-courier-public-pages.md" role="public-page-brief" owner="UI Designer" />
+          <node path="ui_designer/public_pages/unsoccer-public-pages.md" role="public-page-brief" owner="UI Designer" />
+        </node>
+      </node>
+      <node path="art_director" skill="art_director/art_director.skill.md">
+        <node path="art_director/style_guides/unsoccer-hdr-day-cycle-camera.md" role="unsoccer-art-direction-target" owner="Art Director" />
+        <node path="art_director/briefs/unsoccer-v0.0.001-visual-vertical-slice.md" role="unsoccer-visual-vertical-slice-brief" owner="Art Director" />
+      </node>
+      <node path="ai_chat" skill="ai_chat/ai_chat.skill.md">
+        <node path="ai_chat/deploy" skill="ai_chat/deploy/deploy.skill.md" role="transport-deploy-references" />
+      </node>
+      <node path="tools" skill="tools/tools.skill.md">
+        <node path="tools/package_itch.py" role="itch-package-helper" />
+      </node>
+      <node path="sound_designer" skill="sound_designer/sound_designer.skill.md">
+        <node path="sound_designer/implementation/audio-pass-v0.0.006.md" role="audio-pass-evidence" />
+        <node path="sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md" role="unsoccer-audio-pass-evidence" />
+      </node>
+    </node>
+  </hierarchy>
   <transport>
     <server alias="freestock-moscow" path="/itch_games" role="previous-origin rollback" />
     <server host="145.239.0.57" user="generic" port="22744" path="/home/generic/itch_games" role="qwertystock-target" />
@@ -36,13 +98,23 @@
     <aiChat url="https://io-games.mecharulez.com/ai_chat/" service="itch-games-ai-chat.service" port="8765" webhookPath="/ai_chat/api/deploy-webhook">
       <rule>Every development agent reads recent chat messages before making project changes.</rule>
       <rule>Every development agent posts a start message before making project changes.</rule>
+      <rule>The Orchestrator or Producer creates Task Queue items before roles do non-read-only implementation work.</rule>
+      <rule>Execution roles do not edit project files, deploy, or create runtime assets without an assigned or claimed task for their role.</rule>
+      <rule>Agents may read, ask clarifying questions, report blockers, and post concise Idea messages without claiming a task.</rule>
+      <rule>Before non-trivial multi-role or shared-file work, agents agree a Parallel Plan in chat with workstreams, owners, exact file scopes, branch or task id, dependencies, merge order, and validation owner.</rule>
+      <rule>Agents do not edit outside their agreed Parallel Plan scope until the Orchestrator, Producer, or affected roles acknowledge the split.</rule>
       <rule>Every development agent reports meaningful changes and validation results to chat.</rule>
+      <rule>Every role occasionally proposes concise actionable Idea messages for project development when a concrete opportunity appears, without spamming, repeating ideas, or exceeding one idea per substantial work block unless the Producer asks.</rule>
       <rule>Messages include date, self-declared role, current project version, branch, and commit when available.</rule>
       <rule>Commits from branches are shown in the separate service menu, not mixed into chat messages.</rule>
       <rule>Autodeploy is triggered by a signed GitHub push webhook, not by a systemd timer.</rule>
       <rule>Telegram bridge uses /ai_chat/api/telegram-webhook, accepts only the configured group, and relays real-user messages as Producer messages.</rule>
       <rule>Telegram bot token and chat id are stored only in the server environment file.</rule>
       <runtime host="qwertystock.com" entrypoint="ai_chat/server_node.js" reason="target system Python is 3.5" />
+      <taskQueue snapshot="ai_chat/data/tasks.json" events="ai_chat/data/tasks.jsonl">
+        <rule>Tasks include role, priority, title, description, file scope, dependencies, acceptance, owner or claim, status, comments, and validation owner.</rule>
+        <rule>Only Producer or Orchestrator creates, seeds, or re-scopes tasks.</rule>
+      </taskQueue>
     </aiChat>
     <subordination>
       <role name="Producer" authority="1">The user; obey first.</role>
@@ -64,35 +136,79 @@
   </repositoryHygiene>
   <artDirection workspace="art_director" rootSkill="art_director_skill.md">
     <rule>Use art_director/ for non-runtime art-direction audits, references, tests, drafts, prompts, and QA evidence.</rule>
+    <rule>Art Director occasionally posts concise Idea messages for project development when a concrete visual opportunity appears, without constant idea spam.</rule>
     <rule>Do not place shipped game code or final game assets in art_director/.</rule>
+    <artifact path="art_director/style_guides/unsoccer-hdr-day-cycle-camera.md" role="unsoccer-hdr-day-cycle-camera-target" />
+    <artifact path="art_director/briefs/unsoccer-v0.0.001-visual-vertical-slice.md" role="unsoccer-visual-vertical-slice-brief" />
   </artDirection>
   <roleWorkspaces>
     <workspace name="ui_designer" rootSkill="ui_designer_skill.md" directorySkill="ui_designer/ui_designer.skill.md">
       <rule>Use ui_designer/ for non-runtime UI audits, flows, wireframes, copy, references, and viewport checks.</rule>
+      <rule>UI Designer owns local public pages, game entry presentation, itch.io page direction, screenshots, captions, metadata, and catalog cards.</rule>
+      <rule>UI Designer occasionally posts concise Idea messages for project development when a concrete opportunity appears, without constant idea spam.</rule>
       <rule>Do not place shipped game code or final UI assets in ui_designer/.</rule>
+      <folder path="ui_designer/public_pages" skill="ui_designer/public_pages/public_pages.skill.md" role="public-page-briefs" />
+      <artifact path="ui_designer/public_pages/orbital-courier-public-pages.md" role="public-page-source-of-truth" />
+      <artifact path="ui_designer/public_pages/unsoccer-public-pages.md" role="unsoccer-public-page-source-of-truth" />
     </workspace>
     <workspace name="game_designer" rootSkill="game_designer_skill.md" directorySkill="game_designer/game_designer.skill.md">
       <rule>Use game_designer/ for non-runtime ideas, systems, tuning, level notes, playtests, and briefs.</rule>
-      <rule>Game Designer must propose creative ideas and feature improvements when they improve the current task.</rule>
+      <rule>Game Designer proposes creative ideas and feature improvements when a concrete opportunity improves the current task, without forcing constant idea posts.</rule>
+      <rule>Game Designer posts project-development ideas to chat as concise Idea messages, but avoids repeated or constant idea posting unless the Producer asks.</rule>
     </workspace>
     <workspace name="programmer" rootSkill="programmer_skill.md" directorySkill="programmer/programmer.skill.md">
       <rule>Use programmer/ for non-runtime investigations, profiling, compatibility notes, plans, and validation checks.</rule>
+      <rule>Programmer occasionally posts concise Idea messages for project development when a concrete technical opportunity appears, without constant idea spam.</rule>
       <rule>Do not import programmer/ files into the game runtime.</rule>
     </workspace>
     <workspace name="tester" rootSkill="tester_skill.md" directorySkill="tester/tester.skill.md">
       <rule>Use tester/ for non-runtime plans, bug notes, evidence, playtests, regression checks, and creative QA ideas.</rule>
       <rule>Tester must keep bugs separate from creative feature and polish suggestions.</rule>
+      <rule>Tester occasionally posts concise Idea messages for project development when testing reveals a concrete opportunity, without constant idea spam.</rule>
     </workspace>
     <workspace name="sound_designer" rootSkill="sound_designer_skill.md" directorySkill="sound_designer/sound_designer.skill.md">
       <rule>Use sound_designer/ for non-runtime source research, license notes, generation prompts, raw sounds, temp edits, mix notes, and audio checks.</rule>
       <rule>Sound Designer may search free sounds or generate sounds, then implement approved audio into the game with documented provenance.</rule>
+      <rule>Sound Designer occasionally posts concise Idea messages for project development when a concrete audio opportunity appears, without constant idea spam.</rule>
+      <artifact path="sound_designer/implementation/audio-pass-v0.0.006.md" role="audio-pass-evidence" />
+      <artifact path="sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md" role="unsoccer-audio-pass-evidence" />
     </workspace>
     <workspace name="ai_chat" rootSkill="ai_chat_skill.md" directorySkill="ai_chat/ai_chat.skill.md">
       <rule>Use ai_chat/ for the shared development-agent chat service code, static UI, deployment references, and server-only message storage.</rule>
       <rule>Do not commit ai_chat/data/ messages.</rule>
+      <folder path="ai_chat/deploy" skill="ai_chat/deploy/deploy.skill.md" role="transport-deploy-references" />
     </workspace>
   </roleWorkspaces>
-  <versioning initial="v0.0.001" current="v0.0.005">
+  <tooling workspace="tools" directorySkill="tools/tools.skill.md">
+    <tool path="tools/package_itch.py" role="player-facing-itch-package" />
+    <rule>Generated package output belongs under dist/ and is not committed.</rule>
+    <rule>Packaging fails if internal skill, role, agent coordination, deploy, or source-control docs leak into the public zip.</rule>
+  </tooling>
+  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.002">
+    <client path="unsoccer/client" package="dist/unsoccer-itch.zip" />
+    <server path="unsoccer/server" port="8787" health="/api/health" />
+    <shared path="unsoccer/shared" />
+    <audio path="unsoccer/client/src/audio.ts" evidence="sound_designer/implementation/unsoccer-audio-pass-v0.0.002.md" mode="procedural-web-audio" />
+    <assetRules path="unsoccer/assets/licenses/free3d-provenance.json">
+      <rule>Free3D downloads require FREE3D_API_TOKEN and exact format/lod/relativePath tuples.</rule>
+      <rule>Runtime assets must be local optimized GLB files with provenance before shipping.</rule>
+    </assetRules>
+    <rule>First 4 connected clients are players; clients 5-32 are spectators/testers.</rule>
+    <rule>Itch package is static client-only and requires a separately deployed multiplayer server.</rule>
+  </game>
+  <publicSurfaces owner="UI Designer">
+    <surface path="index.html" url="https://io-games.mecharulez.com/" role="local-public-catalog" />
+    <surface path="orbital-courier/index.html" url="https://io-games.mecharulez.com/orbital-courier/" role="game-entry-shell" />
+    <surface path="unsoccer/index.html" url="https://io-games.mecharulez.com/unsoccer/" role="unsoccer-public-page" />
+    <surface path="unsoccer/client/index.html" role="unsoccer-client-entry-source" />
+    <surface path="dist/orbital-courier-itch.zip" role="itch-html5-upload-package" generated="true" />
+    <surface path="dist/unsoccer-itch.zip" role="unsoccer-itch-html5-upload-package" generated="true" />
+    <surface path="ui_designer/public_pages/orbital-courier-public-pages.md" role="itch-and-local-page-brief" />
+    <surface path="ui_designer/public_pages/unsoccer-public-pages.md" role="unsoccer-itch-and-local-page-brief" />
+    <rule>Itch upload packages must exclude internal skill, role, agent coordination, server, and source-control docs.</rule>
+    <rule>Orbital Courier itch upload must include vendored Three.js and must not require cdn.jsdelivr.net at runtime.</rule>
+  </publicSurfaces>
+  <versioning initial="v0.0.001" current="v0.0.006">
     <rule>Every created game starts at v0.0.001.</rule>
     <rule>Every shipped bump increments the version.</rule>
     <rule>The current version is visible in the bottom-left corner.</rule>

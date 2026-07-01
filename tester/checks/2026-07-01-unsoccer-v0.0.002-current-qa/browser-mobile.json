@@ -1,0 +1,28 @@
+{
+  "mobileInfo": {
+    "bodyScrollWidth": 390,
+    "canvas": {
+      "clientHeight": 844,
+      "clientWidth": 390,
+      "height": 844,
+      "width": 390
+    },
+    "documentElementScrollWidth": 390,
+    "htmlDataset": {
+      "dayCycleSeconds": "30.00",
+      "daylight": "0.994",
+      "qaDayCycleSeconds": "30.00",
+      "sunX": "15.30",
+      "sunY": "18.49",
+      "sunZ": "17.82"
+    },
+    "innerHeight": 844,
+    "innerWidth": 390,
+    "rosterText": "MobileTesterвы",
+    "scoreText": "0 Синие : 0 Оранжевые",
+    "status": "MobileTester подключился к полю.",
+    "title": "unsoccer | Ragdoll Soccer II",
+    "versionBadge": "v0.0.002"
+  },
+  "mobileLogs": []
+}

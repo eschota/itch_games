@@ -1,0 +1,31 @@
+{
+  "version": "v0.0.001",
+  "runtimeMode": "procedural-placeholders-until-free3d-provenance",
+  "assignment": "playerIndex maps deterministically to roster order",
+  "candidates": [
+    {
+      "id": "6299851",
+      "name": "Male Soccer Player Character Rigged and Animated",
+      "source": "https://free3d.online/model/6299851-male-soccer-player-character-rigged-and-animated",
+      "status": "candidate-not-downloaded"
+    },
+    {
+      "id": "6270753",
+      "name": "Animated Fox Soccer Character Model Rigged and Animated",
+      "source": "https://free3d.online/model/6270753-animated-fox-soccer-character-model-rigged-and-animated",
+      "status": "candidate-not-downloaded"
+    },
+    {
+      "id": "6298507",
+      "name": "Rugby Player D Character Model Rigged and Animated",
+      "source": "https://free3d.online/model/6298507-rugby-player-d-character-model-rigged-and-animated",
+      "status": "candidate-not-downloaded"
+    },
+    {
+      "id": "6300462",
+      "name": "Ice Hockey Player Character Rigged and Animated",
+      "source": "https://free3d.online/model/6300462-ice-hockey-player-character-rigged-and-animated",
+      "status": "candidate-not-downloaded"
+    }
+  ]
+}

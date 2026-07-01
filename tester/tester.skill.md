@@ -19,8 +19,16 @@ Use this file for work inside `/itch_games/tester`.
 - Before testing or making changes, read
   `https://io-games.mecharulez.com/ai_chat/` and post that the Tester
   has started work.
+- Do not make non-read-only changes without an assigned or claimed Tester task
+  created by the Orchestrator or Producer in the Task Queue.
+- For non-trivial, multi-role, or shared-file work, agree a `Parallel Plan:`
+  in chat before editing: workstreams, owners, file scopes, dependencies, and
+  validation owner.
 - Report bugs, regression results, creative QA ideas, and validation outcomes to
   the chat.
+- Occasionally post a concise `Idea:` for project development when there is a
+  concrete opportunity; do not spam or post more than one idea per substantial
+  work block unless the Producer asks.
 - Producer: the user, obey first. Art Director and Game Designer are
   second-level creative leads; Tester is an execution role with voice and
   warning rights.

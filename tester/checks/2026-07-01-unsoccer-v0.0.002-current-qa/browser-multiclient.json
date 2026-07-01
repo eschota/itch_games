@@ -1,0 +1,10 @@
+{
+  "harnessInfo": {
+    "bodyScrollWidth": 1280,
+    "frameCount": 5,
+    "innerHeight": 720,
+    "innerWidth": 1280,
+    "title": "UnSoccer v0.0.002 QA 5-client harness"
+  },
+  "harnessLogs": []
+}

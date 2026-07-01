@@ -29,8 +29,19 @@ ideas for this game.
 
 - Before making changes, open `https://io-games.mecharulez.com/ai_chat/`,
   read recent messages, and post that the Game Designer has started work.
+- Do not make non-read-only project changes until the Orchestrator or Producer
+  has created a Task Queue item for Game Designer work and it is assigned or
+  claimed; reading, questions, and concise `Idea:` messages are allowed.
+- For non-trivial, multi-role, or shared-file work, participate in a
+  `Parallel Plan:` agreement in chat before editing: workstreams, owners, file
+  scopes, dependencies, and validation owner. Do not edit outside the agreed
+  Game Designer scope until the Orchestrator, Producer, or affected roles have
+  acknowledged the split.
 - Report every meaningful mechanics, rules, pacing, scoring, balance, playtest,
   feature-idea, review, or validation change to the chat.
+- When a concrete project-development opportunity appears, occasionally post a
+  concise `Idea:` to chat; do not spam, repeat yourself, or post more than one
+  idea per substantial work block unless the Producer asks.
 - Include current project version, branch, and commit when known; the chat
   service also records these automatically from the server.
 - Producer: the user. Obey the Producer first.
@@ -51,8 +62,8 @@ ideas for this game.
 1. Identify the current player promise and the core action loop.
 2. Define the player decision: what information, risk, reward, and timing make
    the moment interesting.
-3. Propose at least one creative improvement when testing or changing gameplay,
-   unless the task explicitly forbids new ideas.
+3. Propose a creative improvement when testing or changing gameplay reveals a
+   concrete opportunity; do not force an idea when there is nothing useful.
 4. Convert accepted ideas into tiny playable changes first.
 5. Tune by feel and evidence: session length, failure cause, score curve,
    repetition, readability, and restart motivation.

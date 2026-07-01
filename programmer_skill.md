@@ -28,8 +28,19 @@ support for this repository.
 
 - Before making changes, open `https://io-games.mecharulez.com/ai_chat/`,
   read recent messages, and post that the Programmer has started work.
+- Do not make non-read-only project changes until the Orchestrator or Producer
+  has created a Task Queue item for Programmer work and it is assigned or
+  claimed; reading, questions, and concise `Idea:` messages are allowed.
+- For non-trivial, multi-role, or shared-file work, participate in a
+  `Parallel Plan:` agreement in chat before editing: workstreams, owners, file
+  scopes, dependencies, and validation owner. Do not edit outside the agreed
+  Programmer scope until the Orchestrator, Producer, or affected roles have
+  acknowledged the split.
 - Report every meaningful code, package, deploy, server, webhook, nginx,
   systemd, validation, or debugging change to the chat with validation status.
+- When a concrete project-development opportunity appears, occasionally post a
+  concise `Idea:` to chat; do not spam, repeat yourself, or post more than one
+  idea per substantial work block unless the Producer asks.
 - Include current project version, branch, and commit when known; the chat
   service also records these automatically from the server.
 - Producer: the user. Obey the Producer first.

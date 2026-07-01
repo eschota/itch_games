@@ -8,7 +8,7 @@ const overlay = document.querySelector("#overlay");
 const startButton = document.querySelector("#start-button");
 const versionBadge = document.querySelector("#version-badge");
 
-const gameVersion = "v0.0.005";
+const gameVersion = "v0.0.006";
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -104,9 +104,365 @@ const input = { left: false, right: false, pointer: false, target: 0 };
 const hazards = [];
 const cores = [];
 let lastControlStartAt = 0;
+const audioNetwork = {
+  sourceId: makeAudioSourceId(),
+  sequence: 0,
+  seenIds: new Set(),
+  log: []
+};
+const audio = createAudioSystem();
 
 bestEl.textContent = String(state.best);
 versionBadge.textContent = gameVersion;
+setAudioDiagnostic("audioSupported", audio.supported());
+setAudioDiagnostic("audioState", "uncreated");
+
+function setAudioDiagnostic(name, value) {
+  document.documentElement.dataset[name] = String(value);
+}
+
+function makeAudioSourceId() {
+  if (window.crypto?.randomUUID) return `orbital-courier:${window.crypto.randomUUID()}`;
+  return `orbital-courier:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function createAudioSystem() {
+  const AudioCtor = window.AudioContext || window.webkitAudioContext;
+  const system = {
+    context: null,
+    master: null,
+    sfx: null,
+    ambience: null,
+    engine: null,
+    engineOsc: null,
+    engineFilter: null,
+    ambienceStarted: false,
+    muted: false,
+    unlocked: false
+  };
+
+  function ensureContext() {
+    if (!AudioCtor) return null;
+    if (system.context) return system.context;
+
+    const context = new AudioCtor();
+    system.context = context;
+    system.master = context.createGain();
+    system.sfx = context.createGain();
+    system.ambience = context.createGain();
+    system.engine = context.createGain();
+
+    system.master.gain.value = 0.82;
+    system.sfx.gain.value = 0.7;
+    system.ambience.gain.value = 0.28;
+    system.engine.gain.value = 0;
+
+    system.sfx.connect(system.master);
+    system.ambience.connect(system.master);
+    system.engine.connect(system.master);
+    system.master.connect(context.destination);
+    setAudioDiagnostic("audioState", context.state);
+    context.addEventListener("statechange", () => {
+      setAudioDiagnostic("audioState", context.state);
+      if (context.state === "running") markUnlocked();
+    });
+    return context;
+  }
+
+  function playableContext() {
+    const context = system.context;
+    if (!context || context.state !== "running" || system.muted) return null;
+    return context;
+  }
+
+  function markUnlocked() {
+    system.unlocked = true;
+    setAudioDiagnostic("audioUnlocked", true);
+    startAmbience();
+  }
+
+  function unlock() {
+    const context = ensureContext();
+    if (!context) return false;
+    setAudioDiagnostic("audioUnlockRequested", true);
+    setAudioDiagnostic("audioState", context.state);
+    if (context.state === "running") {
+      markUnlocked();
+      return true;
+    }
+    const resume = context.resume();
+    if (resume?.then) {
+      resume.then(() => {
+        setAudioDiagnostic("audioState", context.state);
+        if (context.state === "running") markUnlocked();
+      }).catch(() => {});
+    }
+    return true;
+  }
+
+  function createPanner(context, pan) {
+    if (!context.createStereoPanner) return null;
+    const panner = context.createStereoPanner();
+    panner.pan.value = THREE.MathUtils.clamp(Number(pan) || 0, -1, 1);
+    return panner;
+  }
+
+  function connectWithPan(context, source, gain, pan) {
+    const panner = createPanner(context, pan);
+    if (panner) {
+      source.connect(panner);
+      panner.connect(gain);
+      return;
+    }
+    source.connect(gain);
+  }
+
+  function tone(options) {
+    const context = playableContext();
+    if (!context) return;
+    const start = context.currentTime + (options.delay || 0);
+    const duration = options.duration || 0.16;
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = options.type || "sine";
+    oscillator.frequency.setValueAtTime(options.frequency, start);
+    if (options.endFrequency) {
+      oscillator.frequency.exponentialRampToValueAtTime(Math.max(24, options.endFrequency), start + duration);
+    }
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, options.gain || 0.08), start + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    connectWithPan(context, oscillator, gain, options.pan || 0);
+    gain.connect(system.sfx);
+    oscillator.start(start);
+    oscillator.stop(start + duration + 0.03);
+  }
+
+  function noiseBurst(options) {
+    const context = playableContext();
+    if (!context) return;
+    const duration = options.duration || 0.18;
+    const frameCount = Math.max(1, Math.floor(context.sampleRate * duration));
+    const buffer = context.createBuffer(1, frameCount, context.sampleRate);
+    const output = buffer.getChannelData(0);
+    for (let i = 0; i < frameCount; i += 1) {
+      const fade = 1 - i / frameCount;
+      output[i] = (Math.random() * 2 - 1) * fade * fade;
+    }
+    const source = context.createBufferSource();
+    const filter = context.createBiquadFilter();
+    const gain = context.createGain();
+    const start = context.currentTime + (options.delay || 0);
+    source.buffer = buffer;
+    filter.type = options.filterType || "bandpass";
+    filter.frequency.value = options.frequency || 900;
+    filter.Q.value = options.q || 1.2;
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, options.gain || 0.08), start + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    source.connect(filter);
+    connectWithPan(context, filter, gain, options.pan || 0);
+    gain.connect(system.sfx);
+    source.start(start);
+    source.stop(start + duration + 0.02);
+  }
+
+  function startAmbience() {
+    const context = playableContext();
+    if (!context || system.ambienceStarted) return;
+    system.ambienceStarted = true;
+
+    const drone = context.createOscillator();
+    const shimmer = context.createOscillator();
+    const filter = context.createBiquadFilter();
+    const gain = context.createGain();
+    drone.type = "sine";
+    shimmer.type = "triangle";
+    drone.frequency.value = 54;
+    shimmer.frequency.value = 108.5;
+    filter.type = "lowpass";
+    filter.frequency.value = 620;
+    gain.gain.value = 0.055;
+    drone.connect(filter);
+    shimmer.connect(filter);
+    filter.connect(gain);
+    gain.connect(system.ambience);
+    drone.start();
+    shimmer.start();
+  }
+
+  function startEngine() {
+    const context = playableContext();
+    if (!context || system.engineOsc) return;
+    system.engineOsc = context.createOscillator();
+    system.engineFilter = context.createBiquadFilter();
+    system.engineOsc.type = "sawtooth";
+    system.engineOsc.frequency.value = 74;
+    system.engineFilter.type = "lowpass";
+    system.engineFilter.frequency.value = 420;
+    system.engineOsc.connect(system.engineFilter);
+    system.engineFilter.connect(system.engine);
+    system.engineOsc.start();
+  }
+
+  function setMotion(running, speed, lateral) {
+    const context = playableContext();
+    if (!context) return;
+    startEngine();
+    const motion = THREE.MathUtils.clamp(Math.abs(lateral || 0), 0, 1);
+    const speedTone = THREE.MathUtils.clamp(Number(speed) || 0, 0, 22);
+    const targetGain = running ? 0.014 + speedTone * 0.0015 + motion * 0.018 : 0.0001;
+    const targetFrequency = 64 + speedTone * 4.2 + motion * 30;
+    system.engine.gain.cancelScheduledValues(context.currentTime);
+    system.engine.gain.linearRampToValueAtTime(targetGain, context.currentTime + 0.12);
+    if (system.engineOsc) {
+      system.engineOsc.frequency.linearRampToValueAtTime(targetFrequency, context.currentTime + 0.1);
+    }
+    if (system.engineFilter) {
+      system.engineFilter.frequency.linearRampToValueAtTime(360 + speedTone * 18 + motion * 240, context.currentTime + 0.12);
+    }
+  }
+
+  function play(event) {
+    const pan = THREE.MathUtils.clamp((event.position?.x || 0) / laneLimit, -0.9, 0.9);
+    const intensity = THREE.MathUtils.clamp(Number(event.payload?.intensity) || 1, 0.25, 1.5);
+    if (event.type === "run_start") {
+      tone({ frequency: 190, endFrequency: 580, duration: 0.24, type: "triangle", gain: 0.08 * intensity, pan });
+      tone({ frequency: 760, duration: 0.12, type: "sine", gain: 0.035 * intensity, delay: 0.08, pan });
+    } else if (event.type === "core_collect") {
+      tone({ frequency: 660, duration: 0.1, type: "sine", gain: 0.075 * intensity, pan });
+      tone({ frequency: 990, duration: 0.11, type: "triangle", gain: 0.055 * intensity, delay: 0.05, pan });
+      tone({ frequency: 1480, duration: 0.13, type: "sine", gain: 0.045 * intensity, delay: 0.11, pan });
+    } else if (event.type === "shield_hit") {
+      noiseBurst({ duration: 0.18, frequency: 520, filterType: "lowpass", gain: 0.14 * intensity, pan });
+      tone({ frequency: 132, endFrequency: 62, duration: 0.28, type: "sawtooth", gain: 0.11 * intensity, pan });
+    } else if (event.type === "near_miss") {
+      noiseBurst({ duration: 0.13, frequency: 1800, filterType: "bandpass", q: 3.2, gain: 0.045 * intensity, pan });
+    } else if (event.type === "run_complete") {
+      tone({ frequency: 330, endFrequency: 220, duration: 0.22, type: "triangle", gain: 0.075 * intensity, pan });
+      tone({ frequency: 247, endFrequency: 165, duration: 0.3, type: "triangle", gain: 0.065 * intensity, delay: 0.16, pan });
+      noiseBurst({ duration: 0.24, frequency: 360, filterType: "lowpass", gain: 0.045 * intensity, delay: 0.08, pan });
+    }
+  }
+
+  function setMuted(muted) {
+    system.muted = Boolean(muted);
+    if (!system.master || !system.context) return;
+    system.master.gain.linearRampToValueAtTime(system.muted ? 0.0001 : 0.82, system.context.currentTime + 0.04);
+  }
+
+  return {
+    unlock,
+    play,
+    setMotion,
+    setMuted,
+    isUnlocked: () => system.unlocked && system.context?.state === "running",
+    supported: () => Boolean(AudioCtor)
+  };
+}
+
+function audioEventPayload(payload) {
+  const clean = {};
+  for (const [key, value] of Object.entries(payload || {})) {
+    if (value === undefined || typeof value === "function") continue;
+    clean[key] = value;
+  }
+  return clean;
+}
+
+function emitAudioEvent(type, payload = {}) {
+  const cleanPayload = audioEventPayload(payload);
+  audioNetwork.sequence += 1;
+  const event = {
+    id: `${audioNetwork.sourceId}:${audioNetwork.sequence}`,
+    type,
+    sourceId: audioNetwork.sourceId,
+    sequence: audioNetwork.sequence,
+    gameVersion,
+    createdAt: performance.now(),
+    fromNetwork: false,
+    position: {
+      x: Number.isFinite(cleanPayload.positionX) ? cleanPayload.positionX : player.position.x,
+      laneLimit
+    },
+    game: {
+      running: state.running,
+      score: Math.floor(state.score),
+      lives: state.lives,
+      speed: Number(state.speed.toFixed(2)),
+      time: Number(state.time.toFixed(3))
+    },
+    payload: cleanPayload
+  };
+  event.network = {
+    id: event.id,
+    type: event.type,
+    sourceId: event.sourceId,
+    sequence: event.sequence,
+    gameVersion: event.gameVersion,
+    positionX: event.position.x,
+    gameTime: event.game.time,
+    intensity: Number(cleanPayload.intensity || 1),
+    replicate: cleanPayload.replicate !== false
+  };
+  dispatchAudioEvent(event);
+  return event.network;
+}
+
+function dispatchAudioEvent(event) {
+  audioNetwork.seenIds.add(event.id);
+  audioNetwork.log.push(event);
+  if (audioNetwork.log.length > 120) audioNetwork.log.splice(0, audioNetwork.log.length - 120);
+  setAudioDiagnostic("lastAudioEvent", event.type);
+  setAudioDiagnostic("audioEventCount", audioNetwork.log.length);
+  window.dispatchEvent(new CustomEvent("orbital-courier:audio-event", { detail: event }));
+  audio.play(event);
+}
+
+function receiveNetworkAudioEvent(networkEvent) {
+  if (!networkEvent || !networkEvent.id || audioNetwork.seenIds.has(networkEvent.id)) return false;
+  const type = String(networkEvent.type || "").slice(0, 80);
+  if (!type) return false;
+  const event = {
+    id: String(networkEvent.id),
+    type,
+    sourceId: String(networkEvent.sourceId || "remote"),
+    sequence: Number(networkEvent.sequence || 0),
+    gameVersion: String(networkEvent.gameVersion || "remote"),
+    createdAt: performance.now(),
+    fromNetwork: true,
+    position: {
+      x: THREE.MathUtils.clamp(Number(networkEvent.positionX) || 0, -laneLimit, laneLimit),
+      laneLimit
+    },
+    game: {
+      running: state.running,
+      score: Math.floor(state.score),
+      lives: state.lives,
+      speed: Number(state.speed.toFixed(2)),
+      time: Number(networkEvent.gameTime || state.time)
+    },
+    payload: {
+      intensity: Number(networkEvent.intensity || 1),
+      replicate: false
+    },
+    network: Object.assign({}, networkEvent, { replicate: false })
+  };
+  dispatchAudioEvent(event);
+  return true;
+}
+
+window.orbitalCourierAudio = {
+  sourceId: audioNetwork.sourceId,
+  eventName: "orbital-courier:audio-event",
+  unlock: audio.unlock,
+  setMuted: audio.setMuted,
+  emit: emitAudioEvent,
+  receiveNetworkEvent: receiveNetworkAudioEvent,
+  recentEvents: () => audioNetwork.log.slice(),
+  isUnlocked: audio.isUnlocked,
+  supported: audio.supported
+};
 
 function resize() {
   const width = innerWidth;
@@ -164,6 +520,12 @@ function startGame() {
   setOverlay(false);
   focusCanvas();
   hud();
+  emitAudioEvent("run_start", {
+    positionX: player.position.x,
+    lives: state.lives,
+    intensity: audio.isUnlocked() ? 1 : 0.7,
+    replicate: true
+  });
 }
 
 function finishGame() {
@@ -171,6 +533,12 @@ function finishGame() {
   state.best = Math.max(state.best, Math.floor(state.score));
   localStorage.setItem("orbital-courier-best", String(state.best));
   hud();
+  emitAudioEvent("run_complete", {
+    positionX: player.position.x,
+    score: Math.floor(state.score),
+    best: state.best,
+    replicate: true
+  });
   setOverlay(true, "Run Complete", `Final score ${Math.floor(state.score)}. Press Space or tap Start to fly again.`);
 }
 
@@ -194,7 +562,7 @@ function spawn(kind) {
   });
 }
 
-function updateObjects(list, delta, hit) {
+function updateObjects(list, delta, hit, pass) {
   for (let i = list.length - 1; i >= 0; i -= 1) {
     const item = list[i];
     item.mesh.position.z += state.speed * delta;
@@ -202,7 +570,7 @@ function updateObjects(list, delta, hit) {
     item.mesh.rotation.y += item.spin * delta * 0.7;
 
     if (item.mesh.position.distanceTo(player.position) < item.radius + 0.58) {
-      hit();
+      hit(item);
       scene.remove(item.mesh);
       item.mesh.geometry.dispose();
       list.splice(i, 1);
@@ -210,6 +578,9 @@ function updateObjects(list, delta, hit) {
       scene.remove(item.mesh);
       item.mesh.geometry.dispose();
       list.splice(i, 1);
+    } else if (!item.passedPlayer && item.mesh.position.z >= player.position.z) {
+      item.passedPlayer = true;
+      pass?.(item);
     }
   }
 }
@@ -256,15 +627,36 @@ function frame(now) {
     }
 
     movePlayer(delta);
-    updateObjects(hazards, delta, () => {
+    updateObjects(hazards, delta, (item) => {
       if (state.grace > 0) return;
       state.lives -= 1;
       state.grace = 1.1;
+      emitAudioEvent("shield_hit", {
+        positionX: item.mesh.position.x,
+        lives: state.lives,
+        speed: state.speed,
+        intensity: state.lives <= 0 ? 1.25 : 1,
+        replicate: true
+      });
       if (state.lives <= 0) finishGame();
+    }, (item) => {
+      const distance = Math.abs(item.mesh.position.x - player.position.x);
+      if (state.grace > 0 || distance > 1.45) return;
+      emitAudioEvent("near_miss", {
+        positionX: item.mesh.position.x,
+        intensity: Math.max(0.35, 1 - distance / 1.45),
+        replicate: false
+      });
     });
-    updateObjects(cores, delta, () => {
+    updateObjects(cores, delta, (item) => {
       state.score += 75;
       pulseLight.intensity = 3.2;
+      emitAudioEvent("core_collect", {
+        positionX: item.mesh.position.x,
+        score: Math.floor(state.score),
+        intensity: 1,
+        replicate: true
+      });
     });
     pulseLight.intensity = THREE.MathUtils.damp(pulseLight.intensity, 1.6, 6, delta);
     player.visible = state.grace <= 0 || Math.floor(state.time * 18) % 2 === 0;
@@ -274,6 +666,11 @@ function frame(now) {
     player.rotation.y += delta * 0.5;
   }
 
+  audio.setMotion(
+    state.running,
+    state.speed,
+    input.pointer ? Math.abs(input.target - player.position.x) / laneLimit : Math.abs(Number(input.right) - Number(input.left))
+  );
   renderer.render(scene, camera);
 }
 
@@ -296,9 +693,14 @@ function stopPointerControl() {
   input.pointer = false;
 }
 
+function unlockAudioFromInput() {
+  audio.unlock();
+}
+
 function startFromControl(event) {
   event?.preventDefault();
   event?.stopPropagation();
+  unlockAudioFromInput();
   const now = performance.now();
   if (now - lastControlStartAt < 250) return;
   lastControlStartAt = now;
@@ -318,6 +720,7 @@ function startFromDocument(event) {
 
 addEventListener("resize", resize);
 addEventListener("keydown", (event) => {
+  unlockAudioFromInput();
   if (event.code === "ArrowLeft" || event.code === "KeyA") input.left = true;
   if (event.code === "ArrowRight" || event.code === "KeyD") input.right = true;
   if (event.code === "Space" && !state.running) {
@@ -329,8 +732,13 @@ addEventListener("keyup", (event) => {
   if (event.code === "ArrowLeft" || event.code === "KeyA") input.left = false;
   if (event.code === "ArrowRight" || event.code === "KeyD") input.right = false;
 });
+document.addEventListener("pointerdown", unlockAudioFromInput, { capture: true });
+document.addEventListener("mousedown", unlockAudioFromInput, { capture: true });
+document.addEventListener("click", unlockAudioFromInput, { capture: true });
+document.addEventListener("touchstart", unlockAudioFromInput, { capture: true, passive: true });
 canvas.addEventListener("pointerdown", (event) => {
   event.preventDefault();
+  unlockAudioFromInput();
   if (!state.running && overlay.classList.contains("visible")) {
     startFromControl(event);
     return;

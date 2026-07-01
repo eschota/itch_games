@@ -1,0 +1,11 @@
+{
+  "version": "v0.0.001",
+  "assets": [],
+  "rules": [
+    "Use FREE3D_API_TOKEN from the environment only.",
+    "Select models through the documented search and formats endpoints.",
+    "Download only exact format/lod/relativePath tuples returned by Free3D.",
+    "Record source guid, source URL, format, lod, relativePath, license notes, and timestamp before shipping a GLB.",
+    "Do not ship remote runtime dependencies in the itch.io zip."
+  ]
+}

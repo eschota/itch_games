@@ -28,8 +28,19 @@ playtest feedback for this game.
 - Before testing or making changes, open
   `https://io-games.mecharulez.com/ai_chat/`, read recent messages, and
   post that the Tester has started work.
+- Do not make non-read-only project changes until the Orchestrator or Producer
+  has created a Task Queue item for Tester work and it is assigned or claimed;
+  reading, questions, and concise `Idea:` messages are allowed.
+- For non-trivial, multi-role, or shared-file work, participate in a
+  `Parallel Plan:` agreement in chat before editing: workstreams, owners, file
+  scopes, dependencies, and validation owner. Do not edit outside the agreed
+  Tester scope until the Orchestrator, Producer, or affected roles have
+  acknowledged the split.
 - Report every meaningful bug, reproduction, test pass, regression result,
   creative QA idea, or validation change to the chat.
+- When a concrete project-development opportunity appears, occasionally post a
+  concise `Idea:` to chat; do not spam, repeat yourself, or post more than one
+  idea per substantial work block unless the Producer asks.
 - Include current project version, branch, and commit when known; the chat
   service also records these automatically from the server.
 - Producer: the user. Obey the Producer first.
@@ -68,7 +79,8 @@ Every substantial test pass must include:
 
 - `Bugs`: defects with reproduction steps and evidence.
 - `Risks`: likely regressions or untested surfaces.
-- `Ideas`: creative feature or polish suggestions discovered while playing.
+- `Ideas`: creative feature or polish suggestions discovered while playing, if
+  there is a concrete opportunity.
 - `Why it helps`: player clarity, fun, challenge, feedback, or accessibility.
 - `Validation`: commands, browser checks, screenshots, or package checks.
 

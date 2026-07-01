@@ -1,4 +1,4 @@
-export declare const GAME_VERSION = "v0.0.003";
+export declare const GAME_VERSION = "v0.0.006";
 export declare const ROOM_ID = "unsoccer-default-room";
 export declare const MAX_ACTIVE_PLAYERS = 4;
 export declare const MAX_ROOM_CLIENTS = 32;
@@ -112,6 +112,10 @@ export interface ServerInfo {
     connectedClients: number;
     maxActivePlayers: number;
     maxRoomClients: number;
+    transports?: {
+        websocket: boolean;
+        http: boolean;
+    };
 }
 export declare const DEFAULT_INPUT: InputState;
 export declare const CHARACTER_ROSTER: readonly ["6299851", "6270753", "6298507", "6300462"];

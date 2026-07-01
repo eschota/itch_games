@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.0.004
+
+- Add document-level iframe click fallback so any pointer, mouse, touch, or
+  click event that reaches the game frame can restart from the game-over
+  overlay.
+
 ## v0.0.003
 
 - Harden restart on itch.io iframe builds with pointer, mouse, touch, and

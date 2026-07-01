@@ -12,12 +12,13 @@ Orbital Courier is a tiny browser game built with Three.js for itch.io HTML5 upl
 
 ## Version
 
-Current game release: `v0.0.003`.
+Current game release: `v0.0.004`.
 
 Game releases use `v0.0.001`-style semantic project versioning. The already
 published first build is treated as `v0.0.001`; this auto-start and input fix is
-`v0.0.002`, and the itch iframe restart hardening is `v0.0.003`. The game
-renders the release version in the bottom-left corner.
+`v0.0.002`, the itch iframe restart hardening is `v0.0.003`, and the
+document-level iframe click fallback is `v0.0.004`. The game renders the release
+version in the bottom-left corner.
 
 ## Local Run
 

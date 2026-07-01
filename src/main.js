@@ -8,7 +8,7 @@ const overlay = document.querySelector("#overlay");
 const startButton = document.querySelector("#start-button");
 const versionBadge = document.querySelector("#version-badge");
 
-const gameVersion = "v0.0.003";
+const gameVersion = "v0.0.004";
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -310,6 +310,12 @@ function startFromOverlay(event) {
   startFromControl(event);
 }
 
+function startFromDocument(event) {
+  if (!overlay.classList.contains("visible")) return;
+  if (event.button && event.button !== 0) return;
+  startFromControl(event);
+}
+
 addEventListener("resize", resize);
 addEventListener("keydown", (event) => {
   if (event.code === "ArrowLeft" || event.code === "KeyA") input.left = true;
@@ -349,6 +355,10 @@ startButton.addEventListener("keydown", (event) => {
 });
 overlay.addEventListener("pointerdown", startFromOverlay, { capture: true });
 overlay.addEventListener("mousedown", startFromOverlay, { capture: true });
+document.addEventListener("pointerdown", startFromDocument, { capture: true });
+document.addEventListener("mousedown", startFromDocument, { capture: true });
+document.addEventListener("click", startFromDocument, { capture: true });
+document.addEventListener("touchstart", startFromDocument, { capture: true, passive: false });
 
 resize();
 hud();

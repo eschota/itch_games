@@ -13,10 +13,90 @@ const ROOT = path.resolve(__dirname, "..");
 const STATIC_DIR = path.join(__dirname, "static");
 const DATA_DIR = process.env.AI_CHAT_DATA_DIR || path.join(__dirname, "data");
 const MESSAGES_FILE = path.join(DATA_DIR, "messages.jsonl");
+const TASKS_FILE = path.join(DATA_DIR, "tasks.json");
+const TASK_EVENTS_FILE = path.join(DATA_DIR, "tasks.jsonl");
 const TELEGRAM_SEEN_FILE = path.join(DATA_DIR, "telegram_seen_updates.txt");
 const MAX_MESSAGE_CHARS = 4000;
 const MAX_ROLE_CHARS = 80;
+const MAX_TASK_TEXT_CHARS = 2000;
 let deployRunning = false;
+
+const TASK_ROLES = [
+  "Orchestrator",
+  "Art Director",
+  "Game Designer",
+  "UI Designer",
+  "Programmer",
+  "Tester",
+  "Sound Designer",
+];
+const TASK_STATUSES = ["new", "claimed", "in_progress", "blocked", "review", "done"];
+const TASK_PRIORITIES = ["low", "normal", "high", "urgent"];
+const DEFAULT_TASK_SEEDS = [
+  {
+    seed_key: "orchestrator-parallel-plan",
+    role: "Orchestrator",
+    priority: "urgent",
+    title: "Create milestone Parallel Plan and task ownership",
+    description: "Turn Producer requests into role-owned tasks before implementation starts. Define workstreams, owners, file scopes, branch/task ids, dependencies, merge order, and validation owner.",
+    scope: ["skill.md", "skill.xml", "ai_chat/**"],
+    acceptance: "Every active role has a task id and agreed scope before editing project files.",
+  },
+  {
+    seed_key: "game-designer-core-loop",
+    role: "Game Designer",
+    priority: "high",
+    title: "Define the next playable core loop and milestone rules",
+    description: "Own mechanics, player goals, scoring, pacing, progression, and the smallest fun playable milestone.",
+    scope: ["game_designer/**"],
+    acceptance: "A concise design brief lists loop, win/loss, scoring, risks, affected roles, and acceptance checks.",
+  },
+  {
+    seed_key: "programmer-game-engine",
+    role: "Programmer",
+    priority: "high",
+    title: "Build the browser game engine foundation",
+    description: "Own runtime architecture: game loop, state machine, input, physics/collision hooks, networking/server hooks when needed, versioning, packaging, and deploy-safe code boundaries.",
+    scope: ["orbital-courier/src/**", "unsoccer/**", "tools/package_itch.py", "package.json"],
+    acceptance: "A playable build runs locally, packages cleanly, exposes version/status, and does not touch art/UI/audio scopes without an assigned task.",
+  },
+  {
+    seed_key: "art-director-visual-3d",
+    role: "Art Director",
+    priority: "high",
+    title: "Define visual direction and 3D model requirements",
+    description: "Own art direction, visual quality, 3D model targets, lighting, VFX, animation style, and asset acceptance rules for the next playable milestone.",
+    scope: ["art_director/**"],
+    acceptance: "Style/asset guidance identifies silhouettes, materials, 3D model list, visual risks, and in-game acceptance checks.",
+  },
+  {
+    seed_key: "ui-designer-interface",
+    role: "UI Designer",
+    priority: "normal",
+    title: "Design HUD, menus, controls, and public game presentation",
+    description: "Own player-facing UI, HUD clarity, menu flow, responsive layout, catalog/game entry pages, and readable state feedback.",
+    scope: ["ui_designer/**", "index.html", "*/index.html", "*/src/styles.css"],
+    acceptance: "UI brief or implementation defines player actions, states, responsive behavior, and validation viewports.",
+  },
+  {
+    seed_key: "sound-designer-audio",
+    role: "Sound Designer",
+    priority: "normal",
+    title: "Create sound map and implement sourced/generated audio",
+    description: "Own free sound search, generated audio, license notes, mix plan, event triggers, and browser audio validation.",
+    scope: ["sound_designer/**"],
+    acceptance: "Audio map lists gameplay events, sources/generation provenance, implementation points, mix checks, and packaging checks.",
+  },
+  {
+    seed_key: "tester-qa-validation",
+    role: "Tester",
+    priority: "normal",
+    title: "Create QA plan and validate integrated milestones",
+    description: "Own bug reproduction, regression checks, playability, browser/input coverage, packaging checks, and separate creative QA ideas.",
+    scope: ["tester/**"],
+    acceptance: "QA report covers build/version, browser, inputs, critical bugs, regression risk, and concrete validation evidence.",
+  },
+];
 
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -126,6 +206,196 @@ function appendMessage(role, text, source, mirrorTelegram) {
     mirrorRecordToTelegram(record);
   }
   return record;
+}
+
+function cleanText(value, maxChars) {
+  return String(value || "").trim().slice(0, maxChars || MAX_TASK_TEXT_CHARS);
+}
+
+function cleanRole(value) {
+  return String(value || "Agent").trim().split(/\s+/).join(" ").slice(0, MAX_ROLE_CHARS) || "Agent";
+}
+
+function roleKey(value) {
+  return cleanRole(value).toLowerCase();
+}
+
+function isProducerOrOrchestrator(role) {
+  const key = roleKey(role);
+  return key.includes("producer") || key.includes("orchestrator") || key.includes("продюсер");
+}
+
+function canonicalTaskRole(value) {
+  const key = roleKey(value);
+  return TASK_ROLES.find((role) => role.toLowerCase() === key) || "";
+}
+
+function canActOnTask(actorRole, task) {
+  if (isProducerOrOrchestrator(actorRole)) return true;
+  return canonicalTaskRole(actorRole) === task.role;
+}
+
+function normalizeList(value, maxItems) {
+  const raw = Array.isArray(value) ? value : String(value || "").split(/[\n,]/);
+  const items = raw
+    .map((item) => cleanText(item, 180))
+    .filter(Boolean);
+  return Array.from(new Set(items)).slice(0, maxItems || 20);
+}
+
+function readTasks() {
+  if (!fs.existsSync(TASKS_FILE)) return [];
+  try {
+    const parsed = JSON.parse(fs.readFileSync(TASKS_FILE, "utf8"));
+    return Array.isArray(parsed.tasks) ? parsed.tasks : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function writeTasks(tasks) {
+  ensureDataDir();
+  const payload = JSON.stringify({ updated_at: nowIso(), tasks }, null, 2) + os.EOL;
+  const tempFile = `${TASKS_FILE}.tmp`;
+  fs.writeFileSync(tempFile, payload, "utf8");
+  fs.renameSync(tempFile, TASKS_FILE);
+}
+
+function appendTaskEvent(action, task, actorRole, payload) {
+  const context = gitContext();
+  const record = {
+    id: randomId(),
+    created_at: nowIso(),
+    action,
+    task_id: task.id,
+    task_role: task.role,
+    task_status: task.status,
+    actor_role: cleanRole(actorRole || "Agent"),
+    project_version: projectVersion(),
+    branch: context.branch,
+    commit: context.commit,
+    dirty: context.dirty,
+    payload: payload || {},
+  };
+  ensureDataDir();
+  fs.appendFileSync(TASK_EVENTS_FILE, JSON.stringify(record) + os.EOL, "utf8");
+  return record;
+}
+
+function taskIdFromSeed(seedKey) {
+  return `task_${String(seedKey || "").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").toLowerCase()}`;
+}
+
+function newTaskId() {
+  return `task_${Date.now().toString(36)}_${randomId().slice(0, 6)}`;
+}
+
+function validateTaskPayload(payload, existingTask) {
+  const role = canonicalTaskRole(payload.role || existingTask?.role);
+  if (!role) throw new Error("valid task role is required");
+  const title = cleanText(payload.title || existingTask?.title, 160);
+  if (!title) throw new Error("task title is required");
+  const priority = TASK_PRIORITIES.includes(payload.priority) ? payload.priority : (existingTask?.priority || "normal");
+  const status = TASK_STATUSES.includes(payload.status) ? payload.status : (existingTask?.status || "new");
+  return {
+    role,
+    title,
+    priority,
+    status,
+    description: cleanText(payload.description || existingTask?.description || "", MAX_TASK_TEXT_CHARS),
+    scope: normalizeList(payload.scope !== undefined ? payload.scope : existingTask?.scope, 30),
+    depends_on: normalizeList(payload.depends_on !== undefined ? payload.depends_on : existingTask?.depends_on, 20),
+    branch: cleanText(payload.branch || existingTask?.branch || "", 120),
+    acceptance: cleanText(payload.acceptance || existingTask?.acceptance || "", MAX_TASK_TEXT_CHARS),
+    parallel_plan: cleanText(payload.parallel_plan || existingTask?.parallel_plan || "", MAX_TASK_TEXT_CHARS),
+    validation_owner: cleanText(payload.validation_owner || existingTask?.validation_owner || "", 120),
+  };
+}
+
+function taskForResponse(task) {
+  return Object.assign({}, task, {
+    comments: Array.isArray(task.comments) ? task.comments.slice(-20) : [],
+  });
+}
+
+function createTask(payload, seed) {
+  const actorRole = cleanRole(payload.created_by_role || payload.actor_role || payload.role_actor);
+  if (!isProducerOrOrchestrator(actorRole)) {
+    throw new Error("only Producer or Orchestrator can create tasks");
+  }
+  const normalized = validateTaskPayload(payload);
+  const context = gitContext();
+  const task = Object.assign({
+    id: seed?.id || newTaskId(),
+    seed_key: seed?.seed_key || "",
+    created_at: nowIso(),
+    updated_at: nowIso(),
+    created_by_role: actorRole,
+    created_by: cleanText(payload.created_by || actorRole, 120),
+    owner: "",
+    owner_role: "",
+    lease_until: "",
+    comments: [],
+    project_version: projectVersion(),
+    branch_context: context.branch,
+    commit_context: context.commit,
+  }, normalized);
+  return task;
+}
+
+function appendTaskMessage(action, task, actorRole, extra) {
+  const actor = actorRole ? `${actorRole}: ` : "";
+  const suffix = extra ? `\n${extra}` : "";
+  appendMessage("Task Queue", `${actor}${action} \`${task.id}\` for ${task.role}: ${task.title}${suffix}`);
+}
+
+function pushTaskComment(task, actorRole, text) {
+  const clean = cleanText(text, MAX_TASK_TEXT_CHARS);
+  if (!clean) return;
+  const comments = Array.isArray(task.comments) ? task.comments : [];
+  comments.push({
+    id: randomId(),
+    created_at: nowIso(),
+    role: cleanRole(actorRole),
+    text: clean,
+  });
+  task.comments = comments.slice(-100);
+}
+
+function seedDefaultTasks(actorRole) {
+  const tasks = readTasks();
+  const existingKeys = new Set(tasks.map((task) => task.seed_key).filter(Boolean));
+  const existingIds = new Set(tasks.map((task) => task.id));
+  const created = [];
+  for (const seed of DEFAULT_TASK_SEEDS) {
+    const id = taskIdFromSeed(seed.seed_key);
+    if (existingKeys.has(seed.seed_key) || existingIds.has(id)) continue;
+    const task = createTask(Object.assign({}, seed, {
+      created_by_role: actorRole,
+      created_by: actorRole,
+    }), { id, seed_key: seed.seed_key });
+    tasks.push(task);
+    created.push(task);
+  }
+  if (created.length) {
+    writeTasks(tasks);
+    for (const task of created) appendTaskEvent("seed", task, actorRole, {});
+    appendMessage("Task Queue", `${actorRole}: Seeded ${created.length} role backlog tasks.\n${created.map((task) => `- ${task.id} -> ${task.role}: ${task.title}`).join("\n")}`);
+  }
+  return created;
+}
+
+function updateTask(id, updater) {
+  const tasks = readTasks();
+  const index = tasks.findIndex((task) => task.id === id);
+  if (index < 0) throw new Error("task not found");
+  const next = updater(Object.assign({}, tasks[index], {
+    comments: Array.isArray(tasks[index].comments) ? tasks[index].comments.slice() : [],
+  }));
+  next.updated_at = nowIso();
+  tasks[index] = next;
+  writeTasks(tasks);
+  return next;
 }
 
 function telegramConfig() {
@@ -295,6 +565,46 @@ function recentCommits(limit) {
   return { branches, commits };
 }
 
+async function readJsonPayload(req, maxBytes) {
+  const body = await readBody(req, maxBytes || 32768);
+  if (!body.length) throw new Error("invalid request size");
+  return JSON.parse(body.toString("utf8"));
+}
+
+function filteredTasks(query) {
+  let tasks = readTasks();
+  const role = cleanText(query.role || "", 80);
+  const status = cleanText(query.status || "", 40);
+  if (role && role !== "all") {
+    const canonical = canonicalTaskRole(role);
+    tasks = tasks.filter((task) => task.role === canonical);
+  }
+  if (status && status !== "all") {
+    tasks = tasks.filter((task) => task.status === status);
+  }
+  const statusOrder = new Map(TASK_STATUSES.map((value, index) => [value, index]));
+  const priorityOrder = new Map(TASK_PRIORITIES.map((value, index) => [value, index]));
+  return tasks
+    .slice()
+    .sort((a, b) => {
+      const statusDiff = (statusOrder.get(a.status) || 99) - (statusOrder.get(b.status) || 99);
+      if (statusDiff) return statusDiff;
+      const priorityDiff = (priorityOrder.get(b.priority) || 0) - (priorityOrder.get(a.priority) || 0);
+      if (priorityDiff) return priorityDiff;
+      return String(a.created_at || "").localeCompare(String(b.created_at || ""));
+    })
+    .map(taskForResponse);
+}
+
+function taskById(id) {
+  return readTasks().find((task) => task.id === id);
+}
+
+function assertTaskActor(actorRole, task) {
+  if (!actorRole || actorRole === "Agent") throw new Error("actor_role is required");
+  if (!canActOnTask(actorRole, task)) throw new Error("actor role cannot change this task");
+}
+
 function verifyGithubSignature(headers, body) {
   const secret = process.env.AI_CHAT_WEBHOOK_SECRET || "";
   if (!secret) return [false, "webhook secret is not configured"];
@@ -402,6 +712,26 @@ async function handleGet(req, res, parsed) {
     jsonResponse(res, 200, { ok: true, messages: readMessages(limit) });
     return;
   }
+  if (pathname === "/api/tasks") {
+    jsonResponse(res, 200, {
+      ok: true,
+      roles: TASK_ROLES,
+      statuses: TASK_STATUSES,
+      priorities: TASK_PRIORITIES,
+      tasks: filteredTasks(parsed.query),
+    });
+    return;
+  }
+  if (pathname.startsWith("/api/tasks/")) {
+    const id = decodeURIComponent(pathname.slice("/api/tasks/".length).split("/")[0] || "");
+    const task = taskById(id);
+    if (!task) {
+      errorJson(res, 404, "task not found");
+      return;
+    }
+    jsonResponse(res, 200, { ok: true, task: taskForResponse(task) });
+    return;
+  }
   if (pathname === "/api/commits") {
     jsonResponse(res, 200, Object.assign({ ok: true }, recentCommits(80)));
     return;
@@ -412,6 +742,7 @@ async function handleGet(req, res, parsed) {
       project_version: projectVersion(),
       git: gitContext(),
       message_count: readMessages(100000).length,
+      task_count: readTasks().length,
       telegram: { enabled: telegramConfig().enabled },
     });
     return;
@@ -472,6 +803,89 @@ async function handlePost(req, res, parsed) {
       jsonResponse(res, 200, { ok: true, accepted: processTelegramUpdate(payload) });
     } catch (error) {
       errorJson(res, 500, `telegram update failed: ${error.message}`);
+    }
+    return;
+  }
+
+  if (pathname === "/api/tasks") {
+    try {
+      const payload = await readJsonPayload(req, 32768);
+      const task = createTask(payload);
+      const tasks = readTasks();
+      tasks.push(task);
+      writeTasks(tasks);
+      appendTaskEvent("create", task, task.created_by_role, { title: task.title });
+      appendTaskMessage("Created task", task, task.created_by_role, task.scope.length ? `Scope: ${task.scope.join(", ")}` : "");
+      jsonResponse(res, 201, { ok: true, task: taskForResponse(task) });
+    } catch (error) {
+      errorJson(res, 400, error.message);
+    }
+    return;
+  }
+
+  if (pathname === "/api/tasks/seed") {
+    try {
+      const payload = await readJsonPayload(req, 8192);
+      const actorRole = cleanRole(payload.actor_role || payload.created_by_role);
+      if (!isProducerOrOrchestrator(actorRole)) throw new Error("only Producer or Orchestrator can seed tasks");
+      const created = seedDefaultTasks(actorRole);
+      jsonResponse(res, 201, { ok: true, created: created.map(taskForResponse), tasks: filteredTasks({}) });
+    } catch (error) {
+      errorJson(res, 400, error.message);
+    }
+    return;
+  }
+
+  if (pathname.startsWith("/api/tasks/")) {
+    const parts = pathname.split("/").filter(Boolean);
+    const taskId = decodeURIComponent(parts[2] || "");
+    const action = parts[3] || "";
+    try {
+      const payload = await readJsonPayload(req, 32768);
+      const actorRole = cleanRole(payload.actor_role || payload.role || payload.owner_role);
+      const task = updateTask(taskId, (current) => {
+        if (action === "comment") {
+          if (!actorRole || actorRole === "Agent") throw new Error("actor_role is required");
+          pushTaskComment(current, actorRole, payload.comment || payload.note || payload.message);
+          return current;
+        }
+        assertTaskActor(actorRole, current);
+        if (action === "claim") {
+          if (current.status === "done") throw new Error("done task cannot be claimed");
+          current.owner = cleanText(payload.owner || actorRole, 120);
+          current.owner_role = canonicalTaskRole(payload.owner_role || actorRole) || current.role;
+          current.status = current.status === "new" ? "claimed" : current.status;
+          const leaseMinutes = Math.min(Math.max(Number(payload.lease_minutes || 120) || 120, 15), 1440);
+          current.lease_until = new Date(Date.now() + leaseMinutes * 60000).toISOString().replace(/\.\d{3}Z$/, "+00:00");
+          pushTaskComment(current, actorRole, payload.note || `Claimed for ${leaseMinutes} minutes.`);
+          return current;
+        }
+        if (action === "status") {
+          const nextStatus = cleanText(payload.status, 40);
+          if (!TASK_STATUSES.includes(nextStatus)) throw new Error("valid status is required");
+          current.status = nextStatus;
+          if (payload.owner) current.owner = cleanText(payload.owner, 120);
+          if (payload.owner_role) current.owner_role = canonicalTaskRole(payload.owner_role) || current.owner_role;
+          pushTaskComment(current, actorRole, payload.note || payload.comment || "");
+          return current;
+        }
+        if (action === "update") {
+          if (!isProducerOrOrchestrator(actorRole)) throw new Error("only Producer or Orchestrator can update task ownership/scope");
+          const normalized = validateTaskPayload(payload, current);
+          Object.assign(current, normalized);
+          pushTaskComment(current, actorRole, payload.note || "");
+          return current;
+        }
+        throw new Error("unknown task action");
+      });
+      appendTaskEvent(action, task, actorRole, { status: task.status, owner: task.owner });
+      if (action !== "comment") {
+        appendTaskMessage(`${action} task`, task, actorRole, task.status ? `Status: ${task.status}` : "");
+      }
+      jsonResponse(res, 200, { ok: true, task: taskForResponse(task) });
+    } catch (error) {
+      const status = error.message === "task not found" ? 404 : 400;
+      errorJson(res, status, error.message);
     }
     return;
   }

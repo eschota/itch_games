@@ -50,6 +50,71 @@
           <h2>Service</h2>
           <button id="refreshButton" type="button">Refresh</button>
         </header>
+        <section class="tasks-section">
+          <div class="section-heading">
+            <h3>Task Queue</h3>
+            <button id="seedTasksButton" type="button">Seed Roles</button>
+          </div>
+          <form id="taskForm" class="task-form">
+            <label>
+              <span>Actor</span>
+              <input id="taskActorInput" maxlength="80" value="Orchestrator" required>
+            </label>
+            <label>
+              <span>Role</span>
+              <select id="taskRoleInput" required>
+                <option value="Orchestrator">Orchestrator</option>
+                <option value="Art Director">Art Director</option>
+                <option value="Game Designer">Game Designer</option>
+                <option value="UI Designer">UI Designer</option>
+                <option value="Programmer">Programmer</option>
+                <option value="Tester">Tester</option>
+                <option value="Sound Designer">Sound Designer</option>
+              </select>
+            </label>
+            <label>
+              <span>Priority</span>
+              <select id="taskPriorityInput">
+                <option value="normal">normal</option>
+                <option value="high">high</option>
+                <option value="urgent">urgent</option>
+                <option value="low">low</option>
+              </select>
+            </label>
+            <label class="wide">
+              <span>Title</span>
+              <input id="taskTitleInput" maxlength="160" required>
+            </label>
+            <label class="wide">
+              <span>Description</span>
+              <textarea id="taskDescriptionInput" maxlength="2000"></textarea>
+            </label>
+            <label class="wide">
+              <span>File scope</span>
+              <input id="taskScopeInput" maxlength="1000" placeholder="unsoccer/**, art_director/**">
+            </label>
+            <label class="wide">
+              <span>Acceptance</span>
+              <textarea id="taskAcceptanceInput" maxlength="2000"></textarea>
+            </label>
+            <button type="submit">Create Task</button>
+          </form>
+          <div class="task-filter">
+            <label>
+              <span>Filter role</span>
+              <select id="taskRoleFilter">
+                <option value="all">all roles</option>
+              </select>
+            </label>
+            <label>
+              <span>Status</span>
+              <select id="taskStatusFilter">
+                <option value="all">all statuses</option>
+              </select>
+            </label>
+          </div>
+          <div id="tasks" class="task-list"></div>
+        </section>
         <section>
           <h3>Branches</h3>
           <div id="branches" class="branch-list"></div>

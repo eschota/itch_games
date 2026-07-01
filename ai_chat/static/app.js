@@ -8,8 +8,21 @@ const telegramEl = document.querySelector("#telegram");
 const branchesEl = document.querySelector("#branches");
 const commitsEl = document.querySelector("#commits");
 const refreshButton = document.querySelector("#refreshButton");
+const tasksEl = document.querySelector("#tasks");
+const taskForm = document.querySelector("#taskForm");
+const taskActorInput = document.querySelector("#taskActorInput");
+const taskRoleInput = document.querySelector("#taskRoleInput");
+const taskPriorityInput = document.querySelector("#taskPriorityInput");
+const taskTitleInput = document.querySelector("#taskTitleInput");
+const taskDescriptionInput = document.querySelector("#taskDescriptionInput");
+const taskScopeInput = document.querySelector("#taskScopeInput");
+const taskAcceptanceInput = document.querySelector("#taskAcceptanceInput");
+const taskRoleFilter = document.querySelector("#taskRoleFilter");
+const taskStatusFilter = document.querySelector("#taskStatusFilter");
+const seedTasksButton = document.querySelector("#seedTasksButton");
 
 const api = (path) => `api/${path}`;
+let taskOptionsReady = false;
 
 function formatDate(value) {
   const date = new Date(value);
@@ -37,6 +50,19 @@ function escapeText(value) {
 async function getJson(path) {
   const response = await fetch(api(path), { cache: "no-store" });
   if (!response.ok) throw new Error(`${path}: ${response.status}`);
+  return response.json();
+}
+
+async function postJson(path, payload) {
+  const response = await fetch(api(path), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`${path}: ${text}`);
+  }
   return response.json();
 }
 
@@ -68,6 +94,81 @@ async function loadMessages() {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
+function syncTaskOptions(payload) {
+  if (taskOptionsReady) return;
+  for (const role of payload.roles || []) {
+    const option = document.createElement("option");
+    option.value = role;
+    option.textContent = role;
+    taskRoleFilter.append(option);
+  }
+  for (const status of payload.statuses || []) {
+    const option = document.createElement("option");
+    option.value = status;
+    option.textContent = status;
+    taskStatusFilter.append(option);
+  }
+  taskOptionsReady = true;
+}
+
+function listText(values) {
+  if (!Array.isArray(values) || !values.length) return "";
+  return values.join(", ");
+}
+
+function taskMeta(task) {
+  const parts = [
+    task.id,
+    task.priority || "normal",
+    task.status || "new",
+    task.owner ? `owner ${task.owner}` : "",
+    task.lease_until ? `lease ${formatDate(task.lease_until)}` : "",
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
+function renderComments(task) {
+  const comments = Array.isArray(task.comments) ? task.comments.slice(-2) : [];
+  if (!comments.length) return "";
+  return `
+    <div class="task-comments">
+      ${comments.map((comment) => `
+        <p><strong>${escapeText(comment.role || "Agent")}</strong>: ${escapeText(comment.text || "")}</p>
+      `).join("")}
+    </div>
+  `;
+}
+
+async function loadTasks() {
+  const role = encodeURIComponent(taskRoleFilter.value || "all");
+  const status = encodeURIComponent(taskStatusFilter.value || "all");
+  const payload = await getJson(`tasks?role=${role}&status=${status}`);
+  syncTaskOptions(payload);
+  const tasks = payload.tasks || [];
+  tasksEl.innerHTML = tasks.map((task) => `
+    <article class="task task-${escapeText(task.status || "new")}">
+      <header>
+        <strong>${escapeText(task.role || "Role")}</strong>
+        <span>${escapeText(taskMeta(task))}</span>
+      </header>
+      <h4>${escapeText(task.title || "")}</h4>
+      ${task.description ? `<p>${escapeText(task.description)}</p>` : ""}
+      ${task.scope && task.scope.length ? `<small>Scope: ${escapeText(listText(task.scope))}</small>` : ""}
+      ${task.acceptance ? `<small>Acceptance: ${escapeText(task.acceptance)}</small>` : ""}
+      ${task.parallel_plan ? `<small>Parallel Plan: ${escapeText(task.parallel_plan)}</small>` : ""}
+      ${renderComments(task)}
+      <div class="task-actions">
+        <button type="button" data-task-action="claim" data-task-id="${escapeText(task.id)}">Claim</button>
+        <button type="button" data-task-action="status" data-status="in_progress" data-task-id="${escapeText(task.id)}">Start</button>
+        <button type="button" data-task-action="status" data-status="review" data-task-id="${escapeText(task.id)}">Review</button>
+        <button type="button" data-task-action="status" data-status="done" data-task-id="${escapeText(task.id)}">Done</button>
+        <button type="button" data-task-action="status" data-status="blocked" data-task-id="${escapeText(task.id)}">Blocked</button>
+        <button type="button" data-task-action="comment" data-task-id="${escapeText(task.id)}">Note</button>
+      </div>
+    </article>
+  `).join("") || `<p class="empty">No tasks match this filter.</p>`;
+}
+
 async function loadCommits() {
   const payload = await getJson("commits");
   const branches = payload.branches || [];
@@ -91,7 +192,7 @@ async function loadCommits() {
 }
 
 async function refreshAll() {
-  await Promise.all([loadStatus(), loadMessages(), loadCommits()]);
+  await Promise.all([loadStatus(), loadMessages(), loadTasks(), loadCommits()]);
 }
 
 formEl.addEventListener("submit", async (event) => {
@@ -113,6 +214,75 @@ formEl.addEventListener("submit", async (event) => {
   await refreshAll();
 });
 
+taskForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await postJson("tasks", {
+      created_by_role: taskActorInput.value.trim() || "Orchestrator",
+      created_by: taskActorInput.value.trim() || "Orchestrator",
+      role: taskRoleInput.value,
+      priority: taskPriorityInput.value,
+      title: taskTitleInput.value.trim(),
+      description: taskDescriptionInput.value.trim(),
+      scope: taskScopeInput.value,
+      acceptance: taskAcceptanceInput.value.trim(),
+    });
+    taskTitleInput.value = "";
+    taskDescriptionInput.value = "";
+    taskScopeInput.value = "";
+    taskAcceptanceInput.value = "";
+    await refreshAll();
+  } catch (error) {
+    alert(`Task failed: ${error.message}`);
+  }
+});
+
+seedTasksButton.addEventListener("click", async () => {
+  try {
+    await postJson("tasks/seed", { actor_role: taskActorInput.value.trim() || "Orchestrator" });
+    await refreshAll();
+  } catch (error) {
+    alert(`Seed failed: ${error.message}`);
+  }
+});
+
+tasksEl.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-task-action]");
+  if (!button) return;
+  const id = button.dataset.taskId;
+  const action = button.dataset.taskAction;
+  const actor = taskActorInput.value.trim() || roleInput.value.trim() || "Agent";
+  try {
+    if (action === "claim") {
+      await postJson(`tasks/${encodeURIComponent(id)}/claim`, {
+        actor_role: actor,
+        owner: actor,
+        owner_role: actor,
+      });
+    } else if (action === "status") {
+      const status = button.dataset.status;
+      const note = status === "blocked" ? prompt("Blocker note?") || "" : "";
+      await postJson(`tasks/${encodeURIComponent(id)}/status`, {
+        actor_role: actor,
+        status,
+        note,
+      });
+    } else if (action === "comment") {
+      const comment = prompt("Task note");
+      if (!comment) return;
+      await postJson(`tasks/${encodeURIComponent(id)}/comment`, {
+        actor_role: actor,
+        comment,
+      });
+    }
+    await refreshAll();
+  } catch (error) {
+    alert(`Task action failed: ${error.message}`);
+  }
+});
+
+taskRoleFilter.addEventListener("change", () => loadTasks().catch(() => {}));
+taskStatusFilter.addEventListener("change", () => loadTasks().catch(() => {}));
 refreshButton.addEventListener("click", refreshAll);
 refreshAll().catch((error) => {
   messagesEl.innerHTML = `<article class="message error"><p>${escapeText(error.message)}</p></article>`;
@@ -120,4 +290,5 @@ refreshAll().catch((error) => {
 setInterval(() => {
   loadMessages().catch(() => {});
   loadStatus().catch(() => {});
+  loadTasks().catch(() => {});
 }, 10000);

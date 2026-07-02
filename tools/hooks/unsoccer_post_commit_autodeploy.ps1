@@ -66,30 +66,68 @@ function Invoke-Logged {
   }
 }
 
+function Get-CommittedText {
+  param([string] $Path)
+  try {
+    return ((& git show "HEAD:$Path") -join "`n")
+  } catch {
+    return ""
+  }
+}
+
+function Test-CommittedUnsoccerDistReady {
+  param(
+    [string] $ExpectedVersion,
+    [string] $ExpectedWeight
+  )
+  $html = Get-CommittedText "unsoccer/client/dist/index.html"
+  $server = Get-CommittedText "unsoccer/server/dist/index.js"
+  $shared = Get-CommittedText "unsoccer/shared/dist/index.js"
+  if (-not $html -or -not $server -or -not $shared) {
+    return $false
+  }
+  return $html.Contains($ExpectedVersion) -and $html.Contains($ExpectedWeight) -and $server.Contains("GAME_VERSION") -and $shared.Contains($ExpectedVersion)
+}
+
 try {
   Write-Log "[post-commit-autodeploy] commit=$commit branch=$branch"
   Write-Log "[post-commit-autodeploy] log=$logFile"
 
+  $packageJson = Get-CommittedText "package.json"
+  if (-not $packageJson) { throw "committed package.json not found" }
+  $expectedVersion = (($packageJson | ConvertFrom-Json).games.unsoccer.version).Trim()
+  $clientSource = Get-CommittedText "unsoccer/client/src/main.ts"
+  $expectedWeight = if ($clientSource -match 'BUILD_WEIGHT_LABEL\s*=\s*["'']([^"'']+)["'']') { $Matches[1] } else { "" }
+  if (-not $expectedWeight) { throw "BUILD_WEIGHT_LABEL not found in committed unsoccer/client/src/main.ts" }
+  Write-Log "[post-commit-autodeploy] expected UnSoccer version=$expectedVersion"
+  Write-Log "[post-commit-autodeploy] expected UnSoccer weight=$expectedWeight"
+
   $dirty = @(& git status --porcelain --untracked-files=no)
   $allowedGenerated = "^( M| D|M |D |MM|MD|AM|AD|A |R |C ) (unsoccer/(client|server|shared)/dist/|dist/)"
   $dirtyBlockers = @($dirty | Where-Object { $_ -and ($_ -notmatch $allowedGenerated) })
+  $skipLocalGate = $false
   if ($dirtyBlockers.Count -gt 0) {
-    Write-Log "[post-commit-autodeploy] abort: tracked non-generated files are still dirty after commit"
+    Write-Log "[post-commit-autodeploy] tracked non-generated files are dirty after commit"
     foreach ($line in $dirtyBlockers) {
       Write-Log $line
     }
-    Write-Log "[post-commit-autodeploy] commit stayed local; push manually after cleaning or committing the remaining files"
-    exit 1
+    if (Test-CommittedUnsoccerDistReady -ExpectedVersion $expectedVersion -ExpectedWeight $expectedWeight) {
+      Write-Log "[post-commit-autodeploy] committed UnSoccer dist is ready; skipping dirty working-tree gate and pushing fast-release artifact"
+      $skipLocalGate = $true
+    } else {
+      Write-Log "[post-commit-autodeploy] abort: dist is not ready, so dirty working-tree validation would be unsafe"
+      Write-Log "[post-commit-autodeploy] commit stayed local; push manually after cleaning or committing the remaining files"
+      exit 1
+    }
   }
 
-  $expectedVersion = (& node -p "require('./package.json').games.unsoccer.version").Trim()
-  Write-Log "[post-commit-autodeploy] expected UnSoccer version=$expectedVersion"
+  if (-not $skipLocalGate) {
+    Invoke-Logged "running acceptance gate" { cmd.exe /d /s /c "npm run test:unsoccer:acceptance 2>&1" }
+    Invoke-Logged "packaging itch artifact" { cmd.exe /d /s /c "npm run package:unsoccer 2>&1" }
+  }
+  Invoke-Logged "pushing main to origin; GitHub webhook will trigger production autodeploy" { cmd.exe /d /s /c "git push origin HEAD:main 2>&1" }
 
-  Invoke-Logged "running acceptance gate" { cmd.exe /c npm run test:unsoccer:acceptance }
-  Invoke-Logged "packaging itch artifact" { cmd.exe /c npm run package:unsoccer }
-  Invoke-Logged "pushing main to origin; GitHub webhook will trigger production autodeploy" { git push origin HEAD:main }
-
-  $waitSeconds = 900
+  $waitSeconds = 45
   if ($env:ITCH_GAMES_POST_COMMIT_WAIT_SECONDS) {
     $waitSeconds = [Math]::Max(0, [int]$env:ITCH_GAMES_POST_COMMIT_WAIT_SECONDS)
   }

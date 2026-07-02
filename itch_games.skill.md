@@ -176,9 +176,11 @@ Use this file for work inside `/itch_games`.
 - Start and finish with `git status --short --branch`.
 - Leave no staged files after a task unless the next immediate action is the
   intended commit.
-- Stage only task-owned source/rule files. Never stage generated packages,
-  caches, logs, temp files, local data, secrets, service env files, `dist/`,
-  `ai_chat/data/`, `__pycache__/`, or `*.pyc`.
+- Stage only task-owned source/rule files. Never stage generated package zips,
+  caches, logs, temp files, local data, secrets, service env files,
+  `ai_chat/data/`, `__pycache__/`, or `*.pyc`. UnSoccer built
+  `client/server/shared` dist artifacts are allowed only for an intentional fast
+  production release.
 - If staging contains accidental files, unstage them without reverting file
   content.
 - Preserve unrelated user or agent changes; report them instead of cleaning

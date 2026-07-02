@@ -1,0 +1,31 @@
+{
+  "version": "unsoccer-sample-sfx-v0.0.023",
+  "generatedAt": "2026-07-02",
+  "notes": "Runtime WebAudio samples promoted from sound_designer/raw/sample-sfx-v0.0.023. Use only as integrated UnSoccer game audio assets.",
+  "files": [
+    { "file": "football-kick-bigsoundbank-1044.ogg", "source": "BigSoundBank", "sourceId": "1044", "license": "CC0 / WTFPL-style free use" },
+    { "file": "ball-rebound-bigsoundbank-1045.ogg", "source": "BigSoundBank", "sourceId": "1045", "license": "CC0 / WTFPL-style free use" },
+    { "file": "punch-heavy-bigsoundbank-2460.ogg", "source": "BigSoundBank", "sourceId": "2460", "license": "CC0 / WTFPL-style free use" },
+    { "file": "punch-combo-bigsoundbank-0444.ogg", "source": "BigSoundBank", "sourceId": "0444", "license": "CC0 / WTFPL-style free use" },
+    { "file": "footstep-grass-kenney-000.ogg", "source": "Kenney Impact Sounds", "sourceId": "footstep_grass_000", "license": "CC0" },
+    { "file": "footstep-grass-kenney-002.ogg", "source": "Kenney Impact Sounds", "sourceId": "footstep_grass_002", "license": "CC0" },
+    { "file": "footstep-snow-kenney-000.ogg", "source": "Kenney Impact Sounds", "sourceId": "footstep_snow_000", "license": "CC0" },
+    { "file": "impact-generic-light-kenney-000.ogg", "source": "Kenney Impact Sounds", "sourceId": "impactGeneric_light_000", "license": "CC0" },
+    { "file": "impact-generic-light-kenney-003.ogg", "source": "Kenney Impact Sounds", "sourceId": "impactGeneric_light_003", "license": "CC0" },
+    { "file": "impact-heavy-kenney-mining-001.ogg", "source": "Kenney Impact Sounds", "sourceId": "impactMining_001", "license": "CC0" },
+    { "file": "soccer-ball-kick-mixkit-2099.mp3", "source": "Mixkit", "sourceId": "2099", "license": "Mixkit free sound effects license" },
+    { "file": "soccer-ball-quick-kick-mixkit-2108.mp3", "source": "Mixkit", "sourceId": "2108", "license": "Mixkit free sound effects license" },
+    { "file": "ball-bounce-mixkit-2077.mp3", "source": "Mixkit", "sourceId": "2077", "license": "Mixkit free sound effects license" },
+    { "file": "stadium-joy-crowd-mixkit-3022.mp3", "source": "Mixkit", "sourceId": "3022", "license": "Mixkit free sound effects license" },
+    { "file": "stadium-crowd-mixkit-2111.mp3", "source": "Mixkit", "sourceId": "2111", "license": "Mixkit free sound effects license" },
+    { "file": "sports-crowd-ambience-mixkit-2097.mp3", "source": "Mixkit", "sourceId": "2097", "license": "Mixkit free sound effects license" },
+    { "file": "little-birds-mixkit-17.mp3", "source": "Mixkit", "sourceId": "17", "license": "Mixkit free sound effects license" },
+    { "file": "city-traffic-mixkit-2930.mp3", "source": "Mixkit", "sourceId": "2930", "license": "Mixkit free sound effects license" },
+    { "file": "light-rain-loop-mixkit-2393.mp3", "source": "Mixkit", "sourceId": "2393", "license": "Mixkit free sound effects license" },
+    { "file": "wind-blowing-mixkit-2658.mp3", "source": "Mixkit", "sourceId": "2658", "license": "Mixkit free sound effects license" },
+    { "file": "short-wind-swoosh-mixkit-1461.mp3", "source": "Mixkit", "sourceId": "1461", "license": "Mixkit free sound effects license" },
+    { "file": "strong-body-punches-mixkit-2198.mp3", "source": "Mixkit", "sourceId": "2198", "license": "Mixkit free sound effects license" },
+    { "file": "martial-kick-mixkit-2163.mp3", "source": "Mixkit", "sourceId": "2163", "license": "Mixkit free sound effects license" },
+    { "file": "slap-clap-mixkit-2167.mp3", "source": "Mixkit", "sourceId": "2167", "license": "Mixkit free sound effects license" }
+  ]
+}

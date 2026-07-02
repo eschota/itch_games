@@ -35,7 +35,9 @@ Use this file for work inside `/itch_games/tools`.
   artifact.
 - Orbital Courier packages include vendored Three.js runtime files so the
   upload remains playable without CDN dependency.
-- Generated output belongs under `dist/` and must not be committed.
+- Generated package zips belong under root `dist/` and must not be committed.
+- Built UnSoccer `client/server/shared` dist artifacts may be committed only for
+  intentional fast production releases.
 - Git hooks must keep secrets out of the repository and use the existing signed
   GitHub push webhook rather than local copies of server HMAC credentials.
 - `npm run test:unsoccer:acceptance` must use an isolated test server and must

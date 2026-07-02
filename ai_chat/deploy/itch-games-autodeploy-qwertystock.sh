@@ -38,23 +38,37 @@ NODE
 )"
 echo "unsoccer expected version: ${expected_version}"
 echo "unsoccer expected weight: ${expected_weight}"
-stage "npm dependencies"
-rm -rf node_modules/@geckos.io node_modules/node-datachannel node_modules/ws node_modules/@types/ws
-previous_head="$(git rev-parse HEAD@{1} 2>/dev/null || true)"
-package_changed=1
-if [ -n "$previous_head" ] && git diff --quiet "$previous_head" HEAD -- package.json package-lock.json unsoccer/shared/package.json unsoccer/server/package.json unsoccer/client/package.json; then
-  package_changed=0
+dist_ready=0
+if [ -s "unsoccer/client/dist/index.html" ] && [ -s "unsoccer/server/dist/index.js" ] && [ -s "unsoccer/shared/dist/index.js" ]; then
+  if grep -q "$expected_version" "unsoccer/client/dist/index.html" \
+    && grep -q "$expected_weight" "unsoccer/client/dist/index.html" \
+    && grep -q "GAME_VERSION" "unsoccer/server/dist/index.js" \
+    && grep -q "$expected_version" "unsoccer/shared/dist/index.js"; then
+    dist_ready=1
+  fi
 fi
-if [ "$package_changed" -eq 0 ] && [ -d node_modules ]; then
-  echo "package manifests unchanged since ${previous_head}; reusing existing node_modules"
+if [ "$dist_ready" -eq 1 ]; then
+  stage "committed dist ready"
+  echo "using committed UnSoccer dist for ${expected_version}; skipping npm ci/build"
 else
-  NODE_ENV=development npm ci --include=dev
+  stage "npm dependencies"
+  rm -rf node_modules/@geckos.io node_modules/node-datachannel node_modules/ws node_modules/@types/ws
+  previous_head="$(git rev-parse HEAD@{1} 2>/dev/null || true)"
+  package_changed=1
+  if [ -n "$previous_head" ] && git diff --quiet "$previous_head" HEAD -- package.json package-lock.json unsoccer/shared/package.json unsoccer/server/package.json unsoccer/client/package.json; then
+    package_changed=0
+  fi
+  if [ "$package_changed" -eq 0 ] && [ -d node_modules ]; then
+    echo "package manifests unchanged since ${previous_head}; reusing existing node_modules"
+  else
+    NODE_ENV=development npm ci --include=dev
+  fi
+  stage "dependency check"
+  node --input-type=module -e "await import('@dimforge/rapier3d-compat'); await import('@itch-games/unsoccer-shared'); console.log('unsoccer required dependencies ok')"
+  stage "build unsoccer"
+  rm -rf unsoccer/client/dist unsoccer/server/dist unsoccer/shared/dist
+  npm run build:unsoccer
 fi
-stage "dependency check"
-node --input-type=module -e "await import('@dimforge/rapier3d-compat'); await import('@itch-games/unsoccer-shared'); console.log('unsoccer required dependencies ok')"
-stage "build unsoccer"
-rm -rf unsoccer/client/dist unsoccer/server/dist unsoccer/shared/dist
-npm run build:unsoccer
 stage "artifact checks"
 dist_html="unsoccer/client/dist/index.html"
 dist_assets="unsoccer/client/dist/assets"

@@ -95,7 +95,10 @@ Use this root skill when changing, packaging, validating, or publishing the
 - `npm run package:unsoccer` must rebuild UnSoccer before writing
   `dist/unsoccer-itch.zip` so stale `unsoccer/*/dist` output cannot be
   published.
-- Do not commit generated files under `dist/`.
+- Do not commit generated package zips under root `dist/`.
+- Release commits may include built UnSoccer `unsoccer/client/dist`,
+  `unsoccer/server/dist`, and `unsoccer/shared/dist` artifacts when production
+  needs fast git-pull-and-restart deployment.
 - Test through a local static server before upload.
 - Public game pages, game clients, and game assets must be a static-file bundle
   in each game public directory. Nginx should serve those files directly from
@@ -209,8 +212,10 @@ Use this root skill when changing, packaging, validating, or publishing the
 - Do not leave staged files between tasks. Staging is allowed only immediately
   before an intentional commit, and the final state after commit/push must have
   no staged changes.
-- Never stage generated files, caches, logs, temp outputs, local data, secrets,
-  service env files, `dist/`, `ai_chat/data/`, `__pycache__/`, or `*.pyc`.
+- Never stage generated package zips, caches, logs, temp outputs, local data,
+  secrets, service env files, `ai_chat/data/`, `__pycache__/`, or `*.pyc`.
+  UnSoccer built `client/server/shared` dist artifacts are allowed only for an
+  intentional fast production release.
 - If accidental staged files exist, unstage them without reverting file content,
   then decide explicitly whether the working-tree changes belong to the task.
 - Preserve unrelated user or agent changes. Do not revert or overwrite them to

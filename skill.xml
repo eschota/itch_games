@@ -183,7 +183,7 @@
   <repositoryHygiene>
     <rule>Every agent runs git status --short --branch before changes and before finishing.</rule>
     <rule>No staged files may be left between tasks; staging is only for an immediate intentional commit.</rule>
-    <rule>Never stage generated packages, caches, logs, temp outputs, local data, secrets, service env files, dist/, ai_chat/data/, __pycache__/, or *.pyc.</rule>
+    <rule>Never stage generated package zips, caches, logs, temp outputs, local data, secrets, service env files, ai_chat/data/, __pycache__/, or *.pyc. UnSoccer client/server/shared dist artifacts are allowed only for intentional fast production releases.</rule>
     <rule>Accidental staged files are unstaged without reverting file content.</rule>
     <rule>Unrelated user or agent changes are preserved and reported, not reverted.</rule>
     <rule>Final git cleanliness is reported in /ai_chat after meaningful work.</rule>
@@ -250,7 +250,8 @@
     <tool path="tools/hooks/unsoccer_post_commit_autodeploy.ps1" role="post-commit-gate-push-webhook-wait" />
     <tool path="tools/package_itch.py" role="player-facing-itch-package" />
     <tool path="tools/unsoccer_acceptance.mjs" role="unsoccer-authoritative-acceptance-gate" />
-    <rule>Generated package output belongs under dist/ and is not committed.</rule>
+    <rule>Generated package output belongs under root dist/ and is not committed.</rule>
+    <rule>UnSoccer client/server/shared dist artifacts may be committed only for intentional fast production release deploys.</rule>
     <rule>Packaging fails if internal skill, role, agent coordination, deploy, or source-control docs leak into the public zip.</rule>
   </tooling>
   <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.030">

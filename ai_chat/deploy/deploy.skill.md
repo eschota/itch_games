@@ -70,6 +70,12 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
   `residential-courtyard` client marker inside built assets, and that the server
   bundle does not import geckos.io, `ws`, or `node-datachannel` before nginx
   reload.
+- For fast production releases, committed UnSoccer `client/server/shared` dist
+  artifacts may skip `npm ci` and `npm run build:unsoccer` when their HTML and
+  shared JS already contain the expected version and weight. The server bundle
+  imports `GAME_VERSION` from shared and does not need to contain the literal
+  version. The deploy must still run artifact checks and restart the UnSoccer
+  service.
 - After nginx reload, the qwertystock autodeploy must smoke the public
   `/unsoccer/` route for the same version and weight markers plus
   `/unsoccer/api/health` for the matching server version. `/api/deploy-health`

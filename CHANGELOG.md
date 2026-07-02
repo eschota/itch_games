@@ -16,6 +16,9 @@
 - Add a local post-commit autodeploy hook script so commits to `main` can run
   the UnSoccer gate, push to GitHub, and wait for the production webhook
   release to match deploy-health.
+- Shorten local hook deploy-health waiting and let qwertystock autodeploy skip
+  server-side npm/build work when committed UnSoccer dist artifacts already
+  match the expected release.
 
 ## unsoccer v0.0.029
 

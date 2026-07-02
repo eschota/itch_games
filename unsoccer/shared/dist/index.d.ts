@@ -1,10 +1,10 @@
-export declare const GAME_VERSION = "v0.0.014";
+export declare const GAME_VERSION = "v0.0.030";
 export declare const ROOM_ID = "unsoccer-default-room";
 export declare const MAX_ACTIVE_PLAYERS = 4;
 export declare const MAX_ROOM_CLIENTS = 32;
 export declare const SERVER_TICK_RATE = 60;
 export declare const SNAPSHOT_RATE = 20;
-export declare const DAY_CYCLE_SECONDS = 120;
+export declare const DAY_CYCLE_SECONDS = 300;
 export declare const DAY_START_SECONDS: number;
 export declare const FIELD_WIDTH = 48;
 export declare const FIELD_LENGTH = 72;
@@ -13,6 +13,12 @@ export declare const GOAL_DEPTH = 3.2;
 export declare const PLAYER_RADIUS = 0.52;
 export declare const PLAYER_HEIGHT = 1.75;
 export declare const PLAYER_SPEED = 8.2;
+export declare const PLAYER_INPUT_AXIS_ACCELERATION = 18;
+export declare const PLAYER_INPUT_AXIS_RELEASE_DECAY = 5;
+export declare const PLAYER_INPUT_AXIS_OPPOSITE_ACCELERATION = 32;
+export declare const PLAYER_MOVEMENT_ACCELERATION = 24;
+export declare const PLAYER_MOVEMENT_DECELERATION = 8;
+export declare const PLAYER_MOVEMENT_TURN_ACCELERATION = 34;
 export declare const PLAYER_SPRINT_MULTIPLIER = 1.58;
 export declare const PLAYER_EXHAUSTED_SPEED_MULTIPLIER = 0.46;
 export declare const PLAYER_EXHAUSTED_RECOVERY_THRESHOLD = 20;
@@ -26,29 +32,46 @@ export declare const PLAYER_JUMP_STRENGTH = 6.1;
 export declare const PLAYER_JUMP_COOLDOWN_MS = 520;
 export declare const PLAYER_GRAVITY = 18;
 export declare const PLAYER_AIR_CONTROL_MULTIPLIER = 0.82;
-export declare const BALL_RADIUS = 0.48;
+export declare const PLAYER_RAGDOLL_MIN_MS = 1600;
+export declare const PLAYER_RAGDOLL_FRICTION_PER_SECOND = 1.35;
+export declare const PLAYER_RAGDOLL_HIT_KNOCKBACK = 11.8;
+export declare const PLAYER_RAGDOLL_VERTICAL_KNOCKBACK = 4.4;
+export declare const BALL_RADIUS = 0.24;
+export declare const BALL_DENSITY = 3.6;
 export declare const BALL_RESTITUTION = 1.05;
 export declare const KICK_RANGE = 2.05;
-export declare const FOOT_KICK_STRENGTH = 8.2;
-export declare const HAND_HIT_STRENGTH = 5.2;
-export declare const HEAD_KICK_STRENGTH = 10.8;
+export declare const FOOT_KICK_ASSIST_RANGE = 2.55;
+export declare const HAND_KICK_ASSIST_RANGE = 2.25;
+export declare const HEAD_KICK_ASSIST_RANGE = 1.85;
+export declare const FOOT_KICK_STRENGTH = 2.4;
+export declare const HAND_HIT_STRENGTH = 1.35;
+export declare const HEAD_KICK_STRENGTH = 3.15;
 export declare const KICK_COOLDOWN_MS = 320;
 export declare const HAND_COOLDOWN_MS = 420;
 export declare const HEAD_COOLDOWN_MS = 520;
+export declare const BALL_HIT_BASE_POWER_MULTIPLIER = 2;
+export declare const LEFT_KICK_CHARGE_SECONDS = 1;
+export declare const LEFT_KICK_FULL_CHARGE_POWER_MULTIPLIER = 4;
 export declare const FOOT_PLAYER_STAMINA_DAMAGE = 12;
 export declare const HAND_PLAYER_STAMINA_DAMAGE = 20;
 export declare const HEAD_PLAYER_STAMINA_DAMAGE = 16;
 export declare const AIRBORNE_HEAD_STAMINA_DAMAGE_BONUS = 6;
-export declare const BODY_BUMP_RANGE = 1.18;
-export declare const BODY_BUMP_MIN_SPEED = 2.25;
-export declare const BODY_BUMP_STRENGTH = 1.75;
-export declare const BODY_BUMP_COOLDOWN_MS = 140;
+export declare const BODY_BUMP_RANGE = 0.62;
+export declare const BODY_BUMP_MIN_SPEED = 3.1;
+export declare const BODY_BUMP_STRENGTH = 0.18;
+export declare const BODY_BUMP_COOLDOWN_MS = 240;
+export declare const POST_GOAL_CELEBRATION_MS = 5000;
+export declare const POST_GOAL_BALL_RETURN_MS = 1000;
+export declare const KICKOFF_COUNTDOWN_MS = 1200;
+export declare const CELEBRATION_WINDOW_MS = 5000;
+export declare const CELEBRATION_DURATION_MS = 2600;
 export type TeamId = 0 | 1;
 export type PlayerRole = "player" | "spectator";
 export type KickKind = "left" | "hand" | "head" | "body" | "jump";
+export type CelebrationKind = "celebrate1" | "celebrate2" | "celebrate3";
 export type WeatherKind = "clear" | "dawn" | "rain" | "snow";
 export type HazardType = "puddle" | "slush" | "snowbank";
-export type AudioEventKind = "roster" | "kick" | "goal" | "countdown";
+export type AudioEventKind = "roster" | "kick" | "goal" | "countdown" | "celebration";
 export type RosterAudioChange = "join" | "leave" | "spectator";
 export interface Vec3 {
     x: number;
@@ -61,6 +84,8 @@ export interface InputState {
     left: boolean;
     right: boolean;
     kickLeft: number;
+    kickLeftHeld: boolean;
+    kickLeftCharge: number;
     kickRight: number;
     head: number;
     jump: number;
@@ -81,14 +106,27 @@ export interface PlayerSnapshot {
     sprinting: boolean;
     airborne: boolean;
     exhausted: boolean;
+    ragdoll: boolean;
+    ragdollAt: number;
     grounded: boolean;
     lastAction: KickKind | null;
     lastActionAt: number;
+    celebration: CelebrationKind | null;
+    celebrationAt: number;
+    celebrationAvailableUntil: number;
 }
 export interface BallSnapshot {
     position: Vec3;
     velocity: Vec3;
     variant: number;
+}
+export type GoalResetPhase = "none" | "celebration" | "returning" | "kickoff";
+export interface GoalResetSnapshot {
+    phase: GoalResetPhase;
+    scoringTeam: TeamId | null;
+    elapsedMs: number;
+    remainingMs: number;
+    returnProgress: number;
 }
 export interface HazardSnapshot {
     id: string;
@@ -135,7 +173,13 @@ export interface CountdownAudioEvent extends ServerAudioEventBase {
     kind: "countdown";
     remainingSeconds: number;
 }
-export type ServerAudioEvent = RosterAudioEvent | KickAudioEvent | GoalAudioEvent | CountdownAudioEvent;
+export interface CelebrationAudioEvent extends ServerAudioEventBase {
+    kind: "celebration";
+    celebration: CelebrationKind;
+    playerId: string;
+    position: Vec3;
+}
+export type ServerAudioEvent = RosterAudioEvent | KickAudioEvent | GoalAudioEvent | CountdownAudioEvent | CelebrationAudioEvent;
 export interface JoinRequest {
     name?: string;
 }
@@ -159,6 +203,7 @@ export interface ServerState {
     score: ScoreState;
     message: string;
     countdown: number;
+    goalReset: GoalResetSnapshot;
     weather: WeatherSnapshot;
     audioEvents: ServerAudioEvent[];
 }
@@ -179,7 +224,7 @@ export interface ServerInfo {
     };
 }
 export declare const DEFAULT_INPUT: InputState;
-export declare const CHARACTER_ROSTER: readonly ["6299851", "6270753", "6298507", "6300462"];
+export declare const CHARACTER_ROSTER: readonly ["6299851", "6243756", "6270571", "6324128", "6244727", "6288738", "6304269", "6298522", "6255142", "6294728", "666dc6f4-0cc4-4714-a7cf-39cfb6655fe8"];
 export declare function teamName(team: TeamId | null): string;
 export declare function clamp(value: number, min: number, max: number): number;
 export declare function sanitizePlayerName(value: unknown): string;

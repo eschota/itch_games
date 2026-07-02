@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UnSoccer Bot Tuning</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #111513;
+        --panel: #18211d;
+        --panel-2: #202924;
+        --line: #405047;
+        --text: #f1f6f2;
+        --muted: #acb8b0;
+        --accent: #5fd38a;
+        --warn: #f2c94c;
+        --bad: #ff6b6b;
+        --blue: #6ba8ff;
+        --orange: #ffb35d;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, "Segoe UI", Arial, sans-serif;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--line);
+        background: #151b18;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      button {
+        min-height: 36px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--panel-2);
+        color: var(--text);
+        padding: 0 12px;
+        cursor: pointer;
+      }
+
+      button.primary {
+        border-color: #7adf9c;
+        background: #23613d;
+      }
+
+      button:disabled {
+        cursor: default;
+        opacity: 0.55;
+      }
+
+      input[type="text"],
+      input[type="number"] {
+        width: 100%;
+        min-height: 36px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #0f1512;
+        color: var(--text);
+        padding: 0 10px;
+      }
+
+      input[type="range"] {
+        width: 100%;
+        accent-color: var(--accent);
+      }
+
+      input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--accent);
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 30px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 0 10px;
+        color: var(--muted);
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      .status::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--warn);
+      }
+
+      .status.ok::before {
+        background: var(--accent);
+      }
+
+      .status.bad::before {
+        background: var(--bad);
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: minmax(340px, 500px) minmax(0, 1fr);
+        gap: 16px;
+        padding: 16px;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      .panel h2 {
+        margin: 0;
+        padding: 14px 14px 0;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
+      .panel-body {
+        display: grid;
+        gap: 14px;
+        padding: 14px;
+      }
+
+      .toolbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        gap: 8px;
+        align-items: end;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .switch-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 42px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 0 10px;
+        background: #131a16;
+        color: var(--text);
+      }
+
+      .control {
+        display: grid;
+        grid-template-columns: minmax(120px, 1fr) minmax(140px, 1.4fr) 72px;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .control span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .actions {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .metric {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 10px;
+        background: #131a16;
+      }
+
+      .metric span {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 20px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        overflow: hidden;
+        border-radius: 6px;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 9px 8px;
+        text-align: left;
+        font-size: 12px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      th {
+        color: var(--muted);
+        font-weight: 600;
+        background: #131a16;
+      }
+
+      .team-0 {
+        color: var(--blue);
+      }
+
+      .team-1 {
+        color: var(--orange);
+      }
+
+      .log {
+        min-height: 38px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 10px;
+        background: #101612;
+        color: var(--muted);
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
+
+      @media (max-width: 920px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+
+        .metrics {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 560px) {
+        header,
+        main {
+          padding: 12px;
+        }
+
+        header {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .toolbar,
+        .control,
+        .actions {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>UnSoccer Bot Tuning</h1>
+      <div id="status" class="status">Waiting</div>
+    </header>
+    <main>
+      <section class="panel">
+        <h2>Server</h2>
+        <div class="panel-body">
+          <div class="toolbar">
+            <label>
+              API server
+              <input id="serverUrl" type="text" autocomplete="off" />
+            </label>
+            <button id="loadButton">Load</button>
+            <button id="applyButton" class="primary">Apply</button>
+          </div>
+          <label class="switch-row">
+            <span>Bot fill</span>
+            <input id="enabled" type="checkbox" />
+          </label>
+          <div id="controls"></div>
+          <div class="actions">
+            <button id="matchButton">4 Bot Match</button>
+            <button id="disableButton">Disable</button>
+            <button id="saveButton">Save Local</button>
+            <button id="defaultsButton">Defaults</button>
+          </div>
+          <div id="log" class="log">No server response yet.</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Live State</h2>
+        <div class="panel-body">
+          <div class="metrics">
+            <div class="metric"><span>Active</span><strong id="activeMetric">0</strong></div>
+            <div class="metric"><span>Bots</span><strong id="botMetric">0</strong></div>
+            <div class="metric"><span>Humans</span><strong id="humanMetric">0</strong></div>
+            <div class="metric"><span>Blue</span><strong id="blueMetric">0</strong></div>
+            <div class="metric"><span>Orange</span><strong id="orangeMetric">0</strong></div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 44px">#</th>
+                <th>Name</th>
+                <th style="width: 90px">Control</th>
+                <th style="width: 72px">Team</th>
+                <th style="width: 82px">Stamina</th>
+                <th style="width: 92px">Action</th>
+              </tr>
+            </thead>
+            <tbody id="playersBody">
+              <tr><td colspan="6">No state</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const STORAGE_KEY = "unsoccer.botTuning.v1";
+      const DEFAULT_SETTINGS = {
+        enabled: true,
+        targetActivePlayers: 4,
+        aggression: 0.7,
+        shootDistance: 2.75,
+        fightDistance: 1.62,
+        chaseDistance: 4.6,
+        sprintDistance: 5.4,
+        kickIntervalMs: 360,
+        handIntervalMs: 620,
+        headIntervalMs: 900,
+        jumpChance: 0.03
+      };
+      const CONTROL_DEFS = [
+        ["targetActivePlayers", "Target players", 0, 4, 1],
+        ["aggression", "Aggression", 0, 1, 0.01],
+        ["shootDistance", "Shoot distance", 1.2, 6, 0.05],
+        ["fightDistance", "Fight distance", 0.9, 3, 0.05],
+        ["chaseDistance", "Chase distance", 1.5, 9, 0.05],
+        ["sprintDistance", "Sprint distance", 0, 14, 0.1],
+        ["kickIntervalMs", "Kick interval ms", 180, 1800, 10],
+        ["handIntervalMs", "Hand interval ms", 260, 2200, 10],
+        ["headIntervalMs", "Head interval ms", 360, 2600, 10],
+        ["jumpChance", "Jump chance", 0, 0.25, 0.005]
+      ];
+
+      const nodes = {
+        status: document.getElementById("status"),
+        log: document.getElementById("log"),
+        controls: document.getElementById("controls"),
+        serverUrl: document.getElementById("serverUrl"),
+        enabled: document.getElementById("enabled"),
+        activeMetric: document.getElementById("activeMetric"),
+        botMetric: document.getElementById("botMetric"),
+        humanMetric: document.getElementById("humanMetric"),
+        blueMetric: document.getElementById("blueMetric"),
+        orangeMetric: document.getElementById("orangeMetric"),
+        playersBody: document.getElementById("playersBody")
+      };
+      const controlNodes = new Map();
+
+      function readStored() {
+        try {
+          return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+        } catch (_) {
+          return {};
+        }
+      }
+
+      function localhostDefaultServer() {
+        const local = ["127.0.0.1", "localhost", ""].includes(location.hostname);
+        if (local) return "http://127.0.0.1:8787";
+        return new URL("./api", location.href).href.replace(/\/api\/?$/, "");
+      }
+
+      function initialServerUrl() {
+        const params = new URLSearchParams(location.search);
+        const stored = readStored();
+        return params.get("server") || stored.serverUrl || localhostDefaultServer();
+      }
+
+      function apiBase() {
+        const raw = String(nodes.serverUrl.value || "").trim() || localhostDefaultServer();
+        try {
+          const url = new URL(raw, location.href);
+          const path = url.pathname.replace(/\/+$/, "");
+          if (path.endsWith("/api")) return url.href.replace(/\/+$/, "");
+          if (path.endsWith("/ws")) url.pathname = path.slice(0, -3) + "/api";
+          else if (path.endsWith("/socket")) url.pathname = path.slice(0, -7) + "/api";
+          else url.pathname = `${path}/api`.replace(/\/+/g, "/");
+          return url.href.replace(/\/+$/, "");
+        } catch (_) {
+          return raw.replace(/\/+$/, "").replace(/\/api$/, "") + "/api";
+        }
+      }
+
+      function saveLocal(settings = collectSettings()) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          serverUrl: nodes.serverUrl.value,
+          settings
+        }));
+      }
+
+      function setStatus(text, kind) {
+        nodes.status.textContent = text;
+        nodes.status.className = `status ${kind || ""}`.trim();
+      }
+
+      function setLog(text) {
+        nodes.log.textContent = text;
+      }
+
+      function createControls() {
+        nodes.controls.innerHTML = "";
+        for (const [key, label, min, max, step] of CONTROL_DEFS) {
+          const row = document.createElement("label");
+          row.className = "control";
+          const caption = document.createElement("span");
+          caption.textContent = label;
+          const range = document.createElement("input");
+          range.type = "range";
+          range.min = String(min);
+          range.max = String(max);
+          range.step = String(step);
+          const number = document.createElement("input");
+          number.type = "number";
+          number.min = String(min);
+          number.max = String(max);
+          number.step = String(step);
+          row.append(caption, range, number);
+          nodes.controls.append(row);
+          controlNodes.set(key, { range, number });
+          const sync = (source) => {
+            const value = Number(source.value);
+            range.value = String(value);
+            number.value = String(value);
+            saveLocal();
+          };
+          range.addEventListener("input", () => sync(range));
+          number.addEventListener("input", () => sync(number));
+        }
+      }
+
+      function setSettings(settings) {
+        const next = { ...DEFAULT_SETTINGS, ...(settings || {}) };
+        nodes.enabled.checked = Boolean(next.enabled);
+        for (const [key] of CONTROL_DEFS) {
+          const pair = controlNodes.get(key);
+          if (!pair) continue;
+          pair.range.value = String(next[key]);
+          pair.number.value = String(next[key]);
+        }
+        saveLocal(next);
+      }
+
+      function collectSettings() {
+        const settings = { enabled: Boolean(nodes.enabled.checked) };
+        for (const [key] of CONTROL_DEFS) {
+          const pair = controlNodes.get(key);
+          settings[key] = Number(pair.number.value);
+        }
+        return settings;
+      }
+
+      async function requestJson(path, options = {}) {
+        const response = await fetch(`${apiBase()}/${path}`, {
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          ...options
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload.ok === false) throw new Error(payload.error || response.statusText);
+        return payload;
+      }
+
+      async function loadSettings() {
+        setStatus("Loading", "");
+        const payload = await requestJson("bot-settings");
+        if (payload.settings) setSettings(payload.settings);
+        render(payload);
+        setStatus(`Connected ${payload.state?.version || ""}`, "ok");
+        setLog("Loaded server bot settings.");
+      }
+
+      async function applySettings(settings = collectSettings()) {
+        setStatus("Applying", "");
+        saveLocal(settings);
+        const payload = await requestJson("bot-settings", {
+          method: "POST",
+          body: JSON.stringify({ settings })
+        });
+        if (payload.settings) setSettings(payload.settings);
+        render(payload);
+        setStatus(`Applied ${payload.state?.version || ""}`, "ok");
+        setLog("Settings applied on server.");
+      }
+
+      function teamName(team) {
+        if (team === 0) return "Blue";
+        if (team === 1) return "Orange";
+        return "-";
+      }
+
+      function render(payload) {
+        const state = payload.state || {};
+        const players = Array.isArray(state.players) ? state.players : [];
+        const active = players.filter((player) => player.role === "player");
+        const bots = players.filter((player) => player.controller === "bot");
+        const humans = players.filter((player) => player.controller === "human");
+        nodes.activeMetric.textContent = String(active.length);
+        nodes.botMetric.textContent = String(bots.length);
+        nodes.humanMetric.textContent = String(humans.length);
+        nodes.blueMetric.textContent = String(state.score?.blue || 0);
+        nodes.orangeMetric.textContent = String(state.score?.orange || 0);
+        nodes.playersBody.innerHTML = "";
+        if (!players.length) {
+          const row = document.createElement("tr");
+          row.innerHTML = '<td colspan="6">No players</td>';
+          nodes.playersBody.append(row);
+          return;
+        }
+        for (const player of players) {
+          const row = document.createElement("tr");
+          const cells = [
+            player.index ?? "-",
+            player.name || player.id || "-",
+            player.controller || "-",
+            teamName(player.team),
+            player.stamina ?? "-",
+            player.lastAction || "-"
+          ];
+          for (let index = 0; index < cells.length; index += 1) {
+            const cell = document.createElement("td");
+            cell.textContent = String(cells[index]);
+            if (index === 1) cell.title = player.id || "";
+            if (index === 3) cell.className = `team-${player.team}`;
+            row.append(cell);
+          }
+          nodes.playersBody.append(row);
+        }
+      }
+
+      async function poll() {
+        try {
+          const payload = await requestJson("bot-settings");
+          render(payload);
+          setStatus(`Live ${payload.state?.version || ""}`, "ok");
+        } catch (error) {
+          setStatus("Offline", "bad");
+          setLog(error.message || String(error));
+        }
+      }
+
+      createControls();
+      nodes.serverUrl.value = initialServerUrl();
+      const stored = readStored();
+      setSettings(stored.settings || DEFAULT_SETTINGS);
+      nodes.enabled.addEventListener("change", () => saveLocal());
+      nodes.serverUrl.addEventListener("change", () => saveLocal());
+      document.getElementById("loadButton").addEventListener("click", () => loadSettings().catch((error) => {
+        setStatus("Load failed", "bad");
+        setLog(error.message || String(error));
+      }));
+      document.getElementById("applyButton").addEventListener("click", () => applySettings().catch((error) => {
+        setStatus("Apply failed", "bad");
+        setLog(error.message || String(error));
+      }));
+      document.getElementById("saveButton").addEventListener("click", () => {
+        saveLocal();
+        setLog("Saved locally.");
+      });
+      document.getElementById("defaultsButton").addEventListener("click", () => {
+        setSettings(DEFAULT_SETTINGS);
+        setLog("Defaults loaded locally.");
+      });
+      document.getElementById("matchButton").addEventListener("click", () => {
+        setSettings({ ...collectSettings(), enabled: true, targetActivePlayers: 4 });
+        applySettings().catch((error) => {
+          setStatus("Apply failed", "bad");
+          setLog(error.message || String(error));
+        });
+      });
+      document.getElementById("disableButton").addEventListener("click", () => {
+        setSettings({ ...collectSettings(), enabled: false });
+        applySettings().catch((error) => {
+          setStatus("Apply failed", "bad");
+          setLog(error.message || String(error));
+        });
+      });
+      loadSettings().catch((error) => {
+        setStatus("Load failed", "bad");
+        setLog(error.message || String(error));
+        poll();
+      });
+      setInterval(poll, 1400);
+    </script>
+  </body>
+</html>

@@ -2212,6 +2212,11 @@ class PlayerVisual {
   private nextVisualHandStrikeSide: "left" | "right" = "right";
   private characterController: GameCharacterController | null = null;
   private characterDebug: CharacterControllerDebugSnapshot | null = null;
+  private readonly renderPosition = new THREE.Vector3();
+  private readonly renderVelocity = new THREE.Vector3();
+  private renderYaw = 0;
+  private renderInitialized = false;
+  private lastRenderUpdateTime = 0;
 
   constructor(private readonly snapshot: PlayerSnapshot) {
     const color = teamColor(snapshot.team);
@@ -2401,7 +2406,46 @@ class PlayerVisual {
     document.documentElement.dataset.playerRigAttached = String(free3dCharacterAttachCount);
   }
 
+  private smoothedSnapshot(snapshot: PlayerSnapshot, time: number): PlayerSnapshot {
+    const targetPosition = new THREE.Vector3(
+      snapshot.position.x,
+      snapshot.position.y - PLAYER_HEIGHT / 2,
+      snapshot.position.z
+    );
+    const snapDistance = this.renderInitialized ? this.renderPosition.distanceTo(targetPosition) : Number.POSITIVE_INFINITY;
+    const dt = this.lastRenderUpdateTime > 0 ? Math.min(0.05, Math.max(0.001, time - this.lastRenderUpdateTime)) : 1 / 60;
+    this.lastRenderUpdateTime = time;
+    if (!this.renderInitialized || snapDistance > PLAYER_SNAP_DISTANCE || snapshot.ragdoll) {
+      this.renderPosition.copy(targetPosition);
+      this.renderVelocity.set(snapshot.velocity.x, snapshot.velocity.y, snapshot.velocity.z);
+      this.renderYaw = snapshot.yaw;
+      this.renderInitialized = true;
+    } else {
+      const positionAlpha = 1 - Math.exp(-dt * (snapshot.id === localJoin?.id ? 16 : 11));
+      const velocityAlpha = 1 - Math.exp(-dt * 7);
+      const yawAlpha = 1 - Math.exp(-dt * 10);
+      this.renderPosition.lerp(targetPosition, positionAlpha);
+      this.renderVelocity.lerp(new THREE.Vector3(snapshot.velocity.x, snapshot.velocity.y, snapshot.velocity.z), velocityAlpha);
+      this.renderYaw = lerpAngle(this.renderYaw, snapshot.yaw, yawAlpha);
+    }
+    return {
+      ...snapshot,
+      position: {
+        x: this.renderPosition.x,
+        y: this.renderPosition.y + PLAYER_HEIGHT / 2,
+        z: this.renderPosition.z
+      },
+      velocity: {
+        x: this.renderVelocity.x,
+        y: this.renderVelocity.y,
+        z: this.renderVelocity.z
+      },
+      yaw: this.renderYaw
+    };
+  }
+
   update(snapshot: PlayerSnapshot, time: number) {
+    snapshot = this.smoothedSnapshot(snapshot, time);
     this.root.position.set(snapshot.position.x, snapshot.position.y - PLAYER_HEIGHT / 2, snapshot.position.z);
     this.root.rotation.y = snapshot.yaw;
     this.root.visible = snapshot.role === "player";

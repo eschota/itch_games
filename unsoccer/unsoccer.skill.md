@@ -25,7 +25,7 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 
 ## Rules
 
-- Current release: `v0.0.030`.
+- Current release: `v0.0.031`.
 - Keep client and server separated; browser bundles must not import server-only
   modules.
 - The server is authoritative for room assignment, teams, player physics, ball
@@ -219,6 +219,36 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
   clicks buffer for a short contact window, active strike inputs suppress
   same-frame passive body bump, and body-only ball contact uses a smaller,
   softer, less frequent nudge.
+- `v0.0.031` adds server-authoritative bot players. In production, bots fill
+  active slots up to four and are removed/backfilled as human clients join or
+  leave; bot snapshots expose `controller="bot"`, bots do not consume
+  `connectedClients`, and the bot AI plays through normal movement, stamina,
+  kick, hand, head, hit, ragdoll, scoring, and audio-event rules. The static
+  `client/public/bot-tuning.html` page can load, save locally, and apply bot
+  settings through `/api/bot-settings`; acceptance covers fill/displacement,
+  settings/CORS, combat, and scoring fixtures for both teams. Runtime strike
+  input also replicates visible foot/hand whiff actions when there is no ball
+  or player contact, player-hit assist cones are forgiving enough for live
+  fighting, and client character visuals smooth render position/yaw/velocity
+  before animation so sideways movement and ragdoll falls do not flicker from
+  authoritative jitter.
+- The local `client/character-controller-test.html` validation page includes a
+  textureless PBR preview converter for characters and Free3D environment
+  props. The runtime debug bake stores `COLOR_0.rgba` with ambient occlusion in
+  alpha, stores roughness/metalness in `TEXCOORD_1`/`uv1.xy` with a `uv2`
+  compatibility alias, uses bilinear texture sampling, tessellates low-detail
+  non-skinned textured props for preview, removes texture maps for preview
+  materials, exposes QA datasets under `data-textureless-pbr-*`, and provides
+  a channel inspector for `COLOR_0` RGBA plus `uv`/`uv1`/`uv2` data under
+  `data-channel-view-*`. AO alpha is no longer texture-only: the converter
+  computes geometric vertex AO with cosine-weighted hemisphere ray sampling,
+  multiplies it by any source AO texture, applies the global AO contrast
+  control, and uses the same alpha as a preview shader AO factor. The single
+  `Convert PBR` path uses the higher-quality 16-sample bake; the
+  `Prepare All Vertex PBR` button uses an interactive 8-sample batch bake
+  across the local character and environment rosters and yields during large
+  meshes so the browser stays responsive. It records batch counters in
+  `data-textureless-pbr-batch-*` but does not write optimized GLBs to disk.
 - `tools/unsoccer_acceptance.mjs` derives the expected version from
   `package.json.games.unsoccer.version`; keep it that way so version bumps do
   not require multiple acceptance edits.

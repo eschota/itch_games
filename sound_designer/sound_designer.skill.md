@@ -67,6 +67,9 @@ Use this file for work inside `/itch_games/sound_designer`.
 - `checks/2026-07-02-unsoccer-v0.0.024-sample-sfx-pass.md`: current sample
   SFX implementation validation, package asset count/signature check, and
   acceptance evidence for the WebAudio sample pass.
+- `checks/2026-07-02-unsoccer-v0.0.031-sample-envelope-pass.md`: current
+  WebAudio sample attack/release smoothing evidence for abrupt sample starts
+  and stops.
 
 ## Rules
 

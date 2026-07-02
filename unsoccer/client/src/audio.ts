@@ -96,6 +96,8 @@ interface SamplePlaybackOptions {
   playbackRate?: number;
   startAt?: number;
   duration?: number;
+  fadeIn?: number;
+  fadeOut?: number;
   destination?: AudioNode;
 }
 
@@ -315,8 +317,8 @@ export class UnSoccerAudio {
     if (!this.canPlay("goal")) return;
     this.markPlayed("goal");
     const pan = team === 0 ? -0.18 : 0.18;
-    const played = this.playSample("stadiumJoyCrowd", { pan, gain: 0.58, duration: 3.2 });
-    this.playSample("stadiumCrowd", { pan: -pan, gain: 0.26, delay: 0.12, duration: 2.2 });
+    const played = this.playSample("stadiumJoyCrowd", { pan, gain: 0.58, duration: 3.2, fadeIn: 0.08, fadeOut: 0.5 });
+    this.playSample("stadiumCrowd", { pan: -pan, gain: 0.26, delay: 0.12, duration: 2.2, fadeIn: 0.1, fadeOut: 0.45 });
     this.playNoiseBurst({ duration: 0.18, peak: 0.045, pan: 0, filterType: "lowpass", frequency: 180, q: 0.4 });
     if (!played) {
       this.playNoiseBurst({ duration: 0.62, peak: 0.085, pan, filterType: "bandpass", frequency: 620, q: 0.45 });
@@ -334,7 +336,9 @@ export class UnSoccerAudio {
       pan,
       gain: localBoost * (kind === "celebrate2" ? 0.4 : 0.28),
       playbackRate: kind === "celebrate3" ? 1.06 : 1,
-      duration: kind === "celebrate2" ? 2.4 : 1.6
+      duration: kind === "celebrate2" ? 2.4 : 1.6,
+      fadeIn: 0.07,
+      fadeOut: kind === "celebrate2" ? 0.42 : 0.32
     });
     this.playSample("slapClap", { pan, gain: localBoost * 0.14, delay: 0.08, playbackRate: 0.94, duration: 0.34 });
     if (!played) {
@@ -681,7 +685,8 @@ export class UnSoccerAudio {
     source.buffer = buffer;
     source.loop = true;
     source.playbackRate.value = playbackRate;
-    gain.gain.value = level;
+    gain.gain.setValueAtTime(MIN_GAIN, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(level, ctx.currentTime + 1.4);
     source.connect(gain).connect(destination);
     source.start(ctx.currentTime, Math.random() * Math.max(0.01, buffer.duration - 0.25));
     this.startedAmbienceSamples.add(key);
@@ -692,8 +697,8 @@ export class UnSoccerAudio {
     const pan = Math.random() > 0.5 ? -0.45 : 0.45;
     const gain = clamp(0.1 + weatherAmount * 0.18, 0.1, 0.32);
     const played = kind === "rain"
-      ? this.playSample("lightRain", { pan, gain, startAt: Math.random() * 0.8, duration: 1.8, playbackRate: 1.04 })
-      : this.playSample("windSwoosh", { pan, gain: gain * 1.2, duration: 1.35, playbackRate: kind === "snow" ? 0.82 : 1 });
+      ? this.playSample("lightRain", { pan, gain, startAt: Math.random() * 0.8, duration: 1.8, playbackRate: 1.04, fadeIn: 0.16, fadeOut: 0.55 })
+      : this.playSample("windSwoosh", { pan, gain: gain * 1.2, duration: 1.35, playbackRate: kind === "snow" ? 0.82 : 1, fadeIn: 0.12, fadeOut: 0.42 });
     if (played) this.weatherCuesPlayed += 1;
   }
 
@@ -712,17 +717,28 @@ export class UnSoccerAudio {
     const source = ctx.createBufferSource();
     const gain = ctx.createGain();
     const now = ctx.currentTime + (options.delay || 0);
+    const playbackRate = Math.max(0.05, options.playbackRate || 1);
     const maxOffset = Math.max(0, buffer.duration - 0.02);
     const offset = clamp(options.startAt || 0, 0, maxOffset);
     const remaining = Math.max(0.02, buffer.duration - offset);
     const duration = options.duration ? clamp(options.duration, 0.02, remaining) : undefined;
+    const audibleDuration = (duration || remaining) / playbackRate;
+    const targetGain = clamp(options.gain ?? 1, MIN_GAIN, 1.4);
+    const fadeIn = clamp(options.fadeIn ?? Math.min(0.018, audibleDuration * 0.22), 0.002, Math.max(0.002, audibleDuration * 0.45));
+    const fadeOut = clamp(options.fadeOut ?? Math.min(0.065, audibleDuration * 0.38), 0.006, Math.max(0.006, audibleDuration * 0.55));
+    const releaseStart = Math.max(now + fadeIn, now + audibleDuration - fadeOut);
+    const releaseEnd = Math.max(releaseStart + 0.004, now + audibleDuration - 0.004);
 
     source.buffer = buffer;
-    source.playbackRate.value = options.playbackRate || 1;
-    gain.gain.setValueAtTime(clamp(options.gain ?? 1, MIN_GAIN, 1.4), now);
+    source.playbackRate.value = playbackRate;
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setValueAtTime(MIN_GAIN, now);
+    gain.gain.linearRampToValueAtTime(targetGain, now + fadeIn);
+    gain.gain.setValueAtTime(targetGain, releaseStart);
+    gain.gain.linearRampToValueAtTime(MIN_GAIN, releaseEnd);
     source.connect(gain).connect(destination);
-    if (duration) source.start(now, offset, duration);
-    else source.start(now, offset);
+    source.start(now, offset);
+    source.stop(now + audibleDuration + 0.02);
     this.samplePlayedEvents += 1;
     return true;
   }
@@ -736,7 +752,9 @@ export class UnSoccerAudio {
       gain: 0.5 + Math.random() * 0.25,
       playbackRate: 0.94 + Math.random() * 0.12,
       startAt: Math.random() * 1.9,
-      duration: 0.85 + Math.random() * 0.75
+      duration: 0.85 + Math.random() * 0.75,
+      fadeIn: 0.05,
+      fadeOut: 0.22
     })) return;
 
     const notes = 2 + Math.floor(Math.random() * 3);
@@ -766,7 +784,9 @@ export class UnSoccerAudio {
       gain: 0.14 + Math.random() * 0.08,
       playbackRate: 0.9 + Math.random() * 0.12,
       startAt: Math.random() * 2.4,
-      duration: 1.25 + Math.random() * 0.6
+      duration: 1.25 + Math.random() * 0.6,
+      fadeIn: 0.16,
+      fadeOut: 0.48
     })) return;
 
     const oscillator = ctx.createOscillator();

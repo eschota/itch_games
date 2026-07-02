@@ -88,6 +88,34 @@
         pointer-events: auto;
       }
 
+      .ao-control {
+        flex: 1 1 190px;
+        display: grid;
+        grid-template-columns: auto minmax(88px, 1fr) 42px;
+        gap: 8px;
+        align-items: center;
+        min-height: 38px;
+        border: 1px solid rgba(207, 244, 221, 0.18);
+        border-radius: 8px;
+        background: rgba(17, 38, 31, 0.72);
+        padding: 0 10px;
+        box-sizing: border-box;
+        color: rgba(234, 247, 239, 0.82);
+        font-size: 12px;
+      }
+
+      .ao-control input {
+        width: 100%;
+        min-width: 0;
+        accent-color: #83e6ae;
+      }
+
+      .ao-control output {
+        color: #ffffff;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+      }
+
       .mode-row select {
         flex: 1 1 160px;
       }
@@ -159,8 +187,8 @@
         padding: 9px 0;
       }
     </style>
-    <script type="module" crossorigin src="./assets/characterControllerTest-C6kYqSOM.js"></script>
-    <link rel="modulepreload" crossorigin href="./assets/character-controller-CeVibk9h.js">
+    <script type="module" crossorigin src="./assets/characterControllerTest-DvmdavtS.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/character-controller-BQR-AboA.js">
   </head>
   <body>
     <canvas id="character-test-canvas" tabindex="0"></canvas>
@@ -180,6 +208,9 @@
           <span>PBR<strong id="pbr-status">textured</strong></span>
           <span>Vertices<strong id="pbr-vertices">0</strong></span>
           <span>Removed<strong id="pbr-textures">0</strong></span>
+          <span>AO<strong id="pbr-ao">1.00</strong></span>
+          <span>Batch<strong id="pbr-batch-status">idle</strong></span>
+          <span>View<strong id="channel-view-status">rendered</strong></span>
         </div>
         <div class="mode-row">
           <select id="asset-kind-select" aria-label="Asset type">
@@ -187,6 +218,23 @@
             <option value="environment">Environment</option>
           </select>
           <select id="environment-select" aria-label="Environment asset"></select>
+          <select id="channel-view-select" aria-label="Channel view">
+            <option value="rendered">Rendered PBR</option>
+            <option value="color-rgb">RGBA: RGB</option>
+            <option value="color-r">RGBA: R</option>
+            <option value="color-g">RGBA: G</option>
+            <option value="color-b">RGBA: B</option>
+            <option value="color-a">RGBA: A / AO</option>
+            <option value="uv0-rg">UV0: U/V</option>
+            <option value="uv0-u">UV0: U</option>
+            <option value="uv0-v">UV0: V</option>
+            <option value="uv1-rg">UV1: R/M</option>
+            <option value="uv1-u">UV1: roughness</option>
+            <option value="uv1-v">UV1: metalness</option>
+            <option value="uv2-rg">UV2: U/V</option>
+            <option value="uv2-u">UV2: U</option>
+            <option value="uv2-v">UV2: V</option>
+          </select>
         </div>
         <div class="character-row">
           <button class="icon-button" id="btn-prev-character" type="button" aria-label="Previous character">&lt;</button>
@@ -194,7 +242,13 @@
           <button class="icon-button" id="btn-next-character" type="button" aria-label="Next character">&gt;</button>
         </div>
         <div class="converter-row">
+          <label class="ao-control">
+            <span>AO contrast</span>
+            <input id="ao-contrast-input" type="range" min="0.45" max="3" step="0.05" value="1.35" />
+            <output id="ao-contrast-value">1.35</output>
+          </label>
           <button id="btn-convert-pbr" type="button">Convert PBR</button>
+          <button id="btn-batch-convert-pbr" type="button">Prepare All Vertex PBR</button>
           <button id="btn-reload-asset" type="button">Reload Textured</button>
         </div>
         <div class="character-title" id="character-title">loading</div>

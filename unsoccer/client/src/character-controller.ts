@@ -46,6 +46,7 @@ export interface LoadedFree3dCharacter {
 }
 
 export interface CharacterControllerSnapshot {
+  yaw?: number;
   velocity: { x: number; y?: number; z: number };
   airborne: boolean;
   exhausted: boolean;
@@ -117,6 +118,25 @@ function resolveClientAsset(src: string, baseUrl = window.location.href): string
 function easeOutCubic(value: number): number {
   const t = THREE.MathUtils.clamp(value, 0, 1);
   return 1 - Math.pow(1 - t, 3);
+}
+
+function normalizeAngle(value: number): number {
+  return Math.atan2(Math.sin(value), Math.cos(value));
+}
+
+function ragdollMotion(snapshot: CharacterControllerSnapshot): { speed: number; forward: number; side: number } {
+  const speed = Math.hypot(snapshot.velocity.x, snapshot.velocity.z);
+  if (speed < 0.08) {
+    const side = Math.sin((snapshot.ragdollAt || 0) * 0.013) >= 0 ? 1 : -1;
+    return { speed, forward: 0.72, side };
+  }
+  const velocityYaw = Math.atan2(snapshot.velocity.x, snapshot.velocity.z);
+  const localYaw = normalizeAngle(velocityYaw - (snapshot.yaw ?? velocityYaw));
+  return {
+    speed,
+    forward: THREE.MathUtils.clamp(Math.cos(localYaw), -1, 1),
+    side: THREE.MathUtils.clamp(Math.sin(localYaw), -1, 1)
+  };
 }
 
 function prepareCharacterScene(model: THREE.Object3D, asset: Free3dCharacterAsset): THREE.Object3D {
@@ -383,6 +403,7 @@ export class GameCharacterController {
   private nextHandStrikeSide: HandStrikeSide = "right";
   private activeJumpStyle: JumpStyle = "standing";
   private ragdollActive = false;
+  private lastActionSwitchAt = 0;
 
   constructor(readonly loaded: LoadedFree3dCharacter, teamColor = 0xffffff) {
     const model = SkeletonUtils.clone(loaded.scene) as THREE.Object3D;
@@ -413,7 +434,7 @@ export class GameCharacterController {
     const deltaTime = this.lastUpdateTime > 0 ? Math.min(0.05, Math.max(0, time - this.lastUpdateTime)) : 1 / 60;
     this.lastUpdateTime = time;
     const speed = Math.hypot(snapshot.velocity.x, snapshot.velocity.z);
-    const smoothAlpha = 1 - Math.exp(-deltaTime * 9.5);
+    const smoothAlpha = 1 - Math.exp(-deltaTime * 5.8);
     this.smoothedSpeed = THREE.MathUtils.lerp(this.smoothedSpeed, speed, smoothAlpha);
     const actionAge = Math.max(0, Date.now() - snapshot.lastActionAt);
     const celebrationAge = Math.max(0, Date.now() - snapshot.celebrationAt);
@@ -437,9 +458,12 @@ export class GameCharacterController {
     if (ragdoll) {
       const ragdollAge = Math.max(0, Date.now() - (snapshot.ragdollAt || 0));
       const fall = easeOutCubic(THREE.MathUtils.clamp(ragdollAge / 480, 0, 1));
-      const side = Math.sin((snapshot.ragdollAt || 0) * 0.017) >= 0 ? 1 : -1;
+      const motion = ragdollMotion(snapshot);
+      const side = Math.abs(motion.side) > 0.12 ? motion.side : Math.sign(motion.side || 1);
+      const forwardFall = 0.82 + Math.max(0, motion.forward) * 0.34;
+      const backwardCatch = Math.max(0, -motion.forward) * 0.18;
       this.root.position.y = 0.22 - fall * 0.18 + Math.sin(time * 18) * 0.012 * (1 - fall);
-      this.root.rotation.set(-1.18 * fall, 0, side * 0.38 * fall);
+      this.root.rotation.set((-1.08 * forwardFall + backwardCatch) * fall, motion.side * 0.18 * fall, side * 0.5 * fall);
       this.root.scale.set(1 + 0.03 * (1 - fall), 1 - 0.04 * fall, 1 + 0.08 * fall);
     } else {
       this.root.position.y = bob + breath + celebrationPose.hop;
@@ -491,10 +515,10 @@ export class GameCharacterController {
       if (speed > 0.4) next = "walk";
       else next = "idle";
     } else if (next === "run") {
-      if (speed < 4.15) next = speed > 0.32 ? "walk" : "idle";
+      if (speed < 3.85) next = speed > 0.25 ? "walk" : "idle";
     } else if (next === "walk") {
-      if (speed > 5.05) next = "run";
-      else if (speed < 0.28) next = "idle";
+      if (speed > 5.25) next = "run";
+      else if (speed < 0.22) next = "idle";
     } else {
       if (speed > 5.25) next = "run";
       else if (speed > 0.42) next = "walk";
@@ -525,13 +549,18 @@ export class GameCharacterController {
     const previous = this.actions.get(this.activeAction);
     const next = this.actions.get(nextName);
     if (!next) return;
+    const now = Date.now();
+    const nextIsLocomotion = nextName === "idle" || nextName === "walk" || nextName === "run";
+    const currentIsLocomotion = this.activeAction === "idle" || this.activeAction === "walk" || this.activeAction === "run";
+    if (!immediate && nextIsLocomotion && currentIsLocomotion && now - this.lastActionSwitchAt < 160) return;
     const fade = immediate ? 0 : nextName.startsWith("jump") ? 0.06 : 0.16;
     if (previous) previous.fadeOut(fade);
-    next.reset();
+    if (immediate || nextName.startsWith("jump") || !nextIsLocomotion) next.reset();
     next.enabled = true;
     next.fadeIn(fade);
     next.play();
     this.activeAction = nextName;
+    this.lastActionSwitchAt = now;
   }
 
   private syncActionSpeed(actionName: string, speed: number): void {
@@ -595,12 +624,14 @@ export class GameCharacterController {
     const ragdollAge = Math.max(0, Date.now() - (snapshot.ragdollAt || 0));
     const fall = easeOutCubic(THREE.MathUtils.clamp(ragdollAge / 520, 0, 1));
     const settle = THREE.MathUtils.clamp((ragdollAge - 520) / 800, 0, 1);
-    const speed = Math.hypot(snapshot.velocity.x, snapshot.velocity.z);
+    const motion = ragdollMotion(snapshot);
+    const speed = motion.speed;
     const flutter = Math.sin(time * 18 + (snapshot.ragdollAt || 0) * 0.001) * (1 - settle) * THREE.MathUtils.clamp(speed / 8, 0.12, 0.8);
-    const side = Math.sin((snapshot.ragdollAt || 0) * 0.013) >= 0 ? 1 : -1;
+    const side = Math.abs(motion.side) > 0.12 ? motion.side : Math.sin((snapshot.ragdollAt || 0) * 0.013) >= 0 ? 1 : -1;
+    const forward = THREE.MathUtils.clamp(motion.forward, -0.45, 1);
 
-    this.rotateBone("spine1", 0.46, 0.12 * side, 0.18 * side, fall);
-    this.rotateBone("spine2", 0.68, 0.18 * side, 0.22 * side, fall);
+    this.rotateBone("spine1", 0.32 + 0.22 * forward, 0.12 * side, 0.18 * side, fall);
+    this.rotateBone("spine2", 0.52 + 0.26 * forward, 0.18 * side, 0.22 * side, fall);
     this.rotateBone("neck", 0.42, -0.1 * side, 0.12 * side, fall);
     this.rotateBone("head", 0.62, -0.16 * side, 0.18 * side, fall);
     this.rotateBone("leftShoulder", -0.34 + flutter * 0.08, 0, -0.92, fall);

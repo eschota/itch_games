@@ -1,4 +1,4 @@
-export const GAME_VERSION = "v0.0.030";
+export const GAME_VERSION = "v0.0.031";
 export const ROOM_ID = "unsoccer-default-room";
 export const MAX_ACTIVE_PLAYERS = 4;
 export const MAX_ROOM_CLIENTS = 32;
@@ -68,6 +68,7 @@ export const CELEBRATION_DURATION_MS = 2600;
 
 export type TeamId = 0 | 1;
 export type PlayerRole = "player" | "spectator";
+export type PlayerController = "human" | "bot" | "test";
 export type KickKind = "left" | "hand" | "head" | "body" | "jump";
 export type CelebrationKind = "celebrate1" | "celebrate2" | "celebrate3";
 export type WeatherKind = "clear" | "dawn" | "rain" | "snow";
@@ -99,6 +100,7 @@ export interface InputState {
 export interface PlayerSnapshot {
   id: string;
   name: string;
+  controller: PlayerController;
   role: PlayerRole;
   team: TeamId | null;
   index: number;

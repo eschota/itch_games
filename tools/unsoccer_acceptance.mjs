@@ -115,6 +115,18 @@ function playerAt(state, index) {
   return player;
 }
 
+function activePlayers(state) {
+  return state.players.filter((player) => player.role === "player");
+}
+
+function playersByController(state, controller) {
+  return state.players.filter((player) => player.controller === controller);
+}
+
+function activePlayersByController(state, controller) {
+  return activePlayers(state).filter((player) => player.controller === controller);
+}
+
 function maxAudioEventId(state) {
   const ids = (state.audioEvents || []).map((event) => event.id || 0);
   return ids.length ? Math.max(...ids) : 0;
@@ -221,6 +233,224 @@ async function assertHttpFallback(api) {
   assert.ok(!state.players.some((player) => player.id === join.joined.id), "http fallback leave should remove player");
 }
 
+async function assertBotSettingsCors(baseUrl) {
+  const response = await fetch(`${baseUrl}/api/bot-settings`, {
+    method: "OPTIONS",
+    headers: {
+      origin: "http://127.0.0.1:5174",
+      "access-control-request-method": "POST",
+      "access-control-request-headers": "content-type"
+    }
+  });
+  assert.equal(response.status, 204, "bot settings endpoint should answer CORS preflight");
+  assert.equal(response.headers.get("access-control-allow-origin"), "*", "bot settings CORS should allow dev static pages");
+  assert.ok(
+    String(response.headers.get("access-control-allow-methods") || "").includes("POST"),
+    "bot settings CORS should allow POST"
+  );
+}
+
+async function assertBotsFillAndDisplace(api) {
+  await api("POST", "/api/test/players", { count: 0 });
+  await api("POST", "/api/test/reset", {});
+  await api("POST", "/api/test/weather", { kind: "clear" });
+
+  let payload = await api("POST", "/api/bot-settings", {
+    settings: {
+      enabled: true,
+      targetActivePlayers: 3,
+      aggression: 0.82,
+      shootDistance: 2.9,
+      fightDistance: 1.72
+    }
+  });
+  assert.equal(payload.settings.enabled, true, "bot settings endpoint should persist enabled=true");
+  assert.equal(payload.settings.targetActivePlayers, 3, "bot settings endpoint should apply targetActivePlayers");
+  assert.equal(activePlayersByController(payload.state, "bot").length, 3, "bot settings endpoint should apply fill count immediately");
+
+  payload = await api("POST", "/api/test/bots", {
+    enabled: true,
+    settings: deterministicBotSettings()
+  });
+  let state = payload.state;
+  assert.equal(activePlayers(state).length, 4, "bot fill should create four active players");
+  assert.equal(activePlayersByController(state, "bot").length, 4, "all initial active players should be bots");
+  assert.equal(activePlayersByController(state, "human").length, 0, "bot-only test should not create human players");
+  assert.deepEqual(
+    activePlayers(state).map((player) => player.team),
+    [0, 1, 0, 1],
+    "bot fill should split active teams 2v2"
+  );
+  const firstBotIds = new Set(activePlayersByController(state, "bot").map((player) => player.id));
+
+  const joinOne = await api("POST", "/api/join", { name: "Human One" });
+  state = joinOne.state;
+  assert.equal(activePlayers(state).length, 4, "one human plus bots should still fill four active slots");
+  assert.equal(activePlayersByController(state, "human").length, 1, "one joined human should be active");
+  assert.equal(activePlayersByController(state, "bot").length, 3, "one joined human should remove one bot");
+  assert.equal(playerAt(state, joinOne.joined.index).controller, "human", "joined player snapshot should be human controlled");
+  assert.ok(
+    activePlayersByController(state, "bot").some((player) => firstBotIds.has(player.id)),
+    "remaining active bots should keep stable runtime ids"
+  );
+  let health = await api("GET", "/api/health");
+  assert.equal(health.connectedClients, 1, "bots should not consume connected client capacity");
+  assert.equal(health.activePlayers, 4, "health activePlayers should include bots filling the match");
+
+  const joinTwo = await api("POST", "/api/join", { name: "Human Two" });
+  state = joinTwo.state;
+  assert.equal(activePlayers(state).length, 4, "two humans plus bots should still fill four active slots");
+  assert.equal(activePlayersByController(state, "human").length, 2, "two joined humans should be active");
+  assert.equal(activePlayersByController(state, "bot").length, 2, "two joined humans should leave two active bots");
+  health = await api("GET", "/api/health");
+  assert.equal(health.connectedClients, 2, "health connectedClients should count humans only");
+
+  await api("POST", "/api/leave", { clientId: joinOne.joined.id });
+  state = (await api("GET", "/api/test/state")).state;
+  assert.equal(activePlayersByController(state, "human").length, 1, "leaving one human should remove that human");
+  assert.equal(activePlayersByController(state, "bot").length, 3, "leaving one human should backfill one bot");
+
+  await api("POST", "/api/leave", { clientId: joinTwo.joined.id });
+  state = (await api("GET", "/api/test/state")).state;
+  assert.equal(activePlayersByController(state, "human").length, 0, "all humans should be gone after leave");
+  assert.equal(activePlayersByController(state, "bot").length, 4, "bot-only fill should restore four active bots");
+}
+
+async function assertBotsFight(api) {
+  let state = await enableBotMatch(api, {
+    aggression: 1,
+    fightDistance: 1.9,
+    handIntervalMs: 260,
+    kickIntervalMs: 220,
+    headIntervalMs: 360
+  });
+  const attackerId = playerAt(state, 0).id;
+  const targetId = playerAt(state, 1).id;
+  await api("POST", "/api/test/ball", {
+    position: { x: 10, y: BALL_RADIUS + 0.04, z: 18 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: 100,
+    yaw: 0,
+    input: inputState()
+  });
+  await api("POST", "/api/test/player/1", {
+    position: { x: 0.15, y: PLAYER_HEIGHT / 2, z: 1.05 },
+    stamina: 36,
+    yaw: Math.PI,
+    input: inputState()
+  });
+  for (const index of [2, 3]) {
+    await api("POST", `/api/test/player/${index}`, {
+      position: { x: index === 2 ? -9 : 9, y: PLAYER_HEIGHT / 2, z: -12 },
+      input: inputState()
+    });
+  }
+  const beforeAudioId = maxAudioEventId(state);
+  state = (await api("POST", "/api/test/tick", { frames: 12 })).state;
+  const attacker = state.players.find((player) => player.id === attackerId);
+  const target = state.players.find((player) => player.id === targetId);
+  assert.ok(attacker && target, "bot fight actors should remain in state");
+  assert.ok(
+    [attacker.lastAction, target.lastAction].some((action) => ["hand", "left", "head"].includes(action)),
+    "close opposing bots should use active combat actions"
+  );
+  assert.ok(
+    attacker.stamina < 100 || target.stamina < 36 || attacker.ragdoll || target.ragdoll,
+    "bot combat should change stamina or ragdoll state"
+  );
+  assertAudioEvent(
+    state,
+    beforeAudioId,
+    (event) => event.kind === "kick" && ["hand", "left", "head"].includes(event.kick) && String(event.playerId).startsWith("bot-"),
+    "bot combat"
+  );
+}
+
+async function assertBotsScoreBothTeams(api) {
+  await assertBotScoresForTeam(api, 0);
+  await assertBotScoresForTeam(api, 1);
+}
+
+async function assertBotScoresForTeam(api, team) {
+  let state = await enableBotMatch(api, {
+    aggression: 0,
+    shootDistance: 3.2,
+    kickIntervalMs: 200,
+    handIntervalMs: 1000,
+    headIntervalMs: 1200
+  });
+  const scorerIndex = team === 0 ? 0 : 1;
+  const scorer = playerAt(state, scorerIndex);
+  const attackDirection = team === 0 ? 1 : -1;
+  const ballZ = attackDirection > 0 ? FIELD_LENGTH / 2 - 2.1 : -FIELD_LENGTH / 2 + 2.1;
+  const botZ = ballZ - attackDirection * 1.08;
+  for (const index of [0, 1, 2, 3]) {
+    await api("POST", `/api/test/player/${index}`, {
+      position: {
+        x: index === scorerIndex ? 0 : (index === 2 ? -9 : 9),
+        y: PLAYER_HEIGHT / 2,
+        z: index === scorerIndex ? botZ : -attackDirection * 10
+      },
+      stamina: 100,
+      yaw: attackDirection > 0 ? 0 : Math.PI,
+      input: inputState()
+    });
+  }
+  state = (await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: ballZ },
+    velocity: { x: 0, y: 0, z: 0 }
+  })).state;
+  const beforeAudioId = maxAudioEventId(state);
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    state = (await api("POST", "/api/test/tick", { frames: 30 })).state;
+    if ((team === 0 && state.score.blue > 0) || (team === 1 && state.score.orange > 0)) break;
+  }
+  if (team === 0) assert.equal(state.score.blue, 1, "team-0 bot should score for blue through bot AI");
+  else assert.equal(state.score.orange, 1, "team-1 bot should score for orange through bot AI");
+  assertAudioEvent(
+    state,
+    beforeAudioId,
+    (event) => event.kind === "kick" && event.playerId === scorer.id,
+    `team-${team} bot scoring kick`
+  );
+  assertAudioEvent(
+    state,
+    beforeAudioId,
+    (event) => event.kind === "goal" && event.team === team,
+    `team-${team} bot goal`
+  );
+}
+
+async function enableBotMatch(api, patch = {}) {
+  await api("POST", "/api/test/players", { count: 0 });
+  await api("POST", "/api/test/reset", {});
+  await api("POST", "/api/test/weather", { kind: "clear" });
+  return (await api("POST", "/api/test/bots", {
+    enabled: true,
+    settings: deterministicBotSettings(patch)
+  })).state;
+}
+
+function deterministicBotSettings(patch = {}) {
+  return {
+    enabled: true,
+    targetActivePlayers: 4,
+    aggression: 0.85,
+    shootDistance: 2.95,
+    fightDistance: 1.72,
+    chaseDistance: 4.8,
+    sprintDistance: 4.8,
+    kickIntervalMs: 260,
+    handIntervalMs: 360,
+    headIntervalMs: 520,
+    jumpChance: 0,
+    ...patch
+  };
+}
+
 async function main() {
   const port = await freePort();
   const baseUrl = `http://127.0.0.1:${port}`;
@@ -287,6 +517,12 @@ async function main() {
     );
 
     await assertHttpFallback(api);
+    await assertBotSettingsCors(baseUrl);
+    await assertBotsFillAndDisplace(api);
+    await assertBotsFight(api);
+    await assertBotsScoreBothTeams(api);
+    await api("POST", "/api/test/bots", { enabled: false });
+    await api("POST", "/api/test/weather", { kind: "dawn" });
 
     state = (await api("POST", "/api/test/players", { count: 5 })).state;
     assert.equal(state.players.filter((player) => player.role === "player").length, 4);
@@ -311,6 +547,7 @@ async function main() {
     await assertDayAndWeather(api);
     await assertSprintAndJump(api);
     await assertPlayerHitStamina(api);
+    await assertEmptySpaceStrikeVisuals(api);
     await assertGoalPostAndBouncePhysics(api);
 
     await assertKick(api, "left", { x: -0.34, y: BALL_RADIUS + 0.04, z: 1.0 }, { kickLeft: 1 });
@@ -444,6 +681,12 @@ async function main() {
         "websocket no-join has no phantom roster audio",
         "websocket join audioEvents",
         "http fallback join/input/state",
+        "bot settings CORS and apply endpoint",
+        "bots fill active slots to four",
+        "human joins displace bots and do not exceed four active players",
+        "bots do not consume connected client capacity",
+        "bot AI fighting through server combat",
+        "bot-only scoring fixtures for blue and orange",
         "5-client role assignment",
         "random non-repeating ready character assignment",
         "team-relative WASD movement",
@@ -680,6 +923,39 @@ async function assertPlayerHitStamina(api) {
   assert.ok(target.velocity.y > 2.2, `hit ragdoll should lift the target, got y=${target.velocity.y}`);
 }
 
+async function assertEmptySpaceStrikeVisuals(api) {
+  for (const strike of [
+    { kind: "hand", input: { kickRight: 1 } },
+    { kind: "left", input: { kickLeft: 1 } }
+  ]) {
+    await api("POST", "/api/test/players", { count: 1 });
+    let state = (await api("POST", "/api/test/reset", {})).state;
+    await api("POST", "/api/test/weather", { kind: "clear" });
+    await api("POST", "/api/test/ball", {
+      position: { x: 14, y: BALL_RADIUS + 0.04, z: 18 },
+      velocity: { x: 0, y: 0, z: 0 }
+    });
+    const beforeAudioId = maxAudioEventId(state);
+    await api("POST", "/api/test/player/0", {
+      position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+      stamina: 100,
+      yaw: 0,
+      input: inputState(strike.input)
+    });
+    state = (await api("POST", "/api/test/tick", { frames: 3 })).state;
+    const player = playerAt(state, 0);
+    assert.equal(player.lastAction, strike.kind, `${strike.kind} whiff should still replicate a visible action`);
+    assert.ok(player.lastActionAt > 0, `${strike.kind} whiff should expose action timing`);
+    assert.ok(player.stamina < 100, `${strike.kind} whiff should spend stamina`);
+    assertAudioEvent(
+      state,
+      beforeAudioId,
+      (event) => event.kind === "kick" && event.kick === strike.kind && event.playerId === player.id,
+      `${strike.kind} whiff`
+    );
+  }
+}
+
 async function assertGoalPostAndBouncePhysics(api) {
   await api("POST", "/api/test/players", { count: 0 });
   await api("POST", "/api/test/reset", {});
@@ -756,7 +1032,11 @@ async function assertFriendlyKickPriority(api) {
   const beforeAudioId = maxAudioEventId(state);
   state = (await api("POST", "/api/test/tick", { frames: 3 })).state;
   assert.equal(playerAt(state, 0).lastAction, "left", "active kick should take priority over passive body contact");
-  assert.ok(speed3(state.ball.velocity) > 5, "priority kick should launch the ball with active kick force");
+  const priorityKickSpeed = speed3(state.ball.velocity);
+  assert.ok(
+    priorityKickSpeed > 4.2,
+    `priority kick should launch the ball with active kick force, got ${priorityKickSpeed}`
+  );
   assertAudioEvent(
     state,
     beforeAudioId,

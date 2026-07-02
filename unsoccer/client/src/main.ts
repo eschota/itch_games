@@ -624,6 +624,8 @@ const PROFILE_STORAGE_KEY = "unsoccer.profile.v1";
 const BROWSER_FINGERPRINT_STORAGE_KEY = "unsoccer.browserFingerprint.v1";
 const EMOTION_WHEEL_IDLE_MS = 2000;
 const APPLIED_EMOTION_FALLBACK_MS = 4200;
+const APPLIED_EMOTION_LABEL_SCALE = 1.44;
+const APPLIED_EMOTION_LABEL_Y = 3.08;
 
 const players = new Map<string, PlayerVisual>();
 let latestState: ServerState | null = null;
@@ -2665,7 +2667,7 @@ class PlayerVisual {
     this.label.position.y = 2.15;
     this.root.add(this.label);
     this.emotionLabel = makeEmotionLabel("");
-    this.emotionLabel.position.y = 2.68;
+    this.emotionLabel.position.y = APPLIED_EMOTION_LABEL_Y;
     this.emotionLabel.visible = false;
     this.root.add(this.emotionLabel);
     scene.add(this.root);
@@ -3090,19 +3092,19 @@ function makeLabelTexture(name: string): THREE.CanvasTexture {
 
 function makeEmotionTexture(emoji: string): THREE.CanvasTexture {
   const canvasLabel = document.createElement("canvas");
-  canvasLabel.width = 128;
-  canvasLabel.height = 128;
+  canvasLabel.width = 256;
+  canvasLabel.height = 256;
   const context = canvasLabel.getContext("2d");
   if (context) {
     context.fillStyle = "rgba(4, 12, 11, 0.72)";
     context.beginPath();
-    context.arc(64, 64, 54, 0, Math.PI * 2);
+    context.arc(128, 128, 108, 0, Math.PI * 2);
     context.fill();
     context.fillStyle = "#ffffff";
-    context.font = "58px sans-serif";
+    context.font = "116px sans-serif";
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.fillText(emoji || " ", 64, 66);
+    context.fillText(emoji || " ", 128, 132);
   }
   return new THREE.CanvasTexture(canvasLabel);
 }
@@ -3125,7 +3127,7 @@ function makeEmotionLabel(emoji: string) {
   const texture = makeEmotionTexture(emoji);
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
   const sprite = new THREE.Sprite(material);
-  sprite.scale.set(0.72, 0.72, 1);
+  sprite.scale.set(APPLIED_EMOTION_LABEL_SCALE, APPLIED_EMOTION_LABEL_SCALE, 1);
   return sprite;
 }
 

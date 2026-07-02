@@ -1,5 +1,22 @@
 # Changelog
 
+## unsoccer v0.0.030
+
+- Make active ball strikes more user-friendly by giving foot/hand/head actions
+  a player-centered assist reach in addition to the limb contact point.
+- Give active strike inputs priority over passive body contact so the body
+  collider no longer steals the interaction in the same frame as a kick.
+- Add a short LMB/left-foot input buffer so slightly early clicks can still
+  fire when the ball enters assisted reach.
+- Reduce passive body bump range, minimum trigger aggression, and impulse so
+  ordinary running contact nudges the ball without competing with deliberate
+  kicks.
+- Add acceptance coverage for active-strike priority, assisted left-foot reach,
+  and softer body contact speed.
+- Add a local post-commit autodeploy hook script so commits to `main` can run
+  the UnSoccer gate, push to GitHub, and wait for the production webhook
+  release to match deploy-health.
+
 ## unsoccer v0.0.029
 
 - Double normal foot/hand/head ball-hit impulse power so ordinary contacts no

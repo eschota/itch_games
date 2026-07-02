@@ -24,6 +24,7 @@ const POST_GOAL_BALL_RETURN_MS = 1000;
 const WEATHER_CHANGE_MIN_MS = 60_000;
 const WEATHER_CHANGE_MAX_MS = 120_000;
 const KICK_SPEED_MAX = 55;
+const BODY_BUMP_SPEED_MAX = 6;
 const CHARACTER_ROSTER = [
   "6299851",
   "6243756",
@@ -315,6 +316,9 @@ async function main() {
     await assertKick(api, "left", { x: -0.34, y: BALL_RADIUS + 0.04, z: 1.0 }, { kickLeft: 1 });
     await assertKick(api, "hand", { x: 0.34, y: BALL_RADIUS + 0.04, z: 1.0 }, { kickRight: 1 });
     await assertKick(api, "head", { x: 0, y: PLAYER_HEIGHT - BALL_RADIUS * 0.1, z: 0.95 }, { head: 1 });
+    await assertFriendlyKickPriority(api);
+    await assertFriendlyKickAssist(api);
+    await assertLeftKickInputBuffer(api);
     await assertLeftKickCharge(api);
     await assertJumpClearsGroundBall(api);
     await assertHeadRequiresReachableHeight(api);
@@ -334,8 +338,8 @@ async function main() {
     state = (await api("POST", "/api/test/tick", { frames: 12 })).state;
     assert.equal(playerAt(state, 0).lastAction, "body");
     const bodyBallSpeed = speed3(state.ball.velocity);
-    assert.ok(bodyBallSpeed > 0.5, "body contact should move the ball");
-    assert.ok(bodyBallSpeed < KICK_SPEED_MAX, "body contact should not launch the half-size ball too hard");
+    assert.ok(bodyBallSpeed > 0.15, "body contact should softly nudge the ball");
+    assert.ok(bodyBallSpeed < BODY_BUMP_SPEED_MAX, "body contact should not compete with active kicks");
     assertAudioEvent(
       state,
       beforeBodyAudioId,
@@ -453,6 +457,9 @@ async function main() {
         "left kick",
         "hand hit",
         "head hit",
+        "active strike priority over body contact",
+        "friendly left kick assist reach",
+        "left kick input buffer",
         "left kick charge scalar",
         "airborne body clearance",
         "head height gate",
@@ -731,6 +738,81 @@ async function assertKick(api, kind, ballPosition, input) {
     `${kind} kick`
   );
   return ballSpeed;
+}
+
+async function assertFriendlyKickPriority(api) {
+  let state = await prepareSinglePlayer(api);
+  const playerId = playerAt(state, 0).id;
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    velocity: { x: 0, y: 0, z: 4.8 },
+    yaw: 0,
+    input: inputState({ up: true, kickLeft: 1 })
+  });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 0.95 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  const beforeAudioId = maxAudioEventId(state);
+  state = (await api("POST", "/api/test/tick", { frames: 3 })).state;
+  assert.equal(playerAt(state, 0).lastAction, "left", "active kick should take priority over passive body contact");
+  assert.ok(speed3(state.ball.velocity) > 5, "priority kick should launch the ball with active kick force");
+  assertAudioEvent(
+    state,
+    beforeAudioId,
+    (event) => event.kind === "kick" && event.kick === "left" && event.playerId === playerId,
+    "priority left kick"
+  );
+  assert.ok(
+    !newerAudioEvents(state, beforeAudioId).some((event) => event.kind === "kick" && event.kick === "body"),
+    "body contact should not fire in the same frame as an active strike input"
+  );
+}
+
+async function assertFriendlyKickAssist(api) {
+  let state = await prepareSinglePlayer(api);
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    yaw: 0,
+    input: inputState()
+  });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 2.45 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  await api("POST", "/api/test/player/0", {
+    input: inputState({ kickLeft: 1 })
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 3 })).state;
+  assert.equal(playerAt(state, 0).lastAction, "left", "left kick assist should cover a reachable ball in front of the player");
+  assert.ok(speed3(state.ball.velocity) > 5, "left kick assist should still use active kick force");
+}
+
+async function assertLeftKickInputBuffer(api) {
+  let state = await prepareSinglePlayer(api);
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    yaw: 0,
+    input: inputState()
+  });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 3.2 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  await api("POST", "/api/test/player/0", {
+    input: inputState({ kickLeft: 1 })
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 2 })).state;
+  assert.notEqual(playerAt(state, 0).lastAction, "left", "early left kick click should buffer instead of spending a miss");
+
+  await api("POST", "/api/test/player/0", { input: inputState() });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 2.45 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 3 })).state;
+  assert.equal(playerAt(state, 0).lastAction, "left", "buffered left kick should fire when the ball enters assist reach");
+  assert.ok(speed3(state.ball.velocity) > 5, "buffered left kick should use active kick force");
 }
 
 async function measureLeftKickSpeed(api, setupInput, releaseInput, holdFrames = 0) {

@@ -25,7 +25,7 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 
 ## Rules
 
-- Current release: `v0.0.029`.
+- Current release: `v0.0.030`.
 - Keep client and server separated; browser bundles must not import server-only
   modules.
 - The server is authoritative for room assignment, teams, player physics, ball
@@ -214,6 +214,11 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 - `v0.0.029` also widens gameplay camera framing and adds visible sideline
   pennant/bench strips so the dense v0.0.028 courtyard dressing is visible in
   normal play while the playable pitch remains clear.
+- `v0.0.030` makes striking more user-friendly without raising raw kick power:
+  foot/hand/head ball hits have player-centered assist reach, LMB/left-foot
+  clicks buffer for a short contact window, active strike inputs suppress
+  same-frame passive body bump, and body-only ball contact uses a smaller,
+  softer, less frequent nudge.
 - `tools/unsoccer_acceptance.mjs` derives the expected version from
   `package.json.games.unsoccer.version`; keep it that way so version bumps do
   not require multiple acceptance edits.

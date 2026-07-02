@@ -21,6 +21,10 @@ Use this file for work inside `/itch_games/tools`.
 - `unsoccer_acceptance.mjs`: starts an isolated `UNSOCCER_TEST_MODE=1` server
   and verifies authoritative spectator assignment, HTTP fallback join/input/
   state, kick/body contacts, goal reset behavior, and server audioEvents.
+- `hooks/hooks.skill.md`: local git-hook tooling rules.
+- `hooks/unsoccer_post_commit_autodeploy.ps1`: installed from
+  `.git/hooks/post-commit` in this clone to gate, push, and wait for production
+  webhook deploys after commits to `main`.
 
 ## Rules
 
@@ -32,6 +36,8 @@ Use this file for work inside `/itch_games/tools`.
 - Orbital Courier packages include vendored Three.js runtime files so the
   upload remains playable without CDN dependency.
 - Generated output belongs under `dist/` and must not be committed.
+- Git hooks must keep secrets out of the repository and use the existing signed
+  GitHub push webhook rather than local copies of server HMAC credentials.
 - `npm run test:unsoccer:acceptance` must use an isolated test server and must
   stop it before finishing.
 - `unsoccer_acceptance.mjs` derives the expected release from

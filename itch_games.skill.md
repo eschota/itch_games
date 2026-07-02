@@ -18,6 +18,9 @@ Use this file for work inside `/itch_games`.
 
 - `index.html`: shared IO Games catalog for the public domain root.
 - `tools/tools.skill.md`: tooling folder rules.
+- `tools/hooks/hooks.skill.md`: local git-hook tooling rules.
+- `tools/hooks/unsoccer_post_commit_autodeploy.ps1`: post-commit UnSoccer
+  release helper used by the local `.git/hooks/post-commit` wrapper.
 - `tools/package_itch.py`: creates the player-facing upload zip in `dist/`.
 - `tools/unsoccer_acceptance.mjs`: isolated deterministic acceptance gate for
   UnSoccer authoritative server mechanics.
@@ -183,14 +186,17 @@ Use this file for work inside `/itch_games`.
 
 ## Versioning
 
-- Current release: `v0.0.029`.
-- `unsoccer` release: `v0.0.029`.
+- Current release: `v0.0.030`.
+- `unsoccer` release: `v0.0.030`.
 - Game releases start at `v0.0.001` and every behavior change increments the
   version.
 - The visible bottom-left badge, `package.json.gameVersion`, README, and skill
   docs must stay synchronized. Multi-game versions also update
   `package.json.games`.
 - Version bumps are committed, pushed to GitHub, and autodeployed.
+- The local clone may install `.git/hooks/post-commit` as a wrapper around
+  `tools/hooks/unsoccer_post_commit_autodeploy.ps1`; keep the tracked hook
+  script secret-free and routed through GitHub push webhook deployment.
 
 ## Validation
 
@@ -327,3 +333,8 @@ Use this file for work inside `/itch_games`.
     screenshot near a sideline and confirm the courtyard props are visible in
     the normal player camera while pitch markings and goal readability remain
     clear.
+34. For UnSoccer v0.0.030 strike-feel QA, acceptance must prove active
+    left-foot input beats same-frame body contact, left-foot assist reaches a
+    ball just beyond the foot contact point, a short early LMB click buffers
+    until the ball enters reach, and passive body bumps stay under the low body
+    speed ceiling.

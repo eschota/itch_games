@@ -72,6 +72,8 @@
     <child path="orbital-courier/src/main.js" role="game-code" />
     <child path="orbital-courier/src/styles.css" role="game-style" />
     <child path="tools/tools.skill.md" role="tools-folder-skill" />
+    <child path="tools/hooks/hooks.skill.md" role="tools-hooks-folder-skill" />
+    <child path="tools/hooks/unsoccer_post_commit_autodeploy.ps1" role="unsoccer-post-commit-autodeploy-hook" />
     <child path="tools/package_itch.py" role="itch-package-helper" />
     <child path="tools/unsoccer_acceptance.mjs" role="unsoccer-authoritative-acceptance-gate" />
   </skill>
@@ -122,6 +124,9 @@
         <node path="ai_chat/deploy" skill="ai_chat/deploy/deploy.skill.md" role="transport-deploy-references" />
       </node>
       <node path="tools" skill="tools/tools.skill.md">
+        <node path="tools/hooks" skill="tools/hooks/hooks.skill.md">
+          <node path="tools/hooks/unsoccer_post_commit_autodeploy.ps1" role="local-post-commit-autodeploy" />
+        </node>
         <node path="tools/package_itch.py" role="itch-package-helper" />
         <node path="tools/unsoccer_acceptance.mjs" role="unsoccer-authoritative-acceptance-gate" />
       </node>
@@ -241,12 +246,14 @@
     </workspace>
   </roleWorkspaces>
   <tooling workspace="tools" directorySkill="tools/tools.skill.md">
+    <folder path="tools/hooks" skill="tools/hooks/hooks.skill.md" role="local-git-hooks" />
+    <tool path="tools/hooks/unsoccer_post_commit_autodeploy.ps1" role="post-commit-gate-push-webhook-wait" />
     <tool path="tools/package_itch.py" role="player-facing-itch-package" />
     <tool path="tools/unsoccer_acceptance.mjs" role="unsoccer-authoritative-acceptance-gate" />
     <rule>Generated package output belongs under dist/ and is not committed.</rule>
     <rule>Packaging fails if internal skill, role, agent coordination, deploy, or source-control docs leak into the public zip.</rule>
   </tooling>
-  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.029">
+  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.030">
     <client path="unsoccer/client" package="dist/unsoccer-itch.zip" productionPath="/unsoccer/" productionStatic="unsoccer/client/dist" />
     <server path="unsoccer/server" port="8787" health="/api/health" transport="plain-websocket-json" fallback="http-polling" productionApiPath="/unsoccer/api/" productionSocketPath="/unsoccer/socket/" />
     <shared path="unsoccer/shared" />
@@ -292,6 +299,7 @@
     <rule>v0.0.028 extends the residential courtyard through client/src/environment-props.ts with 100+ environment instances, 8 local Free3D GLB environment asset sources, and QA datasets for environment/free3d instance counts.</rule>
     <rule>v0.0.029 doubles ordinary foot/hand/head ball-hit power and adds server-authored LMB left-foot charge from 2x tap power to 4x full power over one second; held charge may fire once on ball contact before release and browser QA exposes data-local-kick-charge.</rule>
     <rule>v0.0.029 widens gameplay camera framing and adds close sideline pennant/bench strips so the dense v0.0.028 courtyard dressing is visible in normal play while the pitch remains clear.</rule>
+    <rule>v0.0.030 makes striking more user-friendly: foot/hand/head ball hits have player-centered assist reach, LMB clicks buffer for a short contact window, active strike inputs suppress same-frame body bump, and body-only ball contact is smaller, softer, and less frequent.</rule>
     <rule>tools/unsoccer_acceptance.mjs derives the expected version from package.json.games.unsoccer.version and checks HTTP fallback join/input/state.</rule>
     <rule>npm run package:unsoccer rebuilds before writing dist/unsoccer-itch.zip so stale dist output cannot become the release package.</rule>
   </game>
@@ -322,7 +330,7 @@
     <rule>Orbital Courier itch upload must include vendored Three.js and must not require cdn.jsdelivr.net at runtime.</rule>
     <rule>External itch.io pages remain incomplete until the public URL, uploaded zip, exact live copy, screenshots, publication date, and version match are recorded under ui_designer/public_pages/.</rule>
   </publicSurfaces>
-  <versioning initial="v0.0.001" current="v0.0.029">
+  <versioning initial="v0.0.001" current="v0.0.030">
     <rule>Every created game starts at v0.0.001.</rule>
     <rule>Every shipped bump increments the version.</rule>
     <rule>The current version is visible in the bottom-left corner.</rule>

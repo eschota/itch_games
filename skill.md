@@ -73,6 +73,9 @@ Use this root skill when changing, packaging, validating, or publishing the
 - Tools: `tools/tools.skill.md`
   - Itch package helper: `tools/package_itch.py`
   - UnSoccer acceptance gate: `tools/unsoccer_acceptance.mjs`
+  - Local git hooks: `tools/hooks/hooks.skill.md`
+    - UnSoccer post-commit autodeploy:
+      `tools/hooks/unsoccer_post_commit_autodeploy.ps1`
 
 ## Rules
 
@@ -101,6 +104,11 @@ Use this root skill when changing, packaging, validating, or publishing the
   for dynamic behavior.
 - Treat GitHub `eschota/itch_games` as the public source repository.
 - Version bumps must be committed, pushed to GitHub, and autodeployed.
+- This local clone installs `.git/hooks/post-commit` as a thin wrapper around
+  `tools/hooks/unsoccer_post_commit_autodeploy.ps1`, so commits to `main` run
+  the UnSoccer acceptance/package gate, push to GitHub, and let the signed
+  GitHub webhook publish production. Use `ITCH_GAMES_POST_COMMIT_AUTODEPLOY=0`
+  or `[skip deploy]` only for intentional local-only commits.
 - Use `art_director_skill.md` for art direction, visual quality, 3D, animation,
   VFX, lighting, rendering, screenshots, trailers, and audio-visual mood work.
 - Put Art Director working artifacts that are not runtime code and not final
@@ -211,8 +219,8 @@ Use this root skill when changing, packaging, validating, or publishing the
 
 ## Current Behavior
 
-- Current game release: `v0.0.029`.
-- `unsoccer` current prototype release: `v0.0.029`.
+- Current game release: `v0.0.030`.
+- `unsoccer` current prototype release: `v0.0.030`.
 - `unsoccer` uses a headless authoritative Node server with Rapier3D physics,
   plain WebSocket transport, and HTTP polling fallback; the itch package is
   static client-only and needs the live game server for multiplayer.
@@ -382,6 +390,10 @@ Use this root skill when changing, packaging, validating, or publishing the
 - `unsoccer` v0.0.029 also widens gameplay camera framing and adds visible
   sideline pennant/bench strips so the dense v0.0.028 courtyard remains visible
   during ordinary play without placing props on the pitch.
+- `unsoccer` v0.0.030 makes deliberate strikes easier to execute: active
+  foot/hand/head hits get player-centered assist reach, LMB clicks buffer for a
+  short ball-contact window, active strike inputs suppress same-frame passive
+  body bump, and body-only ball contact is softer and less frequent.
 - `v0.0.006` adds procedural Web Audio feedback and exposes
   `window.orbitalCourierAudio` plus `orbital-courier:audio-event` so future
   network code can replicate semantic sound events instead of audio files.

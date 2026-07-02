@@ -21,14 +21,17 @@ import {
   FIELD_LENGTH,
   FIELD_WIDTH,
   FOOT_PLAYER_STAMINA_DAMAGE,
+  FOOT_KICK_ASSIST_RANGE,
   FOOT_KICK_STRENGTH,
   GAME_VERSION,
   GOAL_DEPTH,
   GOAL_WIDTH,
   HAND_COOLDOWN_MS,
+  HAND_KICK_ASSIST_RANGE,
   HAND_HIT_STRENGTH,
   HAND_PLAYER_STAMINA_DAMAGE,
   HEAD_PLAYER_STAMINA_DAMAGE,
+  HEAD_KICK_ASSIST_RANGE,
   HEAD_KICK_STRENGTH,
   HEAD_COOLDOWN_MS,
   KICKOFF_COUNTDOWN_MS,
@@ -280,6 +283,8 @@ interface PlayerRuntime {
   leftKickChargeStartedAt: number;
   leftKickChargeHeldMs: number;
   kickLeftHoldConsumed: boolean;
+  leftKickBufferedUntil: number;
+  leftKickBufferedCharge: number;
   lastKickRight: number;
   nextHandSide: -1 | 1;
   lastHead: number;
@@ -337,6 +342,7 @@ const HEAD_CONTACT_HEIGHT_FROM_CENTER = PLAYER_HEIGHT * 0.48;
 const FOOT_CONTACT_VERTICAL_RANGE = BALL_RADIUS + 0.24;
 const HAND_CONTACT_VERTICAL_RANGE = PLAYER_HEIGHT * 0.5;
 const HEAD_CONTACT_VERTICAL_RANGE = BALL_RADIUS + 0.18;
+const LEFT_KICK_INPUT_BUFFER_MS = 180;
 
 const WEATHER_HAZARDS: HazardSnapshot[] = [
   {
@@ -444,6 +450,12 @@ function kickContactVerticalRange(kind: KickKind): number {
   if (kind === "head") return HEAD_CONTACT_VERTICAL_RANGE;
   if (kind === "hand") return HAND_CONTACT_VERTICAL_RANGE;
   return FOOT_CONTACT_VERTICAL_RANGE;
+}
+
+function kickAssistHorizontalRange(kind: KickKind): number {
+  if (kind === "head") return HEAD_KICK_ASSIST_RANGE;
+  if (kind === "hand") return HAND_KICK_ASSIST_RANGE;
+  return FOOT_KICK_ASSIST_RANGE;
 }
 
 function leftKickPowerMultiplier(charge: number): number {
@@ -929,6 +941,8 @@ class UnsoccerServer {
       leftKickChargeStartedAt: -1,
       leftKickChargeHeldMs: 0,
       kickLeftHoldConsumed: false,
+      leftKickBufferedUntil: 0,
+      leftKickBufferedCharge: 0,
       lastKickRight: 0,
       nextHandSide: 1,
       lastHead: 0,
@@ -975,6 +989,8 @@ class UnsoccerServer {
       player.leftKickChargeStartedAt = -1;
       player.leftKickChargeHeldMs = 0;
       player.kickLeftHoldConsumed = false;
+      player.leftKickBufferedUntil = 0;
+      player.leftKickBufferedCharge = 0;
       player.lastKickRight = 0;
       player.lastHead = 0;
       player.lastJump = 0;
@@ -1496,6 +1512,8 @@ class UnsoccerServer {
   private processBodyContact(player: PlayerRuntime, now: number, nextPosition?: Vec3): void {
     if (!player.body) return;
     if (this.goalReset) return;
+    if (this.hasPendingActiveStrike(player, now)) return;
+    if (this.hasRecentActiveStrike(player, now)) return;
     if (now - player.lastBodyAt < BODY_BUMP_COOLDOWN_MS) return;
     const speed = Math.hypot(player.velocity.x, player.velocity.z);
     if (speed < BODY_BUMP_MIN_SPEED) return;
@@ -1513,12 +1531,12 @@ class UnsoccerServer {
     const approachSpeed = player.velocity.x * directionX + player.velocity.z * directionZ;
     if (approachSpeed < BODY_BUMP_MIN_SPEED * 0.62) return;
 
-    const strength = BODY_BUMP_STRENGTH + Math.min(1.1, approachSpeed * 0.12);
+    const strength = BODY_BUMP_STRENGTH + Math.min(0.45, approachSpeed * 0.055);
     this.ballBody.applyImpulse(
       {
-        x: directionX * strength + player.velocity.x * 0.08,
-        y: 0.1,
-        z: directionZ * strength + player.velocity.z * 0.08
+        x: directionX * strength + player.velocity.x * 0.025,
+        y: 0.04,
+        z: directionZ * strength + player.velocity.z * 0.025
       },
       true
     );
@@ -1533,6 +1551,19 @@ class UnsoccerServer {
       speed: Math.max(speed, approachSpeed, this.ballSpeed())
     });
     this.message = `${player.name} \u043f\u0440\u043e\u0434\u0430\u0432\u0438\u043b \u043c\u044f\u0447 \u043a\u043e\u0440\u043f\u0443\u0441\u043e\u043c`;
+  }
+
+  private hasPendingActiveStrike(player: PlayerRuntime, now: number): boolean {
+    return Boolean(player.input.kickLeftHeld)
+      || player.input.kickLeft > player.lastKickLeft
+      || player.input.kickRight > player.lastKickRight
+      || player.input.head > player.lastHead
+      || player.leftKickBufferedUntil >= now;
+  }
+
+  private hasRecentActiveStrike(player: PlayerRuntime, now: number): boolean {
+    return (player.lastAction === "left" || player.lastAction === "hand" || player.lastAction === "head")
+      && now - player.lastActionAt < BODY_BUMP_COOLDOWN_MS;
   }
 
   private processKick(player: PlayerRuntime, now: number, dt: number): void {
@@ -1572,7 +1603,13 @@ class UnsoccerServer {
         return;
       }
       if (!player.kickLeftHoldConsumed) {
-        this.tryKick(player, "left", now, { charge: leftKickCharge });
+        if (this.tryKick(player, "left", now, { charge: leftKickCharge })) {
+          player.leftKickBufferedUntil = 0;
+          player.leftKickBufferedCharge = 0;
+        } else {
+          player.leftKickBufferedUntil = now + LEFT_KICK_INPUT_BUFFER_MS;
+          player.leftKickBufferedCharge = leftKickCharge;
+        }
       }
       player.kickLeftHoldConsumed = false;
     }
@@ -1582,6 +1619,18 @@ class UnsoccerServer {
       player.kickLeftHoldConsumed = false;
     }
     player.lastKickLeftHeld = leftHeld;
+    if (!leftHeld && player.leftKickBufferedUntil >= now) {
+      if (this.tryKick(player, "left", now, {
+        charge: player.leftKickBufferedCharge,
+        requireBallContact: true
+      })) {
+        player.leftKickBufferedUntil = 0;
+        player.leftKickBufferedCharge = 0;
+      }
+    } else if (player.leftKickBufferedUntil > 0 && player.leftKickBufferedUntil < now) {
+      player.leftKickBufferedUntil = 0;
+      player.leftKickBufferedCharge = 0;
+    }
     if (player.input.kickRight > player.lastKickRight) {
       player.lastKickRight = player.input.kickRight;
       if (this.tryCelebration(player, "celebrate2", now)) return;
@@ -1648,9 +1697,23 @@ class UnsoccerServer {
     const dy = ballPosition.y - contact.y;
     const dz = ballPosition.z - contact.z;
     const distance = Math.hypot(dx, dz);
-    const ballInRange = distance <= (kind === "hand" ? KICK_RANGE * 0.82 : KICK_RANGE)
-      && Math.abs(dy) <= kickContactVerticalRange(kind);
+    const playerToBallX = ballPosition.x - playerPosition.x;
+    const playerToBallZ = ballPosition.z - playerPosition.z;
+    const playerToBallDistance = Math.hypot(playerToBallX, playerToBallZ);
+    const playerToBallAlignment = playerToBallDistance > 0.001
+      ? (playerToBallX / playerToBallDistance) * forwardX + (playerToBallZ / playerToBallDistance) * forwardZ
+      : 1;
+    const closeBodyContact = playerToBallDistance <= PLAYER_RADIUS + BALL_RADIUS + 0.42;
+    const verticalInRange = Math.abs(dy) <= kickContactVerticalRange(kind);
+    const preciseInRange = distance <= (kind === "hand" ? KICK_RANGE * 0.82 : KICK_RANGE) && verticalInRange;
+    const assistedInRange = playerToBallDistance <= kickAssistHorizontalRange(kind)
+      && verticalInRange
+      && (closeBodyContact || playerToBallAlignment >= -0.15);
+    const ballInRange = preciseInRange || assistedInRange;
+    const playerHitInRange = !options.requireBallContact
+      && this.canApplyPlayerHit(player, kind, { x: forwardX, z: forwardZ });
     if (options.requireBallContact && !ballInRange) return false;
+    if (!ballInRange && !playerHitInRange) return false;
     if (kind === "head") {
       if (now - player.lastHeadAt < HEAD_COOLDOWN_MS) return false;
       player.lastHeadAt = now;
@@ -1692,7 +1755,7 @@ class UnsoccerServer {
       acted = true;
     }
 
-    acted = this.applyPlayerHit(player, kind, now, { x: forwardX, z: forwardZ }) || acted;
+    acted = (playerHitInRange && this.applyPlayerHit(player, kind, now, { x: forwardX, z: forwardZ })) || acted;
     if (!acted) return false;
     if (kind === "hand") player.nextHandSide = player.nextHandSide === 1 ? -1 : 1;
 
@@ -1762,6 +1825,28 @@ class UnsoccerServer {
       hit = true;
     }
     return hit;
+  }
+
+  private canApplyPlayerHit(
+    attacker: PlayerRuntime,
+    kind: KickKind,
+    forward: { x: number; z: number }
+  ): boolean {
+    if (!attacker.body || kind === "body" || kind === "jump") return false;
+    const origin = attacker.body.translation();
+    const range = kind === "left" ? 1.62 : kind === "hand" ? 1.38 : 1.42;
+    const cone = kind === "hand" ? 0.44 : 0.32;
+    for (const target of this.players.values()) {
+      if (target.id === attacker.id || target.role !== "player" || !target.body) continue;
+      const targetPosition = target.body.translation();
+      const dx = targetPosition.x - origin.x;
+      const dz = targetPosition.z - origin.z;
+      const distance = Math.hypot(dx, dz);
+      if (distance > range || distance < 0.001) continue;
+      const alignment = (dx / distance) * forward.x + (dz / distance) * forward.z;
+      if (alignment >= cone) return true;
+    }
+    return false;
   }
 
   private actionLabel(kind: KickKind): string {

@@ -68,6 +68,9 @@ Use this file for work inside `/itch_games/ai_chat`.
 - Keep `/api/deploy-health` read-only and secret-free. It may expose file
   existence, dist asset names, local health status, and systemd active state for
   deployment diagnosis, but it must not expose environment variables or tokens.
+- Treat any Vite-built `./assets/*.js` or `./assets/*.css` entry in UnSoccer
+  dist HTML as built output; do not couple health readiness to a specific chunk
+  basename such as `index-*`.
 - Keep Telegram bridge credentials protected by the server-only
   `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, and `TELEGRAM_WEBHOOK_SECRET`;
   never commit them.

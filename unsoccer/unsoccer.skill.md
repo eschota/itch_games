@@ -25,7 +25,7 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 
 ## Rules
 
-- Current release: `v0.0.031`.
+- Current release: `v0.0.033`.
 - Keep client and server separated; browser bundles must not import server-only
   modules.
 - The server is authoritative for room assignment, teams, player physics, ball
@@ -232,6 +232,47 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
   fighting, and client character visuals smooth render position/yaw/velocity
   before animation so sideways movement and ragdoll falls do not flicker from
   authoritative jitter.
+- `v0.0.031` environment props replace the previous small procedural dressing
+  with local Free3D environment instances only. `client/src/environment-props.ts`
+  must bake each Free3D template through the textureless Vertex PBR converter
+  before it is added to the scene: `COLOR_0.a` stores AO, `uv1.xy` stores
+  roughness/metalness, and runtime material texture maps must count as zero.
+  Browser QA exposes `data-environment-asset-mode`,
+  `data-environment-small-procedural-props`, `data-free3d-environment-textureless-pbr`,
+  `data-free3d-environment-runtime-texture-count`,
+  `data-free3d-environment-rigid-bodies`, `data-free3d-environment-colliders`,
+  `data-free3d-environment-mass-kg`, `data-free3d-environment-moved-rigid-bodies`,
+  and `data-free3d-environment-impulse-events`. The local prop body layer is
+  client-visual only; server-authoritative shared prop physics remains a later
+  production upgrade.
+- `v0.0.032` moves runtime tuning into `game-settings.json` and the shared
+  `GameSettings`/`GAME_SETTINGS_SCHEMA` contract. The authoritative server
+  exposes `GET/POST /api/game-settings` and `POST /api/game-settings/reload`,
+  sends `ServerState.settings` plus `settingsRevision` to clients, and the
+  static `client/public/game-admin.html` admin page renders schema-driven
+  sliders, number inputs, checkboxes, reset/apply/reload controls, and status
+  metrics; `client/public/game-settings.html` remains the larger legacy admin
+  surface. Any new gameplay, world, bot, audio, camera, lighting, prop, or UI
+  feature that adds a tunable value must add it to `GameSettings`,
+  `DEFAULT_GAME_SETTINGS`, `GAME_SETTINGS_SCHEMA`, `game-settings.json`, and
+  the admin-page contract in the same change.
+- The runtime settings admin is Russian-facing. Keep `GAME_SETTINGS_SCHEMA`
+  1:1 with `DEFAULT_GAME_SETTINGS` and `game-settings.json`, and keep acceptance
+  proving a per-key `/api/game-settings` apply/readback roundtrip.
+- `v0.0.033` adds player communication and personalization as a core rule:
+  mouse wheel opens a local-only 9-emotion wheel above the local player for a
+  2-second idle window, continued wheel motion cycles choices, and any mouse
+  click applies the selected emotion. Applied emotions replicate to all players
+  through `PlayerSnapshot.emotion`.
+- `v0.0.033` adds compact bottom-right in-game chat plus profile controls for
+  nickname, `skinId`/`characterId`, and `userPic`. `Enter` opens chat; repeated
+  `Enter` sends and closes it; chat/profile focus must not leak gameplay input.
+  WebSocket and HTTP fallback must expose the same join/profile/chat/emotion
+  behavior.
+- `v0.0.033` keeps combat body-side aware for character readability: hand
+  punches alternate right/left server-side, LMB foot kicks use the current
+  server-authored trailing foot, and snapshots expose `lastActionSide`,
+  `trailingFoot`, and `stancePhase` for animation and acceptance.
 - The local `client/character-controller-test.html` validation page includes a
   textureless PBR preview converter for characters and Free3D environment
   props. The runtime debug bake stores `COLOR_0.rgba` with ambient occlusion in

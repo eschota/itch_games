@@ -70,6 +70,11 @@ Use this root skill when changing, packaging, validating, or publishing the
   - Deploy references: `ai_chat/deploy/deploy.skill.md`
     - UnSoccer production service:
       `ai_chat/deploy/itch-games-unsoccer-server-qwertystock.service`
+    - Moscow mirror deploy references:
+      `ai_chat/deploy/itch-games-io-games-moscow.conf`,
+      `ai_chat/deploy/itch-games-ai-chat-moscow.service`,
+      `ai_chat/deploy/itch-games-unsoccer-server-moscow.service`,
+      `ai_chat/deploy/itch-games-autodeploy-moscow.sh`
 - Tools: `tools/tools.skill.md`
   - Itch package helper: `tools/package_itch.py`
   - Itch.io publish transport: `tools/itch.skill.md`
@@ -233,8 +238,8 @@ Use this root skill when changing, packaging, validating, or publishing the
 
 ## Current Behavior
 
-- Current game release: `v0.0.031`.
-- `unsoccer` current prototype release: `v0.0.031`.
+- Current game release: `v0.0.033`.
+- `unsoccer` current prototype release: `v0.0.033`.
 - `unsoccer` uses a headless authoritative Node server with Rapier3D physics,
   plain WebSocket transport, and HTTP polling fallback; the itch package is
   static client-only and needs the live game server for multiplayer.
@@ -413,6 +418,30 @@ Use this root skill when changing, packaging, validating, or publishing the
   join/leave, expose `controller` metadata in snapshots, keep bot actors out of
   connected-client capacity, and provide a static `client/public/bot-tuning.html`
   page backed by `/api/bot-settings` for local save/apply tuning.
+- `unsoccer` v0.0.032 uses `unsoccer/game-settings.json` as the runtime tuning
+  source, with `GET/POST /api/game-settings`, `POST /api/game-settings/reload`,
+  `ServerState.settings/settingsRevision`, and static
+  `unsoccer/client/public/game-admin.html` schema-driven admin controls
+  (`game-settings.html` remains the larger legacy surface). Every new UnSoccer
+  feature with tunable gameplay/world/bot/audio/camera/lighting/prop/UI behavior
+  must add the value to `GameSettings`, `DEFAULT_GAME_SETTINGS`,
+  `GAME_SETTINGS_SCHEMA`, `game-settings.json`, and the admin page contract in
+  the same change.
+- `unsoccer` v0.0.033 adds the core personalization/communication layer:
+  mouse-wheel opens a local-only 9-emotion wheel above the local player for a
+  2-second idle window, continued wheel motion cycles the selection, and any
+  mouse click applies the selected emotion. Applied emotions replicate to all
+  clients above that player through `PlayerSnapshot.emotion`.
+- `unsoccer` v0.0.033 adds compact bottom-right in-game chat and profile
+  controls. `Enter` opens chat, repeated `Enter` sends and closes it, chat does
+  not drive gameplay input while focused, and profile updates must cover
+  nickname, `skinId`/`characterId`, and `userPic` across WebSocket and HTTP
+  fallback.
+- `unsoccer` v0.0.033 preserves body-side combat readability: hand punches are
+  server-authoritative alternating right/left strikes, LMB foot kicks use the
+  current server-authored trailing foot, and snapshots expose
+  `lastActionSide`, `trailingFoot`, and `stancePhase` so character animation and
+  acceptance can assert the resolved limb side instead of inferring from input.
 - `v0.0.006` adds procedural Web Audio feedback and exposes
   `window.orbitalCourierAudio` plus `orbital-courier:audio-event` so future
   network code can replicate semantic sound events instead of audio files.
@@ -423,8 +452,10 @@ Use this root skill when changing, packaging, validating, or publishing the
 
 ## Transport
 
-The previous production working copy lives on the Moscow server at
-`/itch_games`. Use SSH alias `freestock-moscow` for rollback validation.
+The Moscow mirror working copy lives on `freestock-moscow:/itch_games` and is
+served independently at `https://moscow-io-games.mecharulez.com/unsoccer/`.
+Its DNS record is managed through Way `qwertystock_domain_api` for
+`mecharulez.com` and points at `5.42.121.207`.
 
 The current migration target is the main Qwertystock production server
 `generic@145.239.0.57:22744`, isolated from the main site at
@@ -436,3 +467,11 @@ On `qwertystock.com`, do not edit or restart the main Qwertystock PM2 apps,
 host must use its own `server_name io-games.mecharulez.com`, its own
 `itch-games-ai-chat.service`, and `ai_chat/server_node.js` because the target
 server's system Python is 3.5.
+
+The Moscow mirror must use its own `server_name
+moscow-io-games.mecharulez.com`, its own `itch-games-ai-chat.service`, and the
+Moscow deploy script installed as
+`/usr/local/bin/itch-games-autodeploy-moscow.sh` from
+`ai_chat/deploy/itch-games-autodeploy-moscow.sh`. Do not reuse Qwertystock
+service paths or secrets across hosts; copy only server-side webhook secrets
+into the target environment when configuring the GitHub webhook.

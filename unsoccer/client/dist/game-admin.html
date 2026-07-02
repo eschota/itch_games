@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UnSoccer Runtime Admin</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #08100e;
+      --panel: #101b18;
+      --panel-2: #14231f;
+      --line: #263b35;
+      --text: #eef6f1;
+      --muted: #91a59d;
+      --accent: #70e0a6;
+      --warn: #ffc65d;
+      --danger: #ff7c78;
+      --ok: #7ce69f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 18px;
+      background: rgba(8, 16, 14, 0.96);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(12px);
+    }
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 720;
+      letter-spacing: 0;
+    }
+    button, input, select {
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #0c1714;
+      color: var(--text);
+      font: inherit;
+    }
+    button {
+      padding: 0 12px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    button.primary {
+      background: #153b2b;
+      border-color: #2d7a54;
+      color: #eafff4;
+    }
+    button.warn {
+      background: #3a2d13;
+      border-color: #8e6623;
+      color: #fff2ca;
+    }
+    button:disabled {
+      opacity: 0.48;
+      cursor: default;
+    }
+    input[type="number"], input[type="text"] {
+      padding: 0 10px;
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+    input[type="checkbox"] {
+      width: 18px;
+      min-height: 18px;
+      accent-color: var(--accent);
+    }
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+    .server {
+      width: min(420px, 42vw);
+    }
+    main {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: 18px;
+      padding: 18px;
+    }
+    aside {
+      position: sticky;
+      top: 68px;
+      align-self: start;
+      display: grid;
+      gap: 10px;
+    }
+    .status, .nav, .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .status {
+      padding: 12px;
+      display: grid;
+      gap: 8px;
+    }
+    .status-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+    }
+    .status-line strong {
+      color: var(--text);
+      font-weight: 720;
+      text-align: right;
+    }
+    .nav {
+      display: grid;
+      padding: 6px;
+      gap: 4px;
+    }
+    .nav button {
+      width: 100%;
+      justify-content: flex-start;
+      text-align: left;
+      background: transparent;
+      border-color: transparent;
+      color: var(--muted);
+    }
+    .nav button.active {
+      background: var(--panel-2);
+      border-color: var(--line);
+      color: var(--text);
+    }
+    .content {
+      display: grid;
+      gap: 14px;
+    }
+    .section {
+      overflow: hidden;
+    }
+    .section h2 {
+      margin: 0;
+      padding: 12px 14px;
+      font-size: 15px;
+      border-bottom: 1px solid var(--line);
+      background: #0c1714;
+    }
+    .setting-row {
+      display: grid;
+      grid-template-columns: minmax(210px, 0.85fr) minmax(240px, 1fr) 110px;
+      gap: 14px;
+      align-items: center;
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(38, 59, 53, 0.72);
+    }
+    .setting-row:last-child { border-bottom: 0; }
+    .setting-title {
+      display: grid;
+      gap: 3px;
+    }
+    .setting-title strong {
+      font-size: 14px;
+      font-weight: 740;
+    }
+    .setting-title span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .restart {
+      color: var(--warn);
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 760;
+      letter-spacing: 0;
+    }
+    .control {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 96px;
+      gap: 10px;
+      align-items: center;
+    }
+    .control.checkbox {
+      grid-template-columns: 24px 1fr;
+    }
+    .value {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    .dirty {
+      color: var(--warn);
+    }
+    .ok {
+      color: var(--ok);
+    }
+    .error {
+      color: var(--danger);
+      white-space: pre-wrap;
+    }
+    @media (max-width: 860px) {
+      header {
+        grid-template-columns: 1fr;
+      }
+      .toolbar {
+        justify-content: stretch;
+      }
+      .server {
+        width: 100%;
+      }
+      main {
+        grid-template-columns: 1fr;
+        padding: 12px;
+      }
+      aside {
+        position: static;
+      }
+      .setting-row {
+        grid-template-columns: 1fr;
+      }
+      .control {
+        grid-template-columns: minmax(0, 1fr) 88px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>UnSoccer Runtime Admin</h1>
+    <div class="toolbar">
+      <input id="serverUrl" class="server" type="text" autocomplete="off">
+      <button id="loadBtn">Load</button>
+      <button id="applyBtn" class="primary" disabled>Apply</button>
+      <button id="resetBtn" class="warn" disabled>Defaults</button>
+      <button id="reloadBtn" disabled>Reload File</button>
+    </div>
+  </header>
+  <main>
+    <aside>
+      <div class="status" id="statusPanel"></div>
+      <div class="nav" id="groupNav"></div>
+    </aside>
+    <section class="content" id="content"></section>
+  </main>
+  <script>
+    const qs = new URLSearchParams(location.search);
+    const serverInput = document.querySelector("#serverUrl");
+    const loadBtn = document.querySelector("#loadBtn");
+    const applyBtn = document.querySelector("#applyBtn");
+    const resetBtn = document.querySelector("#resetBtn");
+    const reloadBtn = document.querySelector("#reloadBtn");
+    const statusPanel = document.querySelector("#statusPanel");
+    const groupNav = document.querySelector("#groupNav");
+    const content = document.querySelector("#content");
+    const STORAGE_KEY = "unsoccer-admin-server-url";
+    const defaultServer = qs.get("server") || localStorage.getItem(STORAGE_KEY) || "http://127.0.0.1:8793";
+    let payload = null;
+    let current = {};
+    let dirty = false;
+    let activeGroup = "";
+
+    serverInput.value = defaultServer;
+
+    function apiUrl(path) {
+      return `${serverInput.value.replace(/\/+$/, "")}/api/${path.replace(/^\/+/, "")}`;
+    }
+
+    async function requestJson(path, options = {}) {
+      const response = await fetch(apiUrl(path), {
+        headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+        ...options
+      });
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText}: ${await response.text()}`);
+      return response.json();
+    }
+
+    function setStatus(message, kind = "") {
+      document.documentElement.dataset.adminStatus = kind || "info";
+      statusPanel.innerHTML = `
+        <div class="status-line"><span>Status</span><strong class="${kind}">${escapeHtml(message)}</strong></div>
+        ${payload ? statusLines() : ""}
+      `;
+    }
+
+    function statusLines() {
+      const state = payload.state || {};
+      const settings = payload.settings || {};
+      const info = payload.info || {};
+      return `
+        <div class="status-line"><span>Version</span><strong>${escapeHtml(payload.version || "unknown")}</strong></div>
+        <div class="status-line"><span>Revision</span><strong>${payload.revision ?? state.settingsRevision ?? 0}</strong></div>
+        <div class="status-line"><span>Players</span><strong>${info.activePlayers ?? 0}/${info.maxActivePlayers ?? settings.maxActivePlayers ?? 0}</strong></div>
+        <div class="status-line"><span>Day Time</span><strong>${formatDay(state.dayTimeSeconds)}</strong></div>
+        <div class="status-line"><span>Weather</span><strong>${escapeHtml(state.weather?.kind || "unknown")}</strong></div>
+        <div class="status-line"><span>Ball</span><strong>${formatVec(state.ball?.position)}</strong></div>
+        <div class="status-line"><span>Source</span><strong>${escapeHtml(payload.source || "api")}</strong></div>
+      `;
+    }
+
+    function formatDay(value) {
+      const seconds = Number(value);
+      if (!Number.isFinite(seconds)) return "--:--";
+      const h = Math.floor(seconds / 3600) % 24;
+      const m = Math.floor(seconds / 60) % 60;
+      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    }
+
+    function formatVec(vec) {
+      if (!vec) return "0, 0, 0";
+      return [vec.x, vec.y, vec.z].map((value) => Number(value || 0).toFixed(1)).join(", ");
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      })[char]);
+    }
+
+    function schemaGroups() {
+      const groups = new Map();
+      for (const item of payload.schema || []) {
+        if (!groups.has(item.group)) groups.set(item.group, []);
+        groups.get(item.group).push(item);
+      }
+      return groups;
+    }
+
+    function render() {
+      if (!payload) return;
+      const groups = schemaGroups();
+      if (!activeGroup || !groups.has(activeGroup)) activeGroup = groups.keys().next().value || "";
+      groupNav.innerHTML = "";
+      for (const [group, items] of groups) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = group === activeGroup ? "active" : "";
+        button.dataset.group = group;
+        button.textContent = `${group} (${items.length})`;
+        button.addEventListener("click", () => {
+          activeGroup = group;
+          render();
+        });
+        groupNav.appendChild(button);
+      }
+      content.innerHTML = "";
+      for (const [group, items] of groups) {
+        if (group !== activeGroup) continue;
+        const section = document.createElement("section");
+        section.className = "section";
+        section.innerHTML = `<h2>${escapeHtml(group)}</h2>`;
+        for (const item of items) section.appendChild(settingRow(item));
+        content.appendChild(section);
+      }
+      applyBtn.disabled = !dirty;
+      resetBtn.disabled = false;
+      reloadBtn.disabled = false;
+      setStatus(dirty ? "Unsaved changes" : "Loaded", dirty ? "dirty" : "ok");
+    }
+
+    function settingRow(item) {
+      const row = document.createElement("div");
+      row.className = "setting-row";
+      row.dataset.settingKey = item.key;
+      const title = document.createElement("div");
+      title.className = "setting-title";
+      title.innerHTML = `
+        <strong>${escapeHtml(item.label || item.key)}</strong>
+        <span>${escapeHtml(item.description || item.key)}</span>
+        ${item.restartPhysics ? '<span class="restart">physics reset</span>' : ""}
+      `;
+      const control = document.createElement("div");
+      control.className = item.input === "checkbox" ? "control checkbox" : "control";
+      const valueCell = document.createElement("div");
+      valueCell.className = "value";
+      const value = current[item.key];
+      if (item.input === "checkbox") {
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.dataset.settingKey = item.key;
+        checkbox.checked = Boolean(value);
+        checkbox.addEventListener("change", () => setValue(item.key, checkbox.checked));
+        control.appendChild(checkbox);
+        const flag = document.createElement("span");
+        flag.textContent = checkbox.checked ? "enabled" : "disabled";
+        control.appendChild(flag);
+        valueCell.textContent = "";
+      } else {
+        const range = document.createElement("input");
+        range.type = item.input === "range" ? "range" : "number";
+        range.dataset.settingKey = item.key;
+        if (item.min !== undefined) range.min = item.min;
+        if (item.max !== undefined) range.max = item.max;
+        if (item.step !== undefined) range.step = item.step;
+        range.value = String(value);
+        const number = document.createElement("input");
+        number.type = "number";
+        number.dataset.settingKey = item.key;
+        if (item.min !== undefined) number.min = item.min;
+        if (item.max !== undefined) number.max = item.max;
+        if (item.step !== undefined) number.step = item.step;
+        number.value = String(value);
+        range.addEventListener("input", () => {
+          number.value = range.value;
+          setValue(item.key, Number(range.value), false);
+        });
+        range.addEventListener("change", () => setValue(item.key, Number(range.value)));
+        number.addEventListener("input", () => {
+          range.value = number.value;
+          setValue(item.key, Number(number.value), false);
+        });
+        number.addEventListener("change", () => setValue(item.key, Number(number.value)));
+        control.appendChild(range);
+        control.appendChild(number);
+        valueCell.textContent = String(value);
+      }
+      row.appendChild(title);
+      row.appendChild(control);
+      row.appendChild(valueCell);
+      return row;
+    }
+
+    function setValue(key, value, rerender = true) {
+      current[key] = value;
+      dirty = true;
+      if (rerender) render();
+      else {
+        applyBtn.disabled = false;
+        setStatus("Unsaved changes", "dirty");
+      }
+    }
+
+    async function loadSettings() {
+      try {
+        setStatus("Loading");
+        localStorage.setItem(STORAGE_KEY, serverInput.value);
+        payload = await requestJson("game-settings");
+        current = { ...(payload.settings || {}) };
+        dirty = false;
+        render();
+      } catch (error) {
+        payload = null;
+        current = {};
+        applyBtn.disabled = true;
+        resetBtn.disabled = true;
+        reloadBtn.disabled = true;
+        statusPanel.innerHTML = `<div class="error">${escapeHtml(error.message || error)}</div>`;
+      }
+    }
+
+    async function applySettings(settings) {
+      setStatus("Applying");
+      payload = await requestJson("game-settings", {
+        method: "POST",
+        body: JSON.stringify({ settings })
+      });
+      current = { ...(payload.settings || {}) };
+      dirty = false;
+      render();
+    }
+
+    loadBtn.addEventListener("click", loadSettings);
+    applyBtn.addEventListener("click", () => applySettings(current).catch((error) => setStatus(error.message || error, "error")));
+    resetBtn.addEventListener("click", () => {
+      if (!payload?.defaults) return;
+      current = { ...payload.defaults };
+      dirty = true;
+      render();
+    });
+    reloadBtn.addEventListener("click", async () => {
+      try {
+        setStatus("Reloading");
+        payload = await requestJson("game-settings/reload", { method: "POST", body: "{}" });
+        current = { ...(payload.settings || {}) };
+        dirty = false;
+        render();
+      } catch (error) {
+        setStatus(error.message || error, "error");
+      }
+    });
+
+    window.unsoccerAdmin = {
+      get payload() { return payload; },
+      get settings() { return current; },
+      apply: () => applySettings(current),
+      set: (key, value) => setValue(key, value)
+    };
+
+    loadSettings();
+  </script>
+</body>
+</html>

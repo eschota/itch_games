@@ -3,9 +3,12 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import {
   BALL_RADIUS,
   CELEBRATION_DURATION_MS,
+  CHARACTER_ROSTER,
   DAY_CYCLE_SECONDS,
   DAY_START_SECONDS,
+  DEFAULT_USER_PICS,
   DEFAULT_INPUT,
+  EMOTION_CHOICES,
   FIELD_LENGTH,
   FIELD_WIDTH,
   GAME_VERSION,
@@ -30,7 +33,9 @@ import {
   type InputState,
   type JoinAccepted,
   type KickKind,
+  type EmotionId,
   type PlayerSnapshot,
+  type PlayerProfileSnapshot,
   type ServerAudioEvent,
   type ServerState,
   type WeatherSnapshot
@@ -41,7 +46,7 @@ import {
   loadFree3dCharacter,
   type CharacterControllerDebugSnapshot
 } from "./character-controller";
-import { installCourtyardEnvironment } from "./environment-props";
+import { installCourtyardEnvironment, type CourtyardEnvironmentRuntime } from "./environment-props";
 import { actionPressed, codeForAction, resolveMovementInput } from "./input-map";
 import {
   bindingConflicts,
@@ -230,6 +235,15 @@ const eventFeedEl = requireElement<HTMLElement>("#event-feed");
 const ballOffscreenIndicatorEl = requireElement<HTMLElement>("#ball-offscreen-indicator");
 const playersOffscreenIndicatorsEl = requireElement<HTMLElement>("#players-offscreen-indicators");
 const controlHintsEl = requireElement<HTMLElement>("#control-hints");
+const emotionWheelEl = requireElement<HTMLElement>("#emotion-wheel");
+const chatPanelEl = requireElement<HTMLElement>("#game-chat");
+const chatLogEl = requireElement<HTMLElement>("#chat-log");
+const chatFormEl = requireElement<HTMLFormElement>("#chat-form");
+const chatInputEl = requireElement<HTMLInputElement>("#chat-input");
+const profileNameInput = requireElement<HTMLInputElement>("#profile-name");
+const profileSkinSelect = requireElement<HTMLSelectElement>("#profile-skin");
+const profilePicInput = requireElement<HTMLInputElement>("#profile-pic");
+const profileAvatarEl = requireElement<HTMLElement>("#profile-avatar");
 const settingsButton = requireElement<HTMLButtonElement>("#settings-button");
 const muteButton = requireElement<HTMLButtonElement>("#mute-button");
 const fullscreenButton = requireElement<HTMLButtonElement>("#fullscreen-button");
@@ -247,7 +261,7 @@ const graphicsStateEl = requireElement<HTMLElement>("#graphics-state");
 const networkStateEl = requireElement<HTMLElement>("#network-state");
 const testSoundButton = requireElement<HTMLButtonElement>("#test-sound-button");
 const versionBadge = requireElement<HTMLElement>("#version-badge");
-const ART_PASS_VERSION = "v0.0.031";
+const ART_PASS_VERSION = "v0.0.033";
 const BUILD_WEIGHT_LABEL = "83.79 MB";
 const DAWN_START_SECONDS = 3 * 60 * 60;
 const DAYLIGHT_START_SECONDS = 5 * 60 * 60;
@@ -492,6 +506,7 @@ const BALL_VARIANT_COLORS = [
 
 const fieldGroup = new THREE.Group();
 scene.add(fieldGroup);
+let courtyardEnvironmentRuntime: CourtyardEnvironmentRuntime | null = null;
 const movingCars: MovingCar[] = [];
 const goalNets: GoalNetVisual[] = [];
 const sidelineBalls: THREE.Group[] = [];
@@ -603,6 +618,13 @@ const CELEBRATION_TELEGRAPH: Record<CelebrationKind, {
   }
 };
 
+type LocalPlayerProfile = PlayerProfileSnapshot;
+
+const PROFILE_STORAGE_KEY = "unsoccer.profile.v1";
+const BROWSER_FINGERPRINT_STORAGE_KEY = "unsoccer.browserFingerprint.v1";
+const EMOTION_WHEEL_IDLE_MS = 2000;
+const APPLIED_EMOTION_FALLBACK_MS = 4200;
+
 const players = new Map<string, PlayerVisual>();
 let latestState: ServerState | null = null;
 let renderedState: ServerState | null = null;
@@ -660,6 +682,12 @@ let activeSettingsTab: SettingsTab = "controls";
 let settingsOpen = false;
 let pendingRebindAction: InputAction | null = null;
 let latestSnapshotReceivedAt = 0;
+let localProfile: LocalPlayerProfile = loadLocalProfile();
+const localBrowserFingerprint = loadBrowserFingerprint();
+let profileSendTimer = 0;
+let emotionWheelOpen = false;
+let emotionWheelSelectedIndex = 0;
+let emotionWheelCloseTimer = 0;
 const pressedCodes = new Set<string>();
 const eventFeedMessages: string[] = [];
 
@@ -669,6 +697,282 @@ function inputEl(selector: string): HTMLInputElement {
 
 function selectEl(selector: string): HTMLSelectElement {
   return requireElement<HTMLSelectElement>(selector);
+}
+
+function rosterSkinFallback(): string {
+  return CHARACTER_ROSTER[0] || "6299851";
+}
+
+function defaultUserPic(): string {
+  return DEFAULT_USER_PICS[Math.floor(Math.random() * DEFAULT_USER_PICS.length)] || DEFAULT_USER_PICS[0] || "⚽";
+}
+
+function sanitizeLocalName(value: string): string {
+  const clean = value.replace(/[^\p{L}\p{N}_ .-]/gu, "").trim().slice(0, 18);
+  return clean || `\u0418\u0433\u0440\u043e\u043a ${Math.floor(Math.random() * 90 + 10)}`;
+}
+
+function sanitizeLocalUserPic(value: string): string {
+  const clean = value.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 96);
+  return clean || defaultUserPic();
+}
+
+function sanitizeLocalSkin(value: string): string {
+  return (CHARACTER_ROSTER as readonly string[]).includes(value) ? value : rosterSkinFallback();
+}
+
+function randomFingerprintSeed(): string {
+  const bytes = new Uint8Array(16);
+  globalThis.crypto?.getRandomValues?.(bytes);
+  if (bytes.some((byte) => byte !== 0)) {
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 18)}`;
+}
+
+function fingerprintHash(value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36).padStart(7, "0");
+}
+
+function browserFingerprintFacts(): string {
+  const nav = navigator;
+  const screenInfo = typeof screen === "undefined"
+    ? "noscreen"
+    : `${screen.width}x${screen.height}x${screen.colorDepth}:${devicePixelRatio.toFixed(2)}`;
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "tz";
+  return [
+    nav.userAgent,
+    nav.language,
+    nav.platform,
+    String(nav.hardwareConcurrency || 0),
+    String((nav as Navigator & { deviceMemory?: number }).deviceMemory || 0),
+    screenInfo,
+    timezone
+  ].join("|");
+}
+
+function loadBrowserFingerprint(): string {
+  const facts = browserFingerprintFacts();
+  try {
+    let seed = localStorage.getItem(BROWSER_FINGERPRINT_STORAGE_KEY) || "";
+    if (!/^[a-z0-9]{16,64}$/i.test(seed)) {
+      seed = randomFingerprintSeed();
+      localStorage.setItem(BROWSER_FINGERPRINT_STORAGE_KEY, seed);
+    }
+    return `ufp:${fingerprintHash(`${seed}|${facts}`)}:${seed.slice(0, 16)}`;
+  } catch (_) {
+    return `ufp:${fingerprintHash(facts)}:volatile`;
+  }
+}
+
+function loadLocalProfile(): LocalPlayerProfile {
+  const query = new URLSearchParams(location.search);
+  const fallback: LocalPlayerProfile = {
+    nickname: sanitizeLocalName(query.get("name") || ""),
+    skinId: sanitizeLocalSkin(query.get("skin") || query.get("skinId") || ""),
+    userPic: sanitizeLocalUserPic(query.get("user_pic") || query.get("userPic") || "")
+  };
+  try {
+    const stored = JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY) || "null") as Partial<LocalPlayerProfile> | null;
+    if (!stored) return fallback;
+    return {
+      nickname: sanitizeLocalName(query.get("name") || stored.nickname || fallback.nickname),
+      skinId: sanitizeLocalSkin(query.get("skin") || query.get("skinId") || stored.skinId || fallback.skinId),
+      userPic: sanitizeLocalUserPic(query.get("user_pic") || query.get("userPic") || stored.userPic || fallback.userPic)
+    };
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function saveLocalProfile(): void {
+  localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(localProfile));
+}
+
+function skinLabel(id: string, index: number): string {
+  return `Skin ${index + 1} · ${id.slice(0, 8)}`;
+}
+
+function syncProfileUi(): void {
+  profileNameInput.value = localProfile.nickname;
+  profileSkinSelect.value = localProfile.skinId;
+  profilePicInput.value = localProfile.userPic;
+  profileAvatarEl.textContent = isImageUserPic(localProfile.userPic) ? "" : localProfile.userPic;
+  profileAvatarEl.style.backgroundImage = isImageUserPic(localProfile.userPic) ? `url("${cssUrl(localProfile.userPic)}")` : "";
+  document.documentElement.dataset.localProfileName = localProfile.nickname;
+  document.documentElement.dataset.localProfileSkin = localProfile.skinId;
+  document.documentElement.dataset.localUserPic = localProfile.userPic;
+  document.documentElement.dataset.localFingerprint = localBrowserFingerprint;
+}
+
+function readProfileUi(): boolean {
+  const next: LocalPlayerProfile = {
+    nickname: sanitizeLocalName(profileNameInput.value),
+    skinId: sanitizeLocalSkin(profileSkinSelect.value),
+    userPic: sanitizeLocalUserPic(profilePicInput.value)
+  };
+  const changed = next.nickname !== localProfile.nickname || next.skinId !== localProfile.skinId || next.userPic !== localProfile.userPic;
+  localProfile = next;
+  saveLocalProfile();
+  syncProfileUi();
+  return changed;
+}
+
+function profilePayload(): LocalPlayerProfile {
+  return { ...localProfile };
+}
+
+function joinRequestPayload(name = localProfile.nickname) {
+  return {
+    name,
+    clientFingerprint: localBrowserFingerprint,
+    profile: profilePayload()
+  };
+}
+
+function isImageUserPic(value: string): boolean {
+  return /^https?:\/\//i.test(value);
+}
+
+function cssUrl(value: string): string {
+  return value.replace(/["\\\n\r]/g, "");
+}
+
+function renderUserPicMarkup(value: string, className = "chat-avatar"): string {
+  if (isImageUserPic(value)) return `<span class="${className} image" style="background-image:url('${escapeHtml(cssUrl(value))}')"></span>`;
+  return `<span class="${className}">${escapeHtml(value || "⚽")}</span>`;
+}
+
+function initializeProfileControls(): void {
+  profileSkinSelect.innerHTML = CHARACTER_ROSTER
+    .map((id, index) => `<option value="${escapeHtml(id)}">${escapeHtml(skinLabel(id, index))}</option>`)
+    .join("");
+  syncProfileUi();
+  renderEmotionWheel();
+  updateChatUi(latestState);
+}
+
+function scheduleProfileSend(): void {
+  window.clearTimeout(profileSendTimer);
+  profileSendTimer = window.setTimeout(() => sendProfileUpdate(), 240);
+}
+
+function selectedEmotionId(): EmotionId {
+  return EMOTION_CHOICES[emotionWheelSelectedIndex]?.id || EMOTION_CHOICES[0]?.id || "angry";
+}
+
+function renderEmotionWheel(): void {
+  emotionWheelEl.innerHTML = EMOTION_CHOICES.map((choice, index) => {
+    const selected = index === emotionWheelSelectedIndex ? " selected" : "";
+    const angle = (index / EMOTION_CHOICES.length) * 360 - 90;
+    return (
+      `<button type="button" class="emotion-choice${selected}" data-emotion="${escapeHtml(choice.id)}" ` +
+      `style="--emotion-angle:${angle}deg" title="${escapeHtml(choice.label)}" aria-label="${escapeHtml(choice.label)}">` +
+      `${escapeHtml(choice.emoji)}</button>`
+    );
+  }).join("");
+  emotionWheelEl.dataset.selectedEmotion = selectedEmotionId();
+  document.documentElement.dataset.emotionWheelSelected = selectedEmotionId();
+}
+
+function openOrCycleEmotionWheel(deltaY: number): void {
+  if (settingsOpen || isTextInputActive()) return;
+  const direction = deltaY > 0 ? 1 : -1;
+  if (emotionWheelOpen) {
+    emotionWheelSelectedIndex = (emotionWheelSelectedIndex + direction + EMOTION_CHOICES.length) % EMOTION_CHOICES.length;
+  }
+  emotionWheelOpen = true;
+  renderEmotionWheel();
+  positionEmotionWheel();
+  emotionWheelEl.hidden = false;
+  emotionWheelEl.dataset.open = "true";
+  document.documentElement.dataset.emotionWheelOpen = "true";
+  window.clearTimeout(emotionWheelCloseTimer);
+  emotionWheelCloseTimer = window.setTimeout(closeEmotionWheel, EMOTION_WHEEL_IDLE_MS);
+}
+
+function closeEmotionWheel(): void {
+  emotionWheelOpen = false;
+  emotionWheelEl.hidden = true;
+  emotionWheelEl.dataset.open = "false";
+  document.documentElement.dataset.emotionWheelOpen = "false";
+}
+
+function applySelectedEmotion(): void {
+  if (!emotionWheelOpen) return;
+  const id = selectedEmotionId();
+  closeEmotionWheel();
+  sendEmotion(id);
+  document.documentElement.dataset.lastEmotionApplied = id;
+}
+
+function positionEmotionWheel(): void {
+  if (!emotionWheelOpen) return;
+  const state = renderedState ?? latestState;
+  const localPlayer = localJoin && state
+    ? state.players.find((player) => player.id === localJoin?.id && player.role === "player")
+    : null;
+  if (!localPlayer) {
+    emotionWheelEl.style.left = "50%";
+    emotionWheelEl.style.top = "44%";
+    return;
+  }
+  const projected = new THREE.Vector3(localPlayer.position.x, localPlayer.position.y + 1.58, localPlayer.position.z);
+  projected.project(camera);
+  const x = (projected.x * 0.5 + 0.5) * window.innerWidth;
+  const y = (-projected.y * 0.5 + 0.5) * window.innerHeight;
+  emotionWheelEl.style.left = `${Math.round(THREE.MathUtils.clamp(x, 88, window.innerWidth - 88))}px`;
+  emotionWheelEl.style.top = `${Math.round(THREE.MathUtils.clamp(y, 88, window.innerHeight - 150))}px`;
+}
+
+function isTextInputActive(): boolean {
+  const active = document.activeElement;
+  return active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement;
+}
+
+function isChatFocused(): boolean {
+  return chatPanelEl.contains(document.activeElement);
+}
+
+function openChat(): void {
+  chatPanelEl.classList.add("active");
+  chatInputEl.focus();
+  chatInputEl.select();
+  pressedCodes.clear();
+  updateResolvedInput();
+  sendInput(true);
+  document.documentElement.dataset.chatActive = "true";
+}
+
+function closeChat(): void {
+  chatInputEl.blur();
+  chatPanelEl.classList.remove("active");
+  document.documentElement.dataset.chatActive = "false";
+}
+
+function submitChat(): void {
+  const text = chatInputEl.value.trim();
+  if (text) sendChatMessage(text);
+  chatInputEl.value = "";
+  closeChat();
+}
+
+function updateChatUi(state: ServerState | null): void {
+  const messages = state?.chatMessages || [];
+  chatLogEl.innerHTML = messages.slice(-6).map((message) => (
+    `<div class="chat-line" data-player-id="${escapeHtml(message.playerId)}">` +
+    `${renderUserPicMarkup(message.userPic)}` +
+    `<span><strong>${escapeHtml(message.name)}</strong>${escapeHtml(message.text)}</span>` +
+    `</div>`
+  )).join("");
+  chatPanelEl.dataset.messages = String(messages.length);
+  chatPanelEl.dataset.transport = transportMode;
+  document.documentElement.dataset.chatMessages = String(messages.length);
 }
 
 function readQaDayCycleSeconds(): number | null {
@@ -1010,16 +1314,18 @@ function updateStaminaHud(player: PlayerSnapshot | null): void {
     return;
   }
 
-  const stamina = THREE.MathUtils.clamp(player.stamina, 0, PLAYER_STAMINA_MAX);
-  const staminaPercent = Math.round(stamina / PLAYER_STAMINA_MAX * 100);
-  const state = staminaUiState(player, staminaPercent);
-  staminaMeterEl.dataset.state = state;
+  const serverState = renderedState ?? latestState;
+  const maxStamina = Math.max(1, serverState?.settings?.playerStaminaMax ?? PLAYER_STAMINA_MAX);
+  const stamina = THREE.MathUtils.clamp(player.stamina, 0, maxStamina);
+  const staminaPercent = Math.round(stamina / maxStamina * 100);
+  const uiState = staminaUiState(player, staminaPercent);
+  staminaMeterEl.dataset.state = uiState;
   staminaMeterEl.setAttribute("aria-valuenow", String(staminaPercent));
   staminaFillEl.style.setProperty("--stamina-pct", `${staminaPercent}%`);
   staminaValueEl.textContent = `${staminaPercent}%`;
-  staminaStateEl.textContent = staminaUiLabel(state);
+  staminaStateEl.textContent = staminaUiLabel(uiState);
   document.documentElement.dataset.localStamina = String(staminaPercent);
-  document.documentElement.dataset.localStaminaState = state;
+  document.documentElement.dataset.localStaminaState = uiState;
   document.documentElement.dataset.localStaminaSprinting = String(player.sprinting);
   document.documentElement.dataset.localStaminaExhausted = String(player.exhausted);
 }
@@ -1773,16 +2079,6 @@ function addStadiumFrame(root: THREE.Group) {
     addApartmentBlock(root, x, z, width, height, depth, color, side);
   }
 
-  for (const [x, z, rotation, color] of [
-    [-FIELD_WIDTH / 2 - 5.3, -10.5, 0.08, 0xb9473f],
-    [-FIELD_WIDTH / 2 - 5.1, -4.4, -0.08, 0x416a91],
-    [-FIELD_WIDTH / 2 - 5.4, 5.2, 0.12, 0xd0b055],
-    [FIELD_WIDTH / 2 + 5.2, -7.2, Math.PI + 0.04, 0x8b8f98],
-    [FIELD_WIDTH / 2 + 5.4, 2.2, Math.PI - 0.1, 0x3d6f52]
-  ] as Array<[number, number, number, number]>) {
-    addParkedCar(root, x, z, rotation, color);
-  }
-
   for (const [x, z, scale] of [
     [-FIELD_WIDTH / 2 - 3.4, -FIELD_LENGTH / 2 - 5.4, 1.05],
     [-FIELD_WIDTH / 2 - 4.0, FIELD_LENGTH / 2 + 5.8, 0.92],
@@ -1794,23 +2090,11 @@ function addStadiumFrame(root: THREE.Group) {
     addCourtyardTree(root, x, z, scale);
   }
 
-  for (const [x, z, rotation] of [
-    [-6.8, -FIELD_LENGTH / 2 - 3.6, 0],
-    [6.8, FIELD_LENGTH / 2 + 3.6, Math.PI],
-    [-FIELD_WIDTH / 2 - 3.1, 9.2, Math.PI / 2],
-    [FIELD_WIDTH / 2 + 3.1, -9.2, -Math.PI / 2]
-  ] as Array<[number, number, number]>) {
-    addBench(root, x, z, rotation);
-  }
-
   addCourtyardPavementMarks(root);
-  addPlayground(root, -FIELD_WIDTH / 2 - 6.6, 10.4, Math.PI / 2);
-  addServiceKiosk(root, FIELD_WIDTH / 2 + 6.7, 9.6, -Math.PI / 2);
-  addClothesline(root, -8.8, FIELD_LENGTH / 2 + 4.9, 0);
-  addClothesline(root, 8.6, -FIELD_LENGTH / 2 - 4.9, Math.PI);
-  installCourtyardEnvironment({ root, resolveClientAsset });
+  courtyardEnvironmentRuntime = installCourtyardEnvironment({ root, resolveClientAsset });
   document.documentElement.dataset.environmentModels =
-    "apartments,cars,trees,benches,playground,kiosk,clotheslines,pavement,outer-roads,dense-courtyard-props,free3d-instanced-props,floodlight-masts";
+    "apartments,trees,pavement,outer-roads,free3d-textureless-instanced-props,local-prop-rigidbodies,floodlight-masts";
+  document.documentElement.dataset.environmentPrimitiveSmallPropsRemoved = "parked-cars,benches,playground,kiosk,clotheslines,dense-procedural-dressing";
   addFloodlightMasts(root);
 }
 
@@ -2192,6 +2476,7 @@ class PlayerVisual {
   private readonly shadow: THREE.Mesh;
   private readonly shadowMaterial: THREE.MeshBasicMaterial;
   private readonly label: THREE.Sprite;
+  private readonly emotionLabel: THREE.Sprite;
   private readonly teamHalo: THREE.Mesh;
   private readonly teamHaloMaterial: THREE.MeshBasicMaterial;
   private readonly ring: THREE.Mesh;
@@ -2210,6 +2495,9 @@ class PlayerVisual {
   private lastVisualCelebrationSeenAt = 0;
   private visualHandStrikeSide: "left" | "right" = "right";
   private nextVisualHandStrikeSide: "left" | "right" = "right";
+  private labelKey = "";
+  private emotionKey = "";
+  private readonly currentCharacterId: string;
   private characterController: GameCharacterController | null = null;
   private characterDebug: CharacterControllerDebugSnapshot | null = null;
   private readonly renderPosition = new THREE.Vector3();
@@ -2219,6 +2507,7 @@ class PlayerVisual {
   private lastRenderUpdateTime = 0;
 
   constructor(private readonly snapshot: PlayerSnapshot) {
+    this.currentCharacterId = snapshot.characterId;
     const color = teamColor(snapshot.team);
     const variant = snapshot.index % 4;
     const bodyMaterial = new THREE.MeshStandardMaterial({ color, roughness: 0.42, metalness: 0.05 });
@@ -2372,12 +2661,20 @@ class PlayerVisual {
     this.celebrationBurst.visible = false;
     this.root.add(this.celebrationBurst);
 
-    this.label = makeLabel(snapshot.name);
+    this.label = makeLabel(playerLabelText(snapshot));
     this.label.position.y = 2.15;
     this.root.add(this.label);
+    this.emotionLabel = makeEmotionLabel("");
+    this.emotionLabel.position.y = 2.68;
+    this.emotionLabel.visible = false;
+    this.root.add(this.emotionLabel);
     scene.add(this.root);
     void this.attachCharacterModel();
     this.update(snapshot, 0);
+  }
+
+  matchesCharacter(characterId: string): boolean {
+    return this.currentCharacterId === characterId;
   }
 
   private async attachCharacterModel(): Promise<void> {
@@ -2446,6 +2743,8 @@ class PlayerVisual {
 
   update(snapshot: PlayerSnapshot, time: number) {
     snapshot = this.smoothedSnapshot(snapshot, time);
+    this.updateLabel(snapshot);
+    this.updateEmotion(snapshot);
     this.root.position.set(snapshot.position.x, snapshot.position.y - PLAYER_HEIGHT / 2, snapshot.position.z);
     this.root.rotation.y = snapshot.yaw;
     this.root.visible = snapshot.role === "player";
@@ -2459,8 +2758,8 @@ class PlayerVisual {
       this.lastVisualActionAt = snapshot.lastActionAt;
       this.lastVisualActionSeenAt = performance.now();
       if (snapshot.lastAction === "hand") {
-        this.visualHandStrikeSide = this.nextVisualHandStrikeSide;
-        this.nextVisualHandStrikeSide = this.nextVisualHandStrikeSide === "right" ? "left" : "right";
+        this.visualHandStrikeSide = snapshot.lastActionSide || this.nextVisualHandStrikeSide;
+        this.nextVisualHandStrikeSide = this.visualHandStrikeSide === "right" ? "left" : "right";
         handStrikeUntilByPlayerId.set(snapshot.id, performance.now() + LOCAL_HAND_STRIKE_DURATION_MS);
       }
     }
@@ -2497,6 +2796,8 @@ class PlayerVisual {
       document.documentElement.dataset.playerRigStrike = this.characterDebug.strike;
       document.documentElement.dataset.playerRigStrikePulse = this.characterDebug.strikePulse.toFixed(2);
       document.documentElement.dataset.playerRigStrikeSide = this.characterDebug.strikeSide;
+      document.documentElement.dataset.playerRigTrailingFoot = snapshot.trailingFoot;
+      document.documentElement.dataset.playerRigLastActionSide = snapshot.lastActionSide || "none";
       document.documentElement.dataset.playerRigCelebration = this.characterDebug.celebration;
       document.documentElement.dataset.playerRigCelebrationPulse = this.characterDebug.celebrationPulse.toFixed(2);
       document.documentElement.dataset.playerRigJumpStyle = this.characterDebug.jumpStyle;
@@ -2610,12 +2911,17 @@ class PlayerVisual {
         this.leftArm.rotation.set(-0.24, 0, -0.22);
       }
     } else if (snapshot.lastAction === "left") {
-      this.leftLeg.rotation.x = -1.18 * kickArc;
-      this.leftLeg.rotation.z = -0.1 * kickArc;
-      this.leftFoot.position.set(-0.2, 0.15, 0.48 + 0.48 * kickArc);
-      this.leftFoot.rotation.x = -0.52 * kickArc;
-      this.rightArm.rotation.x = -0.65 * kickArc;
-      this.contactFlash.position.set(-0.2, 0.36, 0.76);
+      const rightFootStrike = snapshot.lastActionSide === "right";
+      const strikeLeg = rightFootStrike ? this.rightLeg : this.leftLeg;
+      const strikeFoot = rightFootStrike ? this.rightFoot : this.leftFoot;
+      const counterArm = rightFootStrike ? this.leftArm : this.rightArm;
+      const side = rightFootStrike ? 1 : -1;
+      strikeLeg.rotation.x = -1.18 * kickArc;
+      strikeLeg.rotation.z = -0.1 * side * kickArc;
+      strikeFoot.position.set(0.2 * side, 0.15, 0.48 + 0.48 * kickArc);
+      strikeFoot.rotation.x = -0.52 * kickArc;
+      counterArm.rotation.x = -0.65 * kickArc;
+      this.contactFlash.position.set(0.2 * side, 0.36, 0.76);
     } else if (snapshot.lastAction === "hand" || handPulse > 0) {
       const serverHandPulse = snapshot.lastAction === "hand" ? actionPulse : 0;
       const previewHandSide = snapshot.id === localJoin?.id && trackedHandPulse > serverHandPulse
@@ -2690,6 +2996,8 @@ class PlayerVisual {
     if (snapshot.id === localJoin?.id) {
       document.documentElement.dataset.localHandStrikeVisible = String(this.handStrike.visible);
       document.documentElement.dataset.localHandStrikeSide = trackedHandPulse > 0 ? localHandStrikeSide : this.visualHandStrikeSide;
+      document.documentElement.dataset.localTrailingFoot = snapshot.trailingFoot;
+      document.documentElement.dataset.localLastActionSide = snapshot.lastActionSide || "none";
       document.documentElement.dataset.localPlayerRagdoll = String(snapshot.ragdoll);
       document.documentElement.dataset.localPlayerRagdollAt = String(snapshot.ragdollAt || 0);
     }
@@ -2718,8 +3026,36 @@ class PlayerVisual {
     }
   }
 
+  private updateLabel(snapshot: PlayerSnapshot): void {
+    const key = playerLabelText(snapshot);
+    if (key === this.labelKey) return;
+    this.labelKey = key;
+    replaceSpriteTexture(this.label, makeLabelTexture(key));
+  }
+
+  private updateEmotion(snapshot: PlayerSnapshot): void {
+    const emotion = snapshot.emotion;
+    const key = emotion ? `${emotion.id}:${emotion.appliedAt}` : "";
+    if (key !== this.emotionKey) {
+      this.emotionKey = key;
+      replaceSpriteTexture(this.emotionLabel, makeEmotionTexture(emotion?.emoji || ""));
+    }
+    this.emotionLabel.visible = Boolean(emotion);
+    if (emotion) {
+      const remaining = Math.max(0, emotion.expiresAt - Date.now());
+      this.emotionLabel.material.opacity = THREE.MathUtils.clamp(remaining / APPLIED_EMOTION_FALLBACK_MS, 0.28, 1);
+      if (snapshot.id === localJoin?.id) document.documentElement.dataset.localEmotion = emotion.id;
+    } else if (snapshot.id === localJoin?.id) {
+      document.documentElement.dataset.localEmotion = "none";
+    }
+  }
+
   dispose() {
     this.characterController?.dispose();
+    this.label.material.map?.dispose();
+    this.label.material.dispose();
+    this.emotionLabel.material.map?.dispose();
+    this.emotionLabel.material.dispose();
     scene.remove(this.root);
   }
 }
@@ -2730,7 +3066,12 @@ function teamColor(team: number | null) {
   return 0xb9c6d8;
 }
 
-function makeLabel(name: string) {
+function playerLabelText(snapshot: PlayerSnapshot): string {
+  const prefix = snapshot.userPic && !isImageUserPic(snapshot.userPic) ? `${snapshot.userPic} ` : "";
+  return `${prefix}${snapshot.name}`;
+}
+
+function makeLabelTexture(name: string): THREE.CanvasTexture {
   const canvasLabel = document.createElement("canvas");
   canvasLabel.width = 256;
   canvasLabel.height = 64;
@@ -2744,10 +3085,47 @@ function makeLabel(name: string) {
     context.textBaseline = "middle";
     context.fillText(name, canvasLabel.width / 2, canvasLabel.height / 2);
   }
-  const texture = new THREE.CanvasTexture(canvasLabel);
+  return new THREE.CanvasTexture(canvasLabel);
+}
+
+function makeEmotionTexture(emoji: string): THREE.CanvasTexture {
+  const canvasLabel = document.createElement("canvas");
+  canvasLabel.width = 128;
+  canvasLabel.height = 128;
+  const context = canvasLabel.getContext("2d");
+  if (context) {
+    context.fillStyle = "rgba(4, 12, 11, 0.72)";
+    context.beginPath();
+    context.arc(64, 64, 54, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = "#ffffff";
+    context.font = "58px sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(emoji || " ", 64, 66);
+  }
+  return new THREE.CanvasTexture(canvasLabel);
+}
+
+function replaceSpriteTexture(sprite: THREE.Sprite, texture: THREE.CanvasTexture): void {
+  sprite.material.map?.dispose();
+  sprite.material.map = texture;
+  sprite.material.needsUpdate = true;
+}
+
+function makeLabel(name: string) {
+  const texture = makeLabelTexture(name);
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
   const sprite = new THREE.Sprite(material);
   sprite.scale.set(1.8, 0.45, 1);
+  return sprite;
+}
+
+function makeEmotionLabel(emoji: string) {
+  const texture = makeEmotionTexture(emoji);
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(0.72, 0.72, 1);
   return sprite;
 }
 
@@ -2816,6 +3194,15 @@ function wait(ms: number) {
 function acceptJoin(join: JoinAccepted) {
   const previous = localJoin;
   localJoin = join;
+  if (join.profile) {
+    localProfile = {
+      nickname: join.profile.nickname,
+      skinId: sanitizeLocalSkin(join.profile.skinId),
+      userPic: sanitizeLocalUserPic(join.profile.userPic)
+    };
+    saveLocalProfile();
+    syncProfileUi();
+  }
   if (!previous || previous.role !== join.role || previous.team !== join.team || previous.index !== join.index) {
     audio.playJoin(localJoin.role);
     pushEventFeed(localJoin.role === "player"
@@ -2830,7 +3217,7 @@ function acceptJoin(join: JoinAccepted) {
 }
 
 function connect() {
-  const name = new URLSearchParams(location.search).get("name") || `\u0418\u0433\u0440\u043e\u043a ${Math.floor(Math.random() * 90 + 10)}`;
+  const name = localProfile.nickname;
   if (prefersHttpTransport()) {
     void connectHttp(name, "preferred");
     return;
@@ -2870,7 +3257,7 @@ function connectWebSocket(name: string) {
     statusEl.textContent = "\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u043e.";
     pushEventFeed("WebSocket online");
     updateNetworkHud();
-    wsChannel.emit("join", { name });
+    wsChannel.emit("join", joinRequestPayload(name));
   });
   wsChannel.onDisconnect(() => {
     if (transportMode !== "websocket" || channel !== wsChannel) return;
@@ -2909,7 +3296,7 @@ async function connectHttp(name: string, reason: string) {
   statusEl.textContent = "\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u0435 HTTP fallback...";
   pushEventFeed("HTTP fallback");
   try {
-    const payload = await postJson<{ ok: boolean; joined: JoinAccepted; state: ServerState }>("join", { name });
+    const payload = await postJson<{ ok: boolean; joined: JoinAccepted; state: ServerState }>("join", joinRequestPayload(name));
     httpClientId = payload.joined.id;
     connected = true;
     audio.playConnection(true);
@@ -3004,6 +3391,51 @@ function sendInput(force = false) {
   }
   if (!channel) return;
   channel.emit("input", { input, sequence: inputSequence });
+}
+
+function sendProfileUpdate(): void {
+  saveLocalProfile();
+  if (!connected) return;
+  const profile = profilePayload();
+  if (transportMode === "http" && httpClientId) {
+    void postJson<{ ok: boolean; joined: JoinAccepted; state: ServerState }>("profile", {
+      clientId: httpClientId,
+      profile
+    }).then((payload) => {
+      acceptJoin(payload.joined);
+      receiveState(payload.state);
+    }).catch((error) => {
+      console.warn("unsoccer http profile failed", error);
+    });
+    return;
+  }
+  channel?.emit("profile", { profile });
+}
+
+function sendChatMessage(text: string): void {
+  if (!connected) return;
+  if (transportMode === "http" && httpClientId) {
+    void postJson<{ ok: boolean; state: ServerState }>("chat", { clientId: httpClientId, text })
+      .then((payload) => receiveState(payload.state))
+      .catch((error) => {
+        console.warn("unsoccer http chat failed", error);
+      });
+    return;
+  }
+  channel?.emit("chat", { text });
+}
+
+function sendEmotion(emotionId: EmotionId): void {
+  if (!connected) return;
+  if (transportMode === "http" && httpClientId) {
+    void postJson<{ ok: boolean; state: ServerState }>("emotion", { clientId: httpClientId, emotionId })
+      .then((payload) => receiveState(payload.state))
+      .catch((error) => {
+        console.warn("unsoccer http emotion failed", error);
+      });
+    return;
+  }
+  channel?.emit("emotion", { emotionId });
 }
 
 function receiveState(state: ServerState) {
@@ -3114,12 +3546,13 @@ function withResponsiveLocalPlayer(state: ServerState, nowSeconds: number): Serv
   localPredictionMoveAxisMagnitude = movement.magnitude;
   const lastAuthoritative = stateHistory[stateHistory.length - 1];
   const rawMoving = rawMovement.magnitude > 0.05;
+  const runtimeSettings = latestState.settings;
   const localSpeedMultiplier = latestPlayer.exhausted
-    ? PLAYER_EXHAUSTED_SPEED_MULTIPLIER
+    ? (runtimeSettings?.playerExhaustedSpeedMultiplier ?? PLAYER_EXHAUSTED_SPEED_MULTIPLIER)
     : rawMoving && input.sprint && latestPlayer.stamina > 0.01
-      ? PLAYER_SPRINT_MULTIPLIER
+      ? (runtimeSettings?.playerSprintMultiplier ?? PLAYER_SPRINT_MULTIPLIER)
       : 1;
-  const localSpeed = PLAYER_SPEED * localSpeedMultiplier;
+  const localSpeed = (runtimeSettings?.playerSpeed ?? PLAYER_SPEED) * localSpeedMultiplier;
   const desiredMoveVelocity = {
     x: movement.x * localSpeed * movement.magnitude,
     y: 0,
@@ -3133,10 +3566,10 @@ function withResponsiveLocalPlayer(state: ServerState, nowSeconds: number): Serv
     ? (localPredictionVelocity.x * desiredMoveVelocity.x + localPredictionVelocity.z * desiredMoveVelocity.z) / (currentMoveSpeed * desiredMoveSpeed)
     : 1;
   const movementRate = desiredMoveSpeed < currentMoveSpeed - 0.01
-    ? PLAYER_MOVEMENT_DECELERATION
+    ? (runtimeSettings?.playerMovementDeceleration ?? PLAYER_MOVEMENT_DECELERATION)
     : velocityDot < -0.05
-      ? PLAYER_MOVEMENT_TURN_ACCELERATION
-      : PLAYER_MOVEMENT_ACCELERATION;
+      ? (runtimeSettings?.playerMovementTurnAcceleration ?? PLAYER_MOVEMENT_TURN_ACCELERATION)
+      : (runtimeSettings?.playerMovementAcceleration ?? PLAYER_MOVEMENT_ACCELERATION);
   localPredictionVelocity.x = approachScalar(localPredictionVelocity.x, desiredMoveVelocity.x, movementRate, predictionDt);
   localPredictionVelocity.z = approachScalar(localPredictionVelocity.z, desiredMoveVelocity.z, movementRate, predictionDt);
   if (desiredMoveSpeed <= 0.001 && Math.abs(localPredictionVelocity.x) < 0.001) localPredictionVelocity.x = 0;
@@ -3259,9 +3692,12 @@ function updateHud(state: ServerState) {
   rosterEl.innerHTML = state.players.map((player) => {
     const dot = player.team === 0 ? "blue" : player.team === 1 ? "orange" : "spectator";
     const role = player.role === "player" ? teamNameLabel(player.team) : "\u0417\u0440\u0438\u0442\u0435\u043b\u044c";
-    const self = player.id === localJoin?.id ? "\u0432\u044b" : role;
-    return `<div class="roster-row"><i class="dot ${dot}"></i><span>${escapeHtml(player.name)}</span><small>${self}</small></div>`;
+    const shortRole = player.role === "player" ? (player.team === 0 ? "\u0421" : "\u041e") : "\u0417";
+    const self = player.id === localJoin?.id ? "\u0432\u044b" : shortRole;
+    const goals = Math.max(0, Math.floor(player.goals || 0));
+    return `<div class="roster-row" title="${escapeHtml(role)}" data-player-goals="${goals}">${renderUserPicMarkup(player.userPic, "roster-avatar")}<i class="dot ${dot}"></i><span>${escapeHtml(player.name)}</span><b class="roster-goals" title="\u0413\u043e\u043b\u044b">${goals}</b><small>${self}</small></div>`;
   }).join("");
+  updateChatUi(state);
 }
 
 function updateWeatherHud(weather: WeatherSnapshot | undefined, dayTimeSeconds: number) {
@@ -3380,7 +3816,7 @@ function escapeHtml(value: string) {
   })[char] || char);
 }
 
-function applyState(state: ServerState, time: number) {
+function applyState(state: ServerState, time: number, deltaSeconds = 1 / 60) {
   const variant = state.ball.variant || 0;
   if (document.documentElement.dataset.activeBallVariant !== String(variant)) {
     applyBallVertexColors(ballGeometry, variant);
@@ -3429,6 +3865,8 @@ function applyState(state: ServerState, time: number) {
       document.documentElement.dataset.lastActionKind = player.lastAction || "none";
       document.documentElement.dataset.lastActionPlayer = player.id;
       document.documentElement.dataset.lastActionAt = String(player.lastActionAt);
+      document.documentElement.dataset.lastActionSide = player.lastActionSide || "none";
+      document.documentElement.dataset.lastTrailingFoot = player.trailingFoot;
       if (player.lastAction === "hand") {
         document.documentElement.dataset.lastHandActionAt = String(player.lastActionAt);
         document.documentElement.dataset.lastHandActionPlayer = player.id;
@@ -3437,6 +3875,11 @@ function applyState(state: ServerState, time: number) {
       if (player.id === localJoin?.id) cameraImpulse = Math.max(cameraImpulse, telegraph?.cameraImpulse ?? 0.58);
     }
     let visual = players.get(player.id);
+    if (visual && !visual.matchesCharacter(player.characterId)) {
+      visual.dispose();
+      players.delete(player.id);
+      visual = undefined;
+    }
     if (!visual) {
       visual = new PlayerVisual(player);
       players.set(player.id, visual);
@@ -3456,6 +3899,7 @@ function applyState(state: ServerState, time: number) {
   document.documentElement.dataset.celebrationVisible = String(visibleCelebrations > 0);
   document.documentElement.dataset.celebrationVisibleCount = String(visibleCelebrations);
   weatherLayer.update(state.weather, time);
+  courtyardEnvironmentRuntime?.update(state, deltaSeconds);
   for (const net of goalNets) net.update(state, time);
   updateMovingCars(time, Number(document.documentElement.dataset.daylight || "0"));
   observeWeatherAudio(state);
@@ -3569,9 +4013,18 @@ function updateAudioMix(state: ServerState) {
 }
 
 function updateLighting(elapsedSeconds: number) {
-  const serverDayTime = (renderedState ?? latestState)?.dayTimeSeconds;
+  const lightingState = renderedState ?? latestState;
+  const runtimeSettings = lightingState?.settings;
+  const cycleSeconds = Math.max(1, runtimeSettings?.dayCycleSeconds ?? DAY_CYCLE_SECONDS);
+  const startSeconds = runtimeSettings?.dayStartSeconds ?? DAY_START_SECONDS;
+  const sunMultiplier = runtimeSettings?.sunIntensity ?? 1;
+  const moonMultiplier = runtimeSettings?.moonIntensity ?? 1;
+  const ambientMultiplier = runtimeSettings?.ambientIntensity ?? 1;
+  const floodlightMultiplier = runtimeSettings?.floodlightIntensity ?? 1;
+  const exposureMultiplier = runtimeSettings?.toneMappingExposure ?? 1;
+  const serverDayTime = lightingState?.dayTimeSeconds;
   const fallbackCycleSeconds = qaDayCycleSeconds === null ? elapsedSeconds : qaDayCycleSeconds + elapsedSeconds;
-  const fallbackDayTime = DAY_START_SECONDS + fallbackCycleSeconds / DAY_CYCLE_SECONDS * 24 * 60 * 60;
+  const fallbackDayTime = startSeconds + fallbackCycleSeconds / cycleSeconds * 24 * 60 * 60;
   const daySeconds = serverDayTime ?? fallbackDayTime;
   const dayTime = THREE.MathUtils.euclideanModulo(daySeconds, 24 * 60 * 60);
   const solarCycle = dayTime / (24 * 60 * 60);
@@ -3592,26 +4045,27 @@ function updateLighting(elapsedSeconds: number) {
   moonMesh.position.set(Math.cos(moonAngle) * 70, 12 + Math.sin(moonAngle) * 42, Math.sin(moonAngle + 0.42) * 42);
   sunColor.copy(dayColor).lerp(sunsetColor, sunset).lerp(nightColor, 1 - daylight);
   skyColor.copy(nightColor).lerp(dayColor, daylight).lerp(sunsetColor, sunset * 0.36);
-  const weather = (renderedState ?? latestState)?.weather;
+  const weather = lightingState?.weather;
   const precipitationIntensity = weather?.kind === "rain" || weather?.kind === "snow" ? weather.intensity : 0;
   const snowIntensity = weather?.kind === "snow" ? weather.intensity : 0;
   fogColor.copy(fogNightColor).lerp(fogDayColor, daylight).lerp(sunsetColor, sunset * 0.18).lerp(snowFogColor, snowIntensity * 0.1);
   sun.color.copy(sunColor);
-  sun.intensity = 1.05 + daylight * 4.15 + sunset * 1.05 - precipitationIntensity * 0.38;
-  hemi.intensity = 1.05 + daylight * 2.1 - precipitationIntensity * 0.16;
+  sun.intensity = Math.max(0, 1.05 + daylight * 4.15 + sunset * 1.05 - precipitationIntensity * 0.38) * sunMultiplier;
+  hemi.intensity = Math.max(0, 1.05 + daylight * 2.1 - precipitationIntensity * 0.16) * ambientMultiplier;
   ambientFill.color.copy(fogColor);
-  ambientFill.intensity = 0.34 + daylight * 0.58 + (1 - daylight) * 0.12 + snowIntensity * 0.02;
+  ambientFill.intensity = (0.34 + daylight * 0.58 + (1 - daylight) * 0.12 + snowIntensity * 0.02) * ambientMultiplier;
   bounceColor.set(0x9fc7b3).lerp(sunsetColor, sunset * 0.32).lerp(nightColor, (1 - daylight) * 0.22);
   courtyardBounce.color.copy(bounceColor);
-  courtyardBounce.intensity = 0.48 + daylight * 1.12 + sunset * 0.42 + (1 - daylight) * 0.18;
+  courtyardBounce.intensity = (0.48 + daylight * 1.12 + sunset * 0.42 + (1 - daylight) * 0.18) * ambientMultiplier;
   rimLight.color.copy(fogColor);
-  rimLight.intensity = 0.28 + (1 - daylight) * 0.72 + sunset * 0.24;
+  rimLight.intensity = (0.28 + (1 - daylight) * 0.72 + sunset * 0.24) * ambientMultiplier;
   let activeFloodlights = 0;
   let visibleCones = 0;
   let strongestFlickerDip = 0;
   for (const [index, entry] of stadiumFloodlights.entries()) {
-    const lightEnabled = floodlightPower > 0.035;
-    const coneEnabled = floodlightPower > 0.055 && !settings.graphics.reduceEffects;
+    const effectiveFloodlightPower = floodlightPower * floodlightMultiplier;
+    const lightEnabled = effectiveFloodlightPower > 0.035;
+    const coneEnabled = effectiveFloodlightPower > 0.055 && !settings.graphics.reduceEffects;
     const flickerWave = Math.sin(elapsedSeconds * entry.flickerSpeed + entry.flickerPhase);
     const rareFlickerGate = THREE.MathUtils.smoothstep(Math.sin(elapsedSeconds * 0.31 + entry.flickerPhase * 0.7), 0.82, 0.98);
     const microWaver = 0.985 + Math.sin(elapsedSeconds * (1.2 + index * 0.17) + entry.flickerPhase) * 0.015;
@@ -3620,20 +4074,20 @@ function updateLighting(elapsedSeconds: number) {
     strongestFlickerDip = Math.max(strongestFlickerDip, flickerDip);
     floodlightRuntimeColor.copy(entry.baseColor).lerp(dayColor, daylight * 0.1);
     entry.light.visible = lightEnabled;
-    entry.light.intensity = lightEnabled ? floodlightPower * (3.1 + precipitationIntensity * 0.28) * entry.intensityBias * flicker : 0;
+    entry.light.intensity = lightEnabled ? effectiveFloodlightPower * (3.1 + precipitationIntensity * 0.28) * entry.intensityBias * flicker : 0;
     entry.light.angle = FLOODLIGHT_BEAM_ANGLE;
     entry.light.color.copy(floodlightRuntimeColor);
     entry.lampMaterial.color.copy(lightEnabled ? floodlightRuntimeColor : floodlightDarkColor);
-    entry.lampMaterial.opacity = 0.58 + floodlightPower * 0.42;
+    entry.lampMaterial.opacity = 0.58 + effectiveFloodlightPower * 0.42;
     entry.cone.visible = coneEnabled;
     entry.cone.scale.x = entry.widthScale;
     entry.cone.scale.z = entry.widthScale;
     entry.cone.material.color.copy(floodlightRuntimeColor);
-    entry.cone.material.opacity = coneEnabled ? floodlightPower * (0.095 + precipitationIntensity * 0.035) * flicker : 0;
+    entry.cone.material.opacity = coneEnabled ? effectiveFloodlightPower * (0.095 + precipitationIntensity * 0.035) * flicker : 0;
     if (lightEnabled) activeFloodlights += 1;
     if (coneEnabled) visibleCones += 1;
   }
-  renderer.toneMappingExposure = 1.12 + daylight * 0.9 + sunset * 0.18 - precipitationIntensity * 0.16;
+  renderer.toneMappingExposure = Math.max(0.05, 1.12 + daylight * 0.9 + sunset * 0.18 - precipitationIntensity * 0.16) * exposureMultiplier;
   scene.background = skyColor;
   skyMaterial.color.copy(skyColor).lerp(fogColor, 0.18);
   if (scene.fog) {
@@ -3647,19 +4101,19 @@ function updateLighting(elapsedSeconds: number) {
   sunMesh.visible = daylight > 0.05 || sunset > 0.03;
   sunGlow.visible = sunMesh.visible;
   sunGlowMaterial.color.copy(sunColor);
-  sunGlowMaterial.opacity = (0.12 + daylight * 0.34 + sunset * 0.3) * (sunMesh.visible ? 1 : 0);
+  sunGlowMaterial.opacity = (0.12 + daylight * 0.34 + sunset * 0.3) * sunMultiplier * (sunMesh.visible ? 1 : 0);
   moonMesh.visible = daylight < 0.7;
-  moonMaterial.opacity = THREE.MathUtils.clamp((1 - daylight) * 0.78 + 0.08, 0, 0.86);
+  moonMaterial.opacity = THREE.MathUtils.clamp(((1 - daylight) * 0.78 + 0.08) * moonMultiplier, 0, 0.86);
   sunPathMaterial.opacity = 0;
   sunPath.visible = false;
-  document.documentElement.dataset.dayCycleSeconds = THREE.MathUtils.euclideanModulo((solarCycle - 0.25) * DAY_CYCLE_SECONDS, DAY_CYCLE_SECONDS).toFixed(2);
+  document.documentElement.dataset.dayCycleSeconds = THREE.MathUtils.euclideanModulo((solarCycle - 0.25) * cycleSeconds, cycleSeconds).toFixed(2);
   document.documentElement.dataset.dayTimeSeconds = dayTime.toFixed(1);
   document.documentElement.dataset.dayCycleSource = serverDayTime === undefined ? "fallback-animated" : "server";
-  document.documentElement.dataset.dayCycleLengthSeconds = String(DAY_CYCLE_SECONDS);
+  document.documentElement.dataset.dayCycleLengthSeconds = String(cycleSeconds);
   document.documentElement.dataset.daylight = daylight.toFixed(3);
   document.documentElement.dataset.darkHours = DARK_HOURS_LABEL;
   document.documentElement.dataset.twilightHours = TWILIGHT_HOURS_LABEL;
-  document.documentElement.dataset.stadiumLightPower = floodlightPower.toFixed(3);
+  document.documentElement.dataset.stadiumLightPower = (floodlightPower * floodlightMultiplier).toFixed(3);
   document.documentElement.dataset.stadiumLightsOn = String(activeFloodlights);
   document.documentElement.dataset.stadiumLightCones = String(visibleCones);
   document.documentElement.dataset.stadiumLightFlicker = strongestFlickerDip.toFixed(3);
@@ -3671,6 +4125,11 @@ function updateLighting(elapsedSeconds: number) {
   document.documentElement.dataset.moonFramed = "false";
   document.documentElement.dataset.ambientFill = ambientFill.intensity.toFixed(3);
   document.documentElement.dataset.courtyardBounce = courtyardBounce.intensity.toFixed(3);
+  document.documentElement.dataset.sunIntensityMultiplier = sunMultiplier.toFixed(3);
+  document.documentElement.dataset.moonIntensityMultiplier = moonMultiplier.toFixed(3);
+  document.documentElement.dataset.ambientIntensityMultiplier = ambientMultiplier.toFixed(3);
+  document.documentElement.dataset.floodlightIntensityMultiplier = floodlightMultiplier.toFixed(3);
+  document.documentElement.dataset.toneMappingExposureMultiplier = exposureMultiplier.toFixed(3);
   document.documentElement.dataset.sunX = sun.position.x.toFixed(2);
   document.documentElement.dataset.sunY = sun.position.y.toFixed(2);
   document.documentElement.dataset.sunZ = sun.position.z.toFixed(2);
@@ -3862,6 +4321,18 @@ addEventListener("keydown", (event) => {
     bindAction(pendingRebindAction, event.code);
     return;
   }
+  if (!settingsOpen && event.code === "Enter") {
+    event.preventDefault();
+    if (document.activeElement === chatInputEl) submitChat();
+    else openChat();
+    return;
+  }
+  if (!settingsOpen && event.code === "Escape" && isChatFocused()) {
+    event.preventDefault();
+    closeChat();
+    return;
+  }
+  if (isChatFocused()) return;
   if (actionPressed(settings.controls, "settings", new Set([event.code]))) {
     event.preventDefault();
     setSettingsOpen(!settingsOpen);
@@ -3890,6 +4361,7 @@ addEventListener("keydown", (event) => {
 
 addEventListener("keyup", (event) => {
   unlockAudio();
+  if (isChatFocused()) return;
   pressedCodes.delete(event.code);
   updateResolvedInput();
   sendInput(true);
@@ -3920,6 +4392,36 @@ testSoundButton.addEventListener("click", () => {
   audio.playConnection(true);
   syncAudioDebugDataset();
 });
+chatFormEl.addEventListener("submit", (event) => {
+  event.preventDefault();
+  submitChat();
+});
+chatInputEl.addEventListener("focus", () => {
+  chatPanelEl.classList.add("active");
+  document.documentElement.dataset.chatActive = "true";
+});
+chatInputEl.addEventListener("blur", () => {
+  if (document.activeElement && chatPanelEl.contains(document.activeElement)) return;
+  chatPanelEl.classList.remove("active");
+  document.documentElement.dataset.chatActive = "false";
+});
+emotionWheelEl.addEventListener("pointerdown", (event) => {
+  const target = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-emotion]") : null;
+  if (target?.dataset.emotion) {
+    const index = EMOTION_CHOICES.findIndex((choice) => choice.id === target.dataset.emotion);
+    if (index >= 0) emotionWheelSelectedIndex = index;
+  }
+  event.preventDefault();
+  applySelectedEmotion();
+});
+for (const element of [profileNameInput, profileSkinSelect, profilePicInput]) {
+  element.addEventListener("input", () => {
+    if (readProfileUi()) scheduleProfileSend();
+  });
+  element.addEventListener("change", () => {
+    if (readProfileUi()) sendProfileUpdate();
+  });
+}
 for (const button of document.querySelectorAll<HTMLButtonElement>("button[data-settings-tab]")) {
   button.addEventListener("click", () => {
     setActiveSettingsTab(button.dataset.settingsTab as SettingsTab);
@@ -3939,8 +4441,14 @@ addEventListener("pointerdown", unlockAudio, audioUnlockOptions);
 addEventListener("mousedown", unlockAudio, audioUnlockOptions);
 addEventListener("touchstart", unlockAudio, audioUnlockOptions);
 canvas.addEventListener("pointerdown", (event) => {
+  if (emotionWheelOpen) {
+    event.preventDefault();
+    applySelectedEmotion();
+    return;
+  }
   canvas.focus();
   if (settingsOpen) return;
+  if (isChatFocused()) return;
   const mouseCodes = new Set([`Mouse${event.button}`]);
   let handled = false;
   if (actionPressed(settings.controls, "leftKick", mouseCodes)) {
@@ -3991,6 +4499,7 @@ canvas.addEventListener("auxclick", (event) => {
 canvas.addEventListener("wheel", (event) => {
   unlockAudio();
   event.preventDefault();
+  openOrCycleEmotionWheel(event.deltaY);
 }, { passive: false });
 
 addEventListener("resize", resize);
@@ -4005,6 +4514,7 @@ addEventListener("pagehide", () => {
   navigator.sendBeacon(`${serverApiBase()}/leave`, new Blob([body], { type: "application/json" }));
 });
 resize();
+initializeProfileControls();
 connect();
 
 function frame(time: number) {
@@ -4022,10 +4532,11 @@ function frame(time: number) {
   document.documentElement.dataset.localPredictionMs = String(Math.round(localPredictionLeadMs));
   document.documentElement.dataset.localMoveSpeed = localPredictionMoveSpeed.toFixed(3);
   document.documentElement.dataset.localMoveAxis = localPredictionMoveAxisMagnitude.toFixed(3);
-  if (renderedState) applyState(renderedState, seconds);
+  if (renderedState) applyState(renderedState, seconds, delta);
   updateLighting(seconds);
   updateCamera(delta);
   updateOffscreenIndicators(renderedState ?? latestState);
+  positionEmotionWheel();
   renderer.render(scene, camera);
 }
 

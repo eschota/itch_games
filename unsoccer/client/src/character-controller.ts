@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
-import { CELEBRATION_DURATION_MS, PLAYER_HEIGHT, type CelebrationKind, type KickKind } from "@itch-games/unsoccer-shared";
+import { CELEBRATION_DURATION_MS, PLAYER_HEIGHT, type CelebrationKind, type KickKind, type StrikeSide } from "@itch-games/unsoccer-shared";
 
 export interface Free3dCharacterAsset {
   guid: string;
@@ -55,7 +55,9 @@ export interface CharacterControllerSnapshot {
   ragdoll?: boolean;
   ragdollAt?: number;
   lastAction: KickKind | null;
+  lastActionSide?: StrikeSide | null;
   lastActionAt: number;
+  trailingFoot?: StrikeSide;
   celebration: CelebrationKind | null;
   celebrationAt: number;
   celebrationAvailableUntil: number;
@@ -97,6 +99,7 @@ interface CelebrationPose {
 }
 
 type HandStrikeSide = "left" | "right";
+type FootStrikeSide = "left" | "right";
 type JumpStyle = "standing" | "run";
 
 const transparentFbxTexture =
@@ -401,6 +404,7 @@ export class GameCharacterController {
   private lastObservedActionAt = 0;
   private activeHandStrikeSide: HandStrikeSide = "right";
   private nextHandStrikeSide: HandStrikeSide = "right";
+  private activeFootStrikeSide: FootStrikeSide = "left";
   private activeJumpStyle: JumpStyle = "standing";
   private ragdollActive = false;
   private lastActionSwitchAt = 0;
@@ -491,7 +495,7 @@ export class GameCharacterController {
       blend: Math.round(this.currentActionWeight() * 100) / 100,
       strike: this.lastStrike || "none",
       strikePulse: Math.round(this.lastStrikePulse * 100) / 100,
-      strikeSide: this.lastStrike === "hand" ? this.activeHandStrikeSide : this.lastStrike || "none",
+      strikeSide: this.lastStrike === "hand" ? this.activeHandStrikeSide : this.lastStrike === "left" ? this.activeFootStrikeSide : this.lastStrike || "none",
       celebration: this.lastCelebration || "none",
       celebrationPulse: Math.round(this.lastCelebrationPulse * 100) / 100,
       jumpStyle: this.activeJumpStyle,
@@ -504,9 +508,12 @@ export class GameCharacterController {
   private syncStrikeSide(snapshot: CharacterControllerSnapshot): void {
     if (!snapshot.lastActionAt || snapshot.lastActionAt === this.lastObservedActionAt) return;
     this.lastObservedActionAt = snapshot.lastActionAt;
-    if (snapshot.lastAction !== "hand") return;
-    this.activeHandStrikeSide = this.nextHandStrikeSide;
-    this.nextHandStrikeSide = this.nextHandStrikeSide === "right" ? "left" : "right";
+    if (snapshot.lastAction === "hand") {
+      this.activeHandStrikeSide = snapshot.lastActionSide || this.nextHandStrikeSide;
+      this.nextHandStrikeSide = this.activeHandStrikeSide === "right" ? "left" : "right";
+    } else if (snapshot.lastAction === "left") {
+      this.activeFootStrikeSide = snapshot.lastActionSide || snapshot.trailingFoot || "left";
+    }
   }
 
   private resolveLocomotion(snapshot: CharacterControllerSnapshot, speed: number): string {
@@ -663,17 +670,23 @@ export class GameCharacterController {
     const impact = pose.impact;
     if (pulse <= 0 || !snapshot.lastAction) return;
     if (snapshot.lastAction === "left") {
-      this.rotateBone("leftThigh", 0, 0, 0.55, chamber);
-      this.rotateBone("leftLeg", 0, 0, -0.3, chamber);
-      this.rotateBone("leftFoot", 0.04, 0, 0.08, chamber);
-      this.rotateBone("leftThigh", 0.02, 0, -1.25, impact);
-      this.rotateBone("leftLeg", -0.06, 0, -0.48, impact);
-      this.rotateBone("leftFoot", 0.1, 0, -0.12, impact);
-      this.rotateBone("rightThigh", 0, 0, 0.16, pulse);
+      const isRight = this.activeFootStrikeSide === "right";
+      const side = isRight ? 1 : -1;
+      const strikeThigh = isRight ? "rightThigh" : "leftThigh";
+      const strikeLeg = isRight ? "rightLeg" : "leftLeg";
+      const strikeFoot = isRight ? "rightFoot" : "leftFoot";
+      const plantThigh = isRight ? "leftThigh" : "rightThigh";
+      this.rotateBone(strikeThigh, 0, 0, -0.55 * side, chamber);
+      this.rotateBone(strikeLeg, 0, 0, 0.3 * side, chamber);
+      this.rotateBone(strikeFoot, 0.04, 0, -0.08 * side, chamber);
+      this.rotateBone(strikeThigh, 0.02, 0, 1.25 * side, impact);
+      this.rotateBone(strikeLeg, -0.06, 0, 0.48 * side, impact);
+      this.rotateBone(strikeFoot, 0.1, 0, 0.12 * side, impact);
+      this.rotateBone(plantThigh, 0, 0, -0.16 * side, pulse);
       this.rotateBone("spine1", 0.18, 0.08, -0.04, impact);
       this.rotateBone("spine2", 0.3, 0.1, -0.06, impact);
-      this.rotateBone("rightArm", -0.24, 0, 0.2, pulse);
-      this.rotateBone("leftArm", 0, 0, 0.24, chamber);
+      this.rotateBone(isRight ? "leftArm" : "rightArm", -0.24, 0, 0.2 * -side, pulse);
+      this.rotateBone(isRight ? "rightArm" : "leftArm", 0, 0, -0.24 * side, chamber);
     } else if (snapshot.lastAction === "hand") {
       const isRight = this.activeHandStrikeSide === "right";
       // The imported Free3D roster reads left/right arm bones mirrored in gameplay view.

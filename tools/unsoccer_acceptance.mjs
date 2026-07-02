@@ -3,28 +3,31 @@ import fs from "node:fs";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import net from "node:net";
+import os from "node:os";
 import path from "node:path";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGE = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
 const EXPECTED_GAME_VERSION = String(PACKAGE.games?.unsoccer?.version || PACKAGE.gameVersion || PACKAGE.version);
-const FIELD_WIDTH = 48;
-const FIELD_LENGTH = 72;
-const GOAL_WIDTH = 12;
-const GOAL_DEPTH = 3.2;
-const GOAL_POST_RADIUS = 0.19;
-const BALL_RADIUS = 0.24;
-const BALL_DENSITY = 3.6;
-const BALL_RESTITUTION = 1.05;
-const PLAYER_HEIGHT = 1.75;
-const DAY_CYCLE_SECONDS = 300;
-const DAY_START_SECONDS = 6 * 60 * 60;
-const POST_GOAL_CELEBRATION_MS = 5000;
-const POST_GOAL_BALL_RETURN_MS = 1000;
-const WEATHER_CHANGE_MIN_MS = 60_000;
-const WEATHER_CHANGE_MAX_MS = 120_000;
+const DEFAULT_GAME_SETTINGS = JSON.parse(fs.readFileSync(path.join(ROOT, "unsoccer", "game-settings.json"), "utf8"));
+const FIELD_WIDTH = DEFAULT_GAME_SETTINGS.fieldWidth;
+const FIELD_LENGTH = DEFAULT_GAME_SETTINGS.fieldLength;
+const GOAL_WIDTH = DEFAULT_GAME_SETTINGS.goalWidth;
+const GOAL_DEPTH = DEFAULT_GAME_SETTINGS.goalDepth;
+const GOAL_POST_RADIUS = DEFAULT_GAME_SETTINGS.goalPostRadius;
+const BALL_RADIUS = DEFAULT_GAME_SETTINGS.ballRadius;
+const BALL_DENSITY = DEFAULT_GAME_SETTINGS.ballDensity;
+const BALL_RESTITUTION = DEFAULT_GAME_SETTINGS.ballRestitution;
+const PLAYER_HEIGHT = DEFAULT_GAME_SETTINGS.playerHeight;
+const DAY_CYCLE_SECONDS = DEFAULT_GAME_SETTINGS.dayCycleSeconds;
+const DAY_START_SECONDS = DEFAULT_GAME_SETTINGS.dayStartSeconds;
+const POST_GOAL_CELEBRATION_MS = DEFAULT_GAME_SETTINGS.postGoalCelebrationMs;
+const POST_GOAL_BALL_RETURN_MS = DEFAULT_GAME_SETTINGS.postGoalBallReturnMs;
+const WEATHER_CHANGE_MIN_MS = DEFAULT_GAME_SETTINGS.weatherChangeMinMs;
+const WEATHER_CHANGE_MAX_MS = DEFAULT_GAME_SETTINGS.weatherChangeMaxMs;
 const KICK_SPEED_MAX = 55;
 const BODY_BUMP_SPEED_MAX = 6;
+const MAX_ACTIVE_PLAYERS = DEFAULT_GAME_SETTINGS.maxActivePlayers;
 const CHARACTER_ROSTER = [
   "6299851",
   "6243756",
@@ -168,7 +171,7 @@ async function probeWebSocketWithoutJoin(baseUrl) {
   });
 }
 
-async function joinWebSocketAndReadState(baseUrl, name) {
+async function joinWebSocketAndReadState(baseUrl, name, extraJoinData = {}) {
   assert.equal(typeof WebSocket, "function", "Node runtime should expose WebSocket");
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(webSocketUrl(baseUrl));
@@ -185,7 +188,7 @@ async function joinWebSocketAndReadState(baseUrl, name) {
       resolve({ joined, state });
     };
     ws.addEventListener("open", () => {
-      ws.send(JSON.stringify({ event: "join", data: { name } }));
+      ws.send(JSON.stringify({ event: "join", data: { name, ...extraJoinData } }));
     });
     ws.addEventListener("message", (event) => {
       const message = JSON.parse(String(event.data));
@@ -196,6 +199,60 @@ async function joinWebSocketAndReadState(baseUrl, name) {
     ws.addEventListener("error", () => {
       clearTimeout(timer);
       reject(new Error("websocket join failed"));
+    });
+  });
+}
+
+async function assertWebSocketChatEmotion(baseUrl) {
+  assert.equal(typeof WebSocket, "function", "Node runtime should expose WebSocket");
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(webSocketUrl(baseUrl));
+    let joined = null;
+    let sawChat = false;
+    let sawEmotion = false;
+    const timer = setTimeout(() => {
+      ws.close();
+      reject(new Error("websocket chat/emotion timed out"));
+    }, 3500);
+    const finish = () => {
+      if (!joined || !sawChat || !sawEmotion) return;
+      clearTimeout(timer);
+      ws.close();
+      resolve();
+    };
+    ws.addEventListener("open", () => {
+      ws.send(JSON.stringify({
+        event: "join",
+        data: {
+          name: "WsProfile",
+          profile: {
+            nickname: "WsProfile",
+            skinId: CHARACTER_ROSTER[1],
+            userPic: "WS"
+          }
+        }
+      }));
+    });
+    ws.addEventListener("message", (event) => {
+      const message = JSON.parse(String(event.data));
+      if (message.event === "joined") {
+        joined = message.data;
+        assert.equal(joined.profile.nickname, "WsProfile", "websocket join should accept profile nickname");
+        assert.equal(joined.profile.skinId, CHARACTER_ROSTER[1], "websocket join should accept profile skin");
+        ws.send(JSON.stringify({ event: "chat", data: { text: "ws hello" } }));
+        ws.send(JSON.stringify({ event: "emotion", data: { emotionId: "heart" } }));
+      }
+      if (message.event === "state" && joined) {
+        const state = message.data;
+        sawChat = sawChat || state.chatMessages?.some((item) => item.playerId === joined.id && item.text === "ws hello");
+        const player = state.players?.find((item) => item.id === joined.id);
+        sawEmotion = sawEmotion || player?.emotion?.id === "heart";
+        finish();
+      }
+    });
+    ws.addEventListener("error", () => {
+      clearTimeout(timer);
+      reject(new Error("websocket chat/emotion failed"));
     });
   });
 }
@@ -233,6 +290,94 @@ async function assertHttpFallback(api) {
   assert.ok(!state.players.some((player) => player.id === join.joined.id), "http fallback leave should remove player");
 }
 
+async function assertCommunicationProfileAndCombatSides(api, baseUrl) {
+  await api("POST", "/api/test/players", { count: 0 });
+  await api("POST", "/api/test/reset", {});
+  await api("POST", "/api/test/bots", { enabled: false });
+
+  const join = await api("POST", "/api/join", {
+    name: "HttpProfile",
+    profile: {
+      nickname: "HttpHero",
+      skinId: CHARACTER_ROSTER[2],
+      userPic: "HP"
+    }
+  });
+  assert.equal(join.joined.profile.nickname, "HttpHero", "http join should accept profile nickname");
+  assert.equal(join.joined.profile.skinId, CHARACTER_ROSTER[2], "http join should accept profile skin");
+  let player = join.state.players.find((item) => item.id === join.joined.id);
+  assert.equal(player.userPic, "HP", "player snapshot should expose user_pic");
+  assert.equal(player.profile.userPic, "HP", "profile snapshot should expose user_pic");
+
+  let payload = await api("POST", "/api/chat", { clientId: join.joined.id, text: "  hello team  " });
+  assert.equal(payload.ok, true, "http chat should return ok");
+  assert.ok(payload.state.chatMessages.some((item) => item.playerId === join.joined.id && item.text === "hello team"), "state should expose chat ring message");
+
+  payload = await api("POST", "/api/emotion", { clientId: join.joined.id, emotionId: "fire" });
+  player = payload.state.players.find((item) => item.id === join.joined.id);
+  assert.equal(player.emotion.id, "fire", "http emotion should replicate through player snapshot");
+
+  payload = await api("POST", "/api/profile", {
+    clientId: join.joined.id,
+    profile: {
+      nickname: "HttpRenamed",
+      skinId: CHARACTER_ROSTER[3],
+      userPic: "HR"
+    }
+  });
+  assert.equal(payload.joined.profile.nickname, "HttpRenamed", "http profile endpoint should update nickname");
+  assert.equal(payload.joined.profile.skinId, CHARACTER_ROSTER[3], "http profile endpoint should update skin");
+  player = payload.state.players.find((item) => item.id === join.joined.id);
+  assert.equal(player.name, "HttpRenamed", "player snapshot name should follow profile nickname");
+  assert.equal(player.characterId, CHARACTER_ROSTER[3], "player snapshot characterId should follow profile skin");
+
+  await api("POST", "/api/leave", { clientId: join.joined.id });
+  await assertWebSocketChatEmotion(baseUrl);
+
+  await api("POST", "/api/test/players", { count: 1 });
+  await api("POST", "/api/test/reset", {});
+  await api("POST", "/api/test/weather", { kind: "clear" });
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: 100,
+    yaw: 0,
+    trailingFoot: "right",
+    input: inputState()
+  });
+  let state = (await api("POST", "/api/test/ball", {
+    position: { x: 0.34, y: BALL_RADIUS + 0.04, z: 1.0 },
+    velocity: { x: 0, y: 0, z: 0 }
+  })).state;
+  await api("POST", "/api/test/player/0", { input: inputState({ kickLeft: 1 }) });
+  state = (await api("POST", "/api/test/tick", { frames: 3 })).state;
+  player = playerAt(state, 0);
+  assert.equal(player.lastAction, "left", "LMB foot kick should still report legacy action kind");
+  assert.equal(player.lastActionSide, "right", "foot kick should resolve to the current trailing foot");
+  assert.equal(player.trailingFoot, "right", "snapshot should expose current trailing foot");
+
+  await api("POST", "/api/test/players", { count: 1 });
+  await api("POST", "/api/test/reset", {});
+  await api("POST", "/api/test/weather", { kind: "clear" });
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: 100,
+    yaw: 0,
+    input: inputState({ kickRight: 1 })
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 3 })).state;
+  player = playerAt(state, 0);
+  assert.equal(player.lastAction, "hand", "RMB should trigger hand punch");
+  assert.equal(player.lastActionSide, "right", "first hand punch should use right hand");
+
+  await api("POST", "/api/test/player/0", { input: inputState() });
+  await api("POST", "/api/test/tick", { frames: 30 });
+  await api("POST", "/api/test/player/0", { stamina: 100, input: inputState({ kickRight: 2 }) });
+  state = (await api("POST", "/api/test/tick", { frames: 3 })).state;
+  player = playerAt(state, 0);
+  assert.equal(player.lastAction, "hand", "second RMB should still trigger hand punch");
+  assert.equal(player.lastActionSide, "left", "hand punch should alternate left after right");
+}
+
 async function assertBotSettingsCors(baseUrl) {
   const response = await fetch(`${baseUrl}/api/bot-settings`, {
     method: "OPTIONS",
@@ -250,6 +395,116 @@ async function assertBotSettingsCors(baseUrl) {
   );
 }
 
+async function assertGameSettingsApi(api, baseUrl, settingsFile) {
+  const cors = await fetch(`${baseUrl}/api/game-settings`, {
+    method: "OPTIONS",
+    headers: {
+      origin: "http://127.0.0.1:5174",
+      "access-control-request-method": "POST",
+      "access-control-request-headers": "content-type"
+    }
+  });
+  assert.equal(cors.status, 204, "game settings endpoint should answer CORS preflight");
+  assert.equal(cors.headers.get("access-control-allow-origin"), "*", "game settings CORS should allow static admin page");
+
+  const initial = await api("GET", "/api/game-settings");
+  assert.equal(initial.ok, true, "game settings GET should return ok");
+  assert.equal(initial.version, EXPECTED_GAME_VERSION);
+  assert.ok(Array.isArray(initial.schema) && initial.schema.length > 20, "game settings should expose a schema for the admin UI");
+  assert.deepEqual(
+    initial.schema.map((item) => item.key).sort(),
+    Object.keys(DEFAULT_GAME_SETTINGS).sort(),
+    "game settings schema should expose every JSON/defaults key"
+  );
+  assert.equal(initial.settings.playerSpeed, DEFAULT_GAME_SETTINGS.playerSpeed, "settings should load playerSpeed from JSON");
+  assert.equal(initial.settings.maxActivePlayers, DEFAULT_GAME_SETTINGS.maxActivePlayers, "settings should load active player limit from JSON");
+  assert.equal(initial.state.settingsRevision, initial.revision, "state should expose the active settings revision");
+  assert.equal(initial.state.settings.playerSpeed, initial.settings.playerSpeed, "state should carry active runtime settings to clients");
+
+  await api("POST", "/api/test/players", { count: 0 });
+  for (const item of initial.schema) {
+    const key = item.key;
+    const testValue = roundtripSettingValue(item, DEFAULT_GAME_SETTINGS[key]);
+    const changed = await api("POST", "/api/game-settings", { settings: { [key]: testValue } });
+    assertSettingValue(changed.settings[key], testValue, `game settings POST should accept ${key}`);
+    const readBack = await api("GET", "/api/game-settings");
+    assertSettingValue(readBack.settings[key], testValue, `game settings GET should read back ${key}`);
+  }
+
+  await api("POST", "/api/game-settings", { settings: DEFAULT_GAME_SETTINGS });
+
+  let payload = await api("POST", "/api/game-settings", {
+    settings: {
+      playerSpeed: 4.1,
+      botAggression: 9
+    }
+  });
+  assert.equal(payload.settings.playerSpeed, 4.1, "game settings POST should apply partial numeric updates");
+  assert.equal(payload.settings.botAggression, 1, "game settings POST should clamp schema-bounded values");
+  assert.ok(payload.revision > initial.revision, "game settings POST should advance revision");
+
+  await api("POST", "/api/test/bots", { enabled: false });
+  await api("POST", "/api/test/players", { count: 1 });
+  await api("POST", "/api/test/reset", {});
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    input: inputState({ up: true })
+  });
+  let state = (await api("POST", "/api/test/tick", { frames: 24 })).state;
+  const slowDistance = playerAt(state, 0).position.z;
+
+  await api("POST", "/api/game-settings", { settings: { playerSpeed: 12.4 } });
+  await api("POST", "/api/test/reset", {});
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    input: inputState({ up: true })
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 24 })).state;
+  assert.ok(playerAt(state, 0).position.z > slowDistance * 1.6, "runtime playerSpeed should affect movement without rebuilding");
+
+  const fileSettings = {
+    ...payload.settings,
+    playerSpeed: 6.2,
+    weatherClearWeight: 24
+  };
+  fs.writeFileSync(settingsFile, `${JSON.stringify(fileSettings, null, 2)}\n`, "utf8");
+  payload = await api("POST", "/api/game-settings/reload", {});
+  assert.equal(payload.settings.playerSpeed, 6.2, "game settings reload should read the JSON file");
+  assert.equal(payload.settings.weatherClearWeight, 24, "game settings reload should preserve file-edited weather weights");
+
+  payload = await api("POST", "/api/game-settings", { settings: DEFAULT_GAME_SETTINGS });
+  assert.equal(payload.settings.playerSpeed, DEFAULT_GAME_SETTINGS.playerSpeed, "game settings should restore defaults for later checks");
+  assert.equal(payload.settings.maxActivePlayers, DEFAULT_GAME_SETTINGS.maxActivePlayers, "restored settings should keep default active player limit");
+}
+
+function roundtripSettingValue(item, current) {
+  if (item.input === "checkbox" || typeof current === "boolean") return !Boolean(current);
+  const step = Number(item.step ?? 1);
+  const min = item.min === undefined ? Number.NEGATIVE_INFINITY : Number(item.min);
+  const max = item.max === undefined ? Number.POSITIVE_INFINITY : Number(item.max);
+  const base = Number(current);
+  const forward = base + (Number.isFinite(step) && step > 0 ? step : 1);
+  if (Number.isFinite(forward) && forward <= max && forward >= min) return roundedForStep(forward, step);
+  const backward = base - (Number.isFinite(step) && step > 0 ? step : 1);
+  if (Number.isFinite(backward) && backward <= max && backward >= min) return roundedForStep(backward, step);
+  if (Number.isFinite(min) && min !== base) return roundedForStep(min, step);
+  if (Number.isFinite(max) && max !== base) return roundedForStep(max, step);
+  return roundedForStep(base, step);
+}
+
+function roundedForStep(value, step) {
+  const decimals = String(step).includes(".") ? String(step).split(".")[1].length : 0;
+  return Number(value.toFixed(Math.min(8, decimals + 2)));
+}
+
+function assertSettingValue(actual, expected, message) {
+  if (typeof expected === "number") {
+    assert.ok(Math.abs(Number(actual) - expected) < 1e-9, `${message}: expected ${expected}, got ${actual}`);
+  } else {
+    assert.equal(actual, expected, message);
+  }
+}
+
 async function assertBotsFillAndDisplace(api) {
   await api("POST", "/api/test/players", { count: 0 });
   await api("POST", "/api/test/reset", {});
@@ -261,33 +516,43 @@ async function assertBotsFillAndDisplace(api) {
       targetActivePlayers: 3,
       aggression: 0.82,
       shootDistance: 2.9,
-      fightDistance: 1.72
+      fightDistance: 1.72,
+      shotAlignmentMin: -0.14,
+      supportReleaseDistance: 5.35
     }
   });
   assert.equal(payload.settings.enabled, true, "bot settings endpoint should persist enabled=true");
   assert.equal(payload.settings.targetActivePlayers, 3, "bot settings endpoint should apply targetActivePlayers");
+  assert.equal(payload.settings.shotAlignmentMin, -0.14, "bot settings endpoint should apply shotAlignmentMin");
+  assert.equal(payload.settings.supportReleaseDistance, 5.35, "bot settings endpoint should apply supportReleaseDistance");
+  assert.equal(payload.state.settings.botShotAlignmentMin, -0.14, "bot settings should sync shot alignment into game settings");
+  assert.equal(payload.state.settings.botSupportReleaseDistance, 5.35, "bot settings should sync support release into game settings");
   assert.equal(activePlayersByController(payload.state, "bot").length, 3, "bot settings endpoint should apply fill count immediately");
 
   payload = await api("POST", "/api/test/bots", {
     enabled: true,
-    settings: deterministicBotSettings()
+    settings: deterministicBotSettings({ targetActivePlayers: MAX_ACTIVE_PLAYERS })
   });
   let state = payload.state;
-  assert.equal(activePlayers(state).length, 4, "bot fill should create four active players");
-  assert.equal(activePlayersByController(state, "bot").length, 4, "all initial active players should be bots");
+  assert.equal(activePlayers(state).length, MAX_ACTIVE_PLAYERS, "bot fill should create ten active players");
+  assert.equal(activePlayersByController(state, "bot").length, MAX_ACTIVE_PLAYERS, "all initial active players should be bots");
   assert.equal(activePlayersByController(state, "human").length, 0, "bot-only test should not create human players");
   assert.deepEqual(
     activePlayers(state).map((player) => player.team),
-    [0, 1, 0, 1],
-    "bot fill should split active teams 2v2"
+    [0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+    "bot fill should split active teams 5v5"
+  );
+  assert.ok(
+    activePlayersByController(state, "bot").every((player) => !/^bot\b/i.test(player.name)),
+    "bot display names should look like player names without a Bot prefix"
   );
   const firstBotIds = new Set(activePlayersByController(state, "bot").map((player) => player.id));
 
   const joinOne = await api("POST", "/api/join", { name: "Human One" });
   state = joinOne.state;
-  assert.equal(activePlayers(state).length, 4, "one human plus bots should still fill four active slots");
+  assert.equal(activePlayers(state).length, MAX_ACTIVE_PLAYERS, "one human plus bots should still fill ten active slots");
   assert.equal(activePlayersByController(state, "human").length, 1, "one joined human should be active");
-  assert.equal(activePlayersByController(state, "bot").length, 3, "one joined human should remove one bot");
+  assert.equal(activePlayersByController(state, "bot").length, MAX_ACTIVE_PLAYERS - 1, "one joined human should remove one bot");
   assert.equal(playerAt(state, joinOne.joined.index).controller, "human", "joined player snapshot should be human controlled");
   assert.ok(
     activePlayersByController(state, "bot").some((player) => firstBotIds.has(player.id)),
@@ -295,29 +560,30 @@ async function assertBotsFillAndDisplace(api) {
   );
   let health = await api("GET", "/api/health");
   assert.equal(health.connectedClients, 1, "bots should not consume connected client capacity");
-  assert.equal(health.activePlayers, 4, "health activePlayers should include bots filling the match");
+  assert.equal(health.activePlayers, MAX_ACTIVE_PLAYERS, "health activePlayers should include bots filling the match");
 
   const joinTwo = await api("POST", "/api/join", { name: "Human Two" });
   state = joinTwo.state;
-  assert.equal(activePlayers(state).length, 4, "two humans plus bots should still fill four active slots");
+  assert.equal(activePlayers(state).length, MAX_ACTIVE_PLAYERS, "two humans plus bots should still fill ten active slots");
   assert.equal(activePlayersByController(state, "human").length, 2, "two joined humans should be active");
-  assert.equal(activePlayersByController(state, "bot").length, 2, "two joined humans should leave two active bots");
+  assert.equal(activePlayersByController(state, "bot").length, MAX_ACTIVE_PLAYERS - 2, "two joined humans should leave eight active bots");
   health = await api("GET", "/api/health");
   assert.equal(health.connectedClients, 2, "health connectedClients should count humans only");
 
   await api("POST", "/api/leave", { clientId: joinOne.joined.id });
   state = (await api("GET", "/api/test/state")).state;
   assert.equal(activePlayersByController(state, "human").length, 1, "leaving one human should remove that human");
-  assert.equal(activePlayersByController(state, "bot").length, 3, "leaving one human should backfill one bot");
+  assert.equal(activePlayersByController(state, "bot").length, MAX_ACTIVE_PLAYERS - 1, "leaving one human should backfill one bot");
 
   await api("POST", "/api/leave", { clientId: joinTwo.joined.id });
   state = (await api("GET", "/api/test/state")).state;
   assert.equal(activePlayersByController(state, "human").length, 0, "all humans should be gone after leave");
-  assert.equal(activePlayersByController(state, "bot").length, 4, "bot-only fill should restore four active bots");
+  assert.equal(activePlayersByController(state, "bot").length, MAX_ACTIVE_PLAYERS, "bot-only fill should restore ten active bots");
 }
 
 async function assertBotsFight(api) {
   let state = await enableBotMatch(api, {
+    targetActivePlayers: 4,
     aggression: 1,
     fightDistance: 1.9,
     handIntervalMs: 260,
@@ -369,13 +635,101 @@ async function assertBotsFight(api) {
   );
 }
 
+async function assertSupportBotsPressureOpponents(api) {
+  let state = await enableBotMatch(api, {
+    targetActivePlayers: 6,
+    aggression: 0.9,
+    fightDistance: 1.9,
+    supportReleaseDistance: 3,
+    handIntervalMs: 240,
+    kickIntervalMs: 220,
+    headIntervalMs: 360
+  });
+  const supportId = playerAt(state, 2).id;
+  const targetId = playerAt(state, 3).id;
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 0 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  const placements = [
+    { index: 0, x: -0.2, z: -0.9, yaw: 0 },
+    { index: 1, x: -8, z: 8, yaw: Math.PI },
+    { index: 2, x: 1.5, z: -1.1, yaw: 0 },
+    { index: 3, x: 1.65, z: 0.05, yaw: Math.PI },
+    { index: 4, x: -9, z: -9, yaw: 0 },
+    { index: 5, x: 9, z: 9, yaw: Math.PI }
+  ];
+  for (const placement of placements) {
+    await api("POST", `/api/test/player/${placement.index}`, {
+      position: { x: placement.x, y: PLAYER_HEIGHT / 2, z: placement.z },
+      stamina: 100,
+      yaw: placement.yaw,
+      input: inputState()
+    });
+  }
+  state = (await api("GET", "/api/test/state")).state;
+  const beforeAudioId = maxAudioEventId(state);
+  state = (await api("POST", "/api/test/tick", { frames: 14 })).state;
+  const support = state.players.find((player) => player.id === supportId);
+  const target = state.players.find((player) => player.id === targetId);
+  assert.ok(support && target, "support pressure actors should remain in state");
+  assert.ok(
+    ["hand", "left", "head"].includes(support.lastAction),
+    "non-primary support bot should actively fight an opponent threatening the ball"
+  );
+  assert.ok(
+    support.stamina < 100 || target.stamina < 100 || support.ragdoll || target.ragdoll,
+    "support pressure should spend stamina or damage the opponent through combat"
+  );
+  assertAudioEvent(
+    state,
+    beforeAudioId,
+    (event) => event.kind === "kick" && ["hand", "left", "head"].includes(event.kick) && event.playerId === supportId,
+    "support bot pressure combat"
+  );
+}
+
 async function assertBotsScoreBothTeams(api) {
   await assertBotScoresForTeam(api, 0);
   await assertBotScoresForTeam(api, 1);
 }
 
+async function assertDefaultBotsProduceGoal(api) {
+  await api("POST", "/api/test/players", { count: 0 });
+  await api("POST", "/api/test/reset", {});
+  await api("POST", "/api/test/weather", { kind: "clear" });
+  const defaults = (await api("GET", "/api/bot-settings")).defaults;
+  let state = (await api("POST", "/api/test/bots", {
+    enabled: true,
+    settings: defaults
+  })).state;
+  const beforeAudioId = maxAudioEventId(state);
+  for (let second = 0; second < 16; second += 1) {
+    state = (await api("POST", "/api/test/tick", { frames: 60 })).state;
+    if (state.score.blue + state.score.orange > 0) break;
+  }
+  assert.ok(state.score.blue + state.score.orange > 0, "default bot match should produce a first goal");
+  assert.equal(activePlayersByController(state, "bot").length, MAX_ACTIVE_PLAYERS, "default bot match should keep ten bot players active");
+  assert.ok(
+    activePlayersByController(state, "bot").every((player) => !/^bot\b/i.test(player.name)),
+    "default bot match should expose player-like names"
+  );
+  assert.equal(
+    activePlayers(state).filter((player) => player.ragdoll || player.exhausted).length,
+    0,
+    "default bot match should score without stamina exhaustion or ragdoll collapse"
+  );
+  assertAudioEvent(
+    state,
+    beforeAudioId,
+    (event) => event.kind === "goal",
+    "default bot match goal"
+  );
+}
+
 async function assertBotScoresForTeam(api, team) {
   let state = await enableBotMatch(api, {
+    targetActivePlayers: 4,
     aggression: 0,
     shootDistance: 3.2,
     kickIntervalMs: 200,
@@ -437,12 +791,14 @@ async function enableBotMatch(api, patch = {}) {
 function deterministicBotSettings(patch = {}) {
   return {
     enabled: true,
-    targetActivePlayers: 4,
+    targetActivePlayers: MAX_ACTIVE_PLAYERS,
     aggression: 0.85,
     shootDistance: 2.95,
     fightDistance: 1.72,
     chaseDistance: 4.8,
     sprintDistance: 4.8,
+    shotAlignmentMin: 0.18,
+    supportReleaseDistance: 2.2,
     kickIntervalMs: 260,
     handIntervalMs: 360,
     headIntervalMs: 520,
@@ -454,6 +810,9 @@ function deterministicBotSettings(patch = {}) {
 async function main() {
   const port = await freePort();
   const baseUrl = `http://127.0.0.1:${port}`;
+  const settingsDir = fs.mkdtempSync(path.join(os.tmpdir(), "unsoccer-settings-"));
+  const settingsFile = path.join(settingsDir, "game-settings.json");
+  fs.writeFileSync(settingsFile, `${JSON.stringify(DEFAULT_GAME_SETTINGS, null, 2)}\n`, "utf8");
   const stdoutLines = [];
   const stderrLines = [];
   let exitCode = null;
@@ -463,7 +822,8 @@ async function main() {
       ...process.env,
       UNSOCCER_PORT: String(port),
       UNSOCCER_TEST_MODE: "1",
-      UNSOCCER_LOCAL_ICE: "1"
+      UNSOCCER_LOCAL_ICE: "1",
+      UNSOCCER_GAME_SETTINGS_FILE: settingsFile
     },
     stdio: ["ignore", "pipe", "pipe"]
   });
@@ -517,29 +877,33 @@ async function main() {
     );
 
     await assertHttpFallback(api);
+    await assertCommunicationProfileAndCombatSides(api, baseUrl);
     await assertBotSettingsCors(baseUrl);
+    await assertGameSettingsApi(api, baseUrl, settingsFile);
     await assertBotsFillAndDisplace(api);
     await assertBotsFight(api);
+    await assertSupportBotsPressureOpponents(api);
     await assertBotsScoreBothTeams(api);
+    await assertDefaultBotsProduceGoal(api);
     await api("POST", "/api/test/bots", { enabled: false });
     await api("POST", "/api/test/weather", { kind: "dawn" });
 
-    state = (await api("POST", "/api/test/players", { count: 5 })).state;
-    assert.equal(state.players.filter((player) => player.role === "player").length, 4);
+    state = (await api("POST", "/api/test/players", { count: MAX_ACTIVE_PLAYERS + 1 })).state;
+    assert.equal(state.players.filter((player) => player.role === "player").length, MAX_ACTIVE_PLAYERS);
     assert.equal(state.players.filter((player) => player.role === "spectator").length, 1);
-    assert.equal(playerAt(state, 4).team, null);
+    assert.equal(playerAt(state, MAX_ACTIVE_PLAYERS).team, null);
     const assignedCharacters = state.players.map((player) => player.characterId);
     assert.ok(
       assignedCharacters.every((characterId) => CHARACTER_ROSTER_SET.has(characterId)),
       "all players should receive a character from the ready runtime roster"
     );
     assert.ok(
-      new Set(assignedCharacters).size >= Math.min(assignedCharacters.length, CHARACTER_ROSTER.length),
-      "new players should draw non-repeating random characters from the ready roster deck"
+      new Set(assignedCharacters).size >= Math.min(assignedCharacters.length, 6),
+      "new players should draw varied random characters from the ready roster deck"
     );
     assert.ok(Array.isArray(state.audioEvents), "state should expose server audioEvents");
     assert.ok(
-      state.audioEvents.some((event) => event.kind === "roster" && event.change === "spectator" && event.playerId === playerAt(state, 4).id),
+      state.audioEvents.some((event) => event.kind === "roster" && event.change === "spectator" && event.playerId === playerAt(state, MAX_ACTIVE_PLAYERS).id),
       "spectator assignment should emit roster audio event"
     );
     await assertMovementControls(api);
@@ -650,7 +1014,7 @@ async function main() {
     );
 
     state = (await api("POST", "/api/test/tick", {
-      frames: Math.ceil((POST_GOAL_CELEBRATION_MS + POST_GOAL_BALL_RETURN_MS + 600) / (1000 / 60))
+      frames: Math.ceil((POST_GOAL_BALL_RETURN_MS * 0.5 + 600) / (1000 / 60))
     })).state;
     assert.ok(Math.abs(state.ball.position.x) < 0.01);
     assert.ok(Math.abs(state.ball.position.z) < 0.01);
@@ -681,13 +1045,17 @@ async function main() {
         "websocket no-join has no phantom roster audio",
         "websocket join audioEvents",
         "http fallback join/input/state",
+        "communication profile chat emotion and side-aware combat",
+        "runtime game settings API/schema/clamp/reload",
         "bot settings CORS and apply endpoint",
-        "bots fill active slots to four",
-        "human joins displace bots and do not exceed four active players",
+        "bots fill active slots to ten",
+        "human joins displace bots and do not exceed ten active players",
         "bots do not consume connected client capacity",
         "bot AI fighting through server combat",
+        "support bot pressure fighting through server combat",
         "bot-only scoring fixtures for blue and orange",
-        "5-client role assignment",
+        "default bot match produces a first goal without collapse",
+        "11-client role assignment",
         "random non-repeating ready character assignment",
         "team-relative WASD movement",
         "smoothed keyboard axes and acceleration",
@@ -715,6 +1083,7 @@ async function main() {
     }, null, 2));
   } finally {
     await stopServer(child);
+    fs.rmSync(settingsDir, { recursive: true, force: true });
   }
 }
 

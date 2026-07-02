@@ -4,7 +4,7 @@
   <parent path="../itch_games.skill.md" />
   <entry file="unsoccer.skill.md" />
   <runtime url="https://io-games.mecharulez.com/unsoccer/" />
-  <version current="v0.0.031" />
+  <version current="v0.0.033" />
   <publicSurface owner="UI Designer" localUrl="http://127.0.0.1:8000/unsoccer/" itchEntry="dist/index.html">
     <rule>unsoccer/index.html is the public static page for the local server and production route until the built client is deployed there.</rule>
     <rule>UI Designer owns public page hierarchy, prototype status copy, catalog continuity, and itch.io presentation fit.</rule>
@@ -16,6 +16,8 @@
     <file path="client/index.html" role="client-entry hud-settings-dom" />
     <file path="client/character-controller-test.html" role="local-character-controller-test-page" />
     <file path="client/public/bot-tuning.html" role="static-server-bot-tuning-page" />
+    <file path="client/public/game-settings.html" role="static-runtime-game-settings-admin-page" />
+    <file path="client/public/game-admin.html" role="static-schema-runtime-game-admin-page" />
     <file path="client/src/main.ts" role="three-runtime hud-settings-network-input" />
     <file path="client/src/environment-props.ts" role="art-director-courtyard-free3d-environment-loader" />
     <file path="client/src/character-controller.ts" role="free3d-character-loader-animation-controller-ik" />
@@ -27,6 +29,7 @@
     <file path="client/src/weather.ts" role="weather-graphics-options" />
     <folder path="server" role="authoritative-server" />
     <folder path="shared" role="shared-protocol" />
+    <file path="game-settings.json" role="runtime-game-settings-json-source" />
     <folder path="assets" role="runtime-assets-and-provenance" />
     <file path="client/public/assets/environment/free3d/roster.json" role="local-free3d-environment-runtime-roster" />
     <file path="assets/models/environment/free3d/provenance.json" role="local-free3d-environment-source-provenance" />
@@ -70,6 +73,9 @@
     <rule>v0.0.029 widens gameplay camera framing and adds close sideline pennant/bench strips so the dense v0.0.028 courtyard dressing is visible in normal play while the pitch remains clear.</rule>
     <rule>v0.0.030 makes striking more user-friendly: foot/hand/head ball hits have player-centered assist reach, LMB clicks buffer for a short contact window, active strike inputs suppress same-frame body bump, and body-only ball contact is smaller, softer, and less frequent.</rule>
     <rule>v0.0.031 adds server-authoritative bot actors that fill active player slots to four, remove/backfill as humans join or leave, do not consume connectedClients capacity, expose controller=bot in snapshots, play through normal movement/combat/scoring rules, and can be tuned from client/public/bot-tuning.html through /api/bot-settings. Visible foot/hand whiff actions replicate even without ball/player contact, player-hit ranges/cones are forgiving for live fighting, and client character visuals smooth render position/yaw/velocity before animation to reduce sideways movement and ragdoll flicker.</rule>
+    <rule>v0.0.031 environment props replace small procedural dressing with local Free3D instances baked at runtime to textureless Vertex PBR before scene insertion. Free3D environment meshes must have zero runtime texture maps, COLOR_0 alpha AO, uv1 roughness/metalness, and local client-visual rigid bodies/colliders/mass exposed through data-free3d-environment-* QA counters. Shared/server-authoritative prop physics is not yet shipped.</rule>
+    <rule>v0.0.032 introduces unsoccer/game-settings.json as the runtime settings source, /api/game-settings plus /api/game-settings/reload as the authoritative apply/reload API, ServerState.settings/settingsRevision for client runtime tuning, and client/public/game-admin.html as the compact schema-driven admin page with controls/status metrics; client/public/game-settings.html remains the larger legacy admin surface. Every new UnSoccer gameplay, world, bot, audio, camera, lighting, prop, or UI feature that adds a tunable value must add it to GameSettings, DEFAULT_GAME_SETTINGS, GAME_SETTINGS_SCHEMA, game-settings.json, and the admin page contract in the same change. The settings admin is Russian-facing, GAME_SETTINGS_SCHEMA must cover every JSON/defaults key, and acceptance must prove per-key apply/readback through /api/game-settings.</rule>
+    <rule>v0.0.033 adds player communication and personalization: a local-only 9-emotion mouse-wheel selector above the local player, replicated applied emotions in PlayerSnapshot.emotion, compact bottom-right chat, profile controls for nickname/skin/userPic across WebSocket and HTTP fallback, and server-authored body-side combat metadata where hand punches alternate right/left and LMB foot kicks use the current trailingFoot exposed through lastActionSide/trailingFoot/stancePhase.</rule>
     <rule>Server-confirmed left-foot, hand, head, jump, and body contacts must stay visually distinguishable and expose data-last-action-kind, data-last-action-player, and data-last-action-at for QA.</rule>
     <rule>Server owns physics, score, teams, and room assignment.</rule>
     <rule>Production transport is plain WebSocket JSON under /unsoccer/socket/ with HTTP polling fallback, implemented with built-in Node http/net/crypto primitives; do not require geckos.io, ws, or native node-datachannel on the Qwertystock host.</rule>
@@ -79,7 +85,7 @@
     <rule>npm run package:unsoccer rebuilds before creating dist/unsoccer-itch.zip so stale dist output is not published.</rule>
     <rule>Client audio is procedural Web Audio driven by authoritative ServerState audioEvents and weather state, not local input prediction.</rule>
     <rule>Audio QA must inspect data-audio-played-events, data-audio-blocked-events, data-audio-context, and data-audio-unlocked after a real trusted browser gesture.</rule>
-    <rule>Humans/test clients get active-slot priority; server bots fill remaining active slots up to four, while clients beyond the active limit remain spectators/testers.</rule>
+    <rule>Humans/test clients get active-slot priority; server bots fill remaining active slots up to the active max in GameSettings, while clients beyond the active limit remain spectators/testers.</rule>
     <rule>Itch package contains static built client only.</rule>
     <rule>Free3D runtime assets require local GLB files and provenance; tokenless LowPoly 1k assets must be selected only from exact public worker inventory paths.json entries.</rule>
     <rule>Character ids in shared/src/index.ts CHARACTER_ROSTER must exist in client/public/assets/characters/free3d/roster.json with local textures and clips before they can be assigned by the server.</rule>

@@ -320,7 +320,7 @@
           </label>
           <div id="controls"></div>
           <div class="actions">
-            <button id="matchButton">4 Bot Match</button>
+            <button id="matchButton">10 Player Match</button>
             <button id="disableButton">Disable</button>
             <button id="saveButton">Save Local</button>
             <button id="defaultsButton">Defaults</button>
@@ -362,24 +362,28 @@
       const STORAGE_KEY = "unsoccer.botTuning.v1";
       const DEFAULT_SETTINGS = {
         enabled: true,
-        targetActivePlayers: 4,
-        aggression: 0.7,
-        shootDistance: 2.75,
-        fightDistance: 1.62,
-        chaseDistance: 4.6,
-        sprintDistance: 5.4,
-        kickIntervalMs: 360,
-        handIntervalMs: 620,
-        headIntervalMs: 900,
-        jumpChance: 0.03
+        targetActivePlayers: 10,
+        aggression: 0.38,
+        shootDistance: 4.15,
+        fightDistance: 1.28,
+        chaseDistance: 5.4,
+        sprintDistance: 6.8,
+        shotAlignmentMin: 0.18,
+        supportReleaseDistance: 2.2,
+        kickIntervalMs: 440,
+        handIntervalMs: 1150,
+        headIntervalMs: 1100,
+        jumpChance: 0.015
       };
       const CONTROL_DEFS = [
-        ["targetActivePlayers", "Target players", 0, 4, 1],
+        ["targetActivePlayers", "Target players", 0, 10, 1],
         ["aggression", "Aggression", 0, 1, 0.01],
         ["shootDistance", "Shoot distance", 1.2, 6, 0.05],
         ["fightDistance", "Fight distance", 0.9, 3, 0.05],
         ["chaseDistance", "Chase distance", 1.5, 9, 0.05],
         ["sprintDistance", "Sprint distance", 0, 14, 0.1],
+        ["shotAlignmentMin", "Shot alignment", -0.5, 1, 0.01],
+        ["supportReleaseDistance", "Support release", 0, 8, 0.05],
         ["kickIntervalMs", "Kick interval ms", 180, 1800, 10],
         ["handIntervalMs", "Hand interval ms", 260, 2200, 10],
         ["headIntervalMs", "Head interval ms", 360, 2600, 10],
@@ -616,7 +620,7 @@
         setLog("Defaults loaded locally.");
       });
       document.getElementById("matchButton").addEventListener("click", () => {
-        setSettings({ ...collectSettings(), enabled: true, targetActivePlayers: 4 });
+        setSettings({ ...collectSettings(), enabled: true, targetActivePlayers: 10 });
         applySettings().catch((error) => {
           setStatus("Apply failed", "bad");
           setLog(error.message || String(error));

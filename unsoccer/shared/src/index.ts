@@ -1,6 +1,6 @@
-export const GAME_VERSION = "v0.0.031";
+export const GAME_VERSION = "v0.0.033";
 export const ROOM_ID = "unsoccer-default-room";
-export const MAX_ACTIVE_PLAYERS = 4;
+export const MAX_ACTIVE_PLAYERS = 10;
 export const MAX_ROOM_CLIENTS = 32;
 export const SERVER_TICK_RATE = 60;
 export const SNAPSHOT_RATE = 20;
@@ -75,6 +75,23 @@ export type WeatherKind = "clear" | "dawn" | "rain" | "snow";
 export type HazardType = "puddle" | "slush" | "snowbank";
 export type AudioEventKind = "roster" | "kick" | "goal" | "countdown" | "celebration";
 export type RosterAudioChange = "join" | "leave" | "spectator";
+export type StrikeSide = "left" | "right";
+
+export const EMOTION_CHOICES = [
+  { id: "angry", emoji: "😡", label: "Злость" },
+  { id: "heart", emoji: "❤️", label: "Сердце" },
+  { id: "laugh", emoji: "😂", label: "Смех" },
+  { id: "wow", emoji: "😮", label: "Вау" },
+  { id: "sad", emoji: "😢", label: "Грусть" },
+  { id: "fire", emoji: "🔥", label: "Огонь" },
+  { id: "gg", emoji: "🤝", label: "Хорошая игра" },
+  { id: "goal", emoji: "⚽", label: "Гол" },
+  { id: "crown", emoji: "👑", label: "Корона" }
+] as const;
+
+export const DEFAULT_USER_PICS = ["⚽", "⭐", "🔥", "👑", "😎", "🤝", "🚀", "🎯", "🧤"] as const;
+
+export type EmotionId = typeof EMOTION_CHOICES[number]["id"];
 
 export interface Vec3 {
   x: number;
@@ -97,13 +114,39 @@ export interface InputState {
   yaw: number;
 }
 
+export interface PlayerProfileSnapshot {
+  nickname: string;
+  skinId: string;
+  userPic: string;
+}
+
+export interface PlayerEmotionSnapshot {
+  id: EmotionId;
+  emoji: string;
+  label: string;
+  appliedAt: number;
+  expiresAt: number;
+}
+
+export interface ChatMessageSnapshot {
+  id: number;
+  playerId: string;
+  name: string;
+  userPic: string;
+  text: string;
+  createdAt: number;
+}
+
 export interface PlayerSnapshot {
   id: string;
   name: string;
+  profile: PlayerProfileSnapshot;
+  userPic: string;
   controller: PlayerController;
   role: PlayerRole;
   team: TeamId | null;
   index: number;
+  goals: number;
   characterId: string;
   position: Vec3;
   velocity: Vec3;
@@ -116,10 +159,14 @@ export interface PlayerSnapshot {
   ragdollAt: number;
   grounded: boolean;
   lastAction: KickKind | null;
+  lastActionSide: StrikeSide | null;
   lastActionAt: number;
+  trailingFoot: StrikeSide;
+  stancePhase: number;
   celebration: CelebrationKind | null;
   celebrationAt: number;
   celebrationAvailableUntil: number;
+  emotion: PlayerEmotionSnapshot | null;
 }
 
 export interface BallSnapshot {
@@ -202,6 +249,10 @@ export type ServerAudioEvent = RosterAudioEvent | KickAudioEvent | GoalAudioEven
 
 export interface JoinRequest {
   name?: string;
+  clientFingerprint?: string;
+  profile?: Partial<PlayerProfileSnapshot>;
+  skinId?: string;
+  userPic?: string;
 }
 
 export interface JoinAccepted {
@@ -209,7 +260,9 @@ export interface JoinAccepted {
   role: PlayerRole;
   team: TeamId | null;
   index: number;
+  goals: number;
   characterId: string;
+  profile: PlayerProfileSnapshot;
   version: string;
   maxActivePlayers: number;
   maxRoomClients: number;
@@ -217,8 +270,10 @@ export interface JoinAccepted {
 
 export interface ServerState {
   version: string;
+  settingsRevision: number;
   serverTime: number;
   dayTimeSeconds: number;
+  settings: GameSettings;
   tick: number;
   players: PlayerSnapshot[];
   ball: BallSnapshot;
@@ -227,6 +282,7 @@ export interface ServerState {
   countdown: number;
   goalReset: GoalResetSnapshot;
   weather: WeatherSnapshot;
+  chatMessages: ChatMessageSnapshot[];
   audioEvents: ServerAudioEvent[];
 }
 
@@ -238,6 +294,7 @@ export interface ClientInputMessage {
 export interface ServerInfo {
   ok: boolean;
   version: string;
+  settingsRevision: number;
   activePlayers: number;
   connectedClients: number;
   maxActivePlayers: number;
@@ -277,6 +334,341 @@ export const CHARACTER_ROSTER = [
   "666dc6f4-0cc4-4714-a7cf-39cfb6655fe8"
 ] as const;
 
+export interface GameSettings {
+  fieldWidth: number;
+  fieldLength: number;
+  goalWidth: number;
+  goalDepth: number;
+  goalPostRadius: number;
+  goalCrossbarHeight: number;
+  goalCrossbarRadius: number;
+  maxActivePlayers: number;
+  dayCycleSeconds: number;
+  dayStartSeconds: number;
+  sunIntensity: number;
+  moonIntensity: number;
+  ambientIntensity: number;
+  floodlightIntensity: number;
+  toneMappingExposure: number;
+  weatherChangeMinMs: number;
+  weatherChangeMaxMs: number;
+  weatherDawnWeight: number;
+  weatherClearWeight: number;
+  weatherRainWeight: number;
+  weatherSnowWeight: number;
+  playerRadius: number;
+  playerHeight: number;
+  playerSpeed: number;
+  playerInputAxisAcceleration: number;
+  playerInputAxisReleaseDecay: number;
+  playerInputAxisOppositeAcceleration: number;
+  playerMovementAcceleration: number;
+  playerMovementDeceleration: number;
+  playerMovementTurnAcceleration: number;
+  playerSprintMultiplier: number;
+  playerExhaustedSpeedMultiplier: number;
+  playerExhaustedRecoveryThreshold: number;
+  playerStaminaMax: number;
+  playerStaminaSprintDrainPerSecond: number;
+  playerStaminaJumpCost: number;
+  playerStaminaHitCost: number;
+  playerStaminaRecoveryDelayMs: number;
+  playerStaminaRecoveryPerSecond: number;
+  playerHitRecoveryDelayMs: number;
+  playerJumpStrength: number;
+  playerJumpCooldownMs: number;
+  playerGravity: number;
+  playerAirControlMultiplier: number;
+  playerRagdollMinMs: number;
+  playerRagdollFrictionPerSecond: number;
+  playerRagdollHitKnockback: number;
+  playerRagdollVerticalKnockback: number;
+  ballRadius: number;
+  ballDensity: number;
+  ballRestitution: number;
+  kickRange: number;
+  footKickAssistRange: number;
+  handKickAssistRange: number;
+  headKickAssistRange: number;
+  footKickStrength: number;
+  handHitStrength: number;
+  headKickStrength: number;
+  kickCooldownMs: number;
+  handCooldownMs: number;
+  headCooldownMs: number;
+  ballHitBasePowerMultiplier: number;
+  leftKickInputBufferMs: number;
+  leftKickChargeSeconds: number;
+  leftKickFullChargePowerMultiplier: number;
+  footPlayerStaminaDamage: number;
+  handPlayerStaminaDamage: number;
+  headPlayerStaminaDamage: number;
+  airborneHeadStaminaDamageBonus: number;
+  bodyBumpRange: number;
+  bodyBumpMinSpeed: number;
+  bodyBumpStrength: number;
+  bodyBumpCooldownMs: number;
+  propImpulseMultiplier: number;
+  propDamping: number;
+  propReturnStrength: number;
+  propMaxDisplacementMultiplier: number;
+  postGoalCelebrationMs: number;
+  postGoalBallReturnMs: number;
+  kickoffCountdownMs: number;
+  celebrationWindowMs: number;
+  celebrationDurationMs: number;
+  botsEnabled: boolean;
+  botTargetActivePlayers: number;
+  botAggression: number;
+  botShootDistance: number;
+  botFightDistance: number;
+  botChaseDistance: number;
+  botSprintDistance: number;
+  botShotAlignmentMin: number;
+  botSupportReleaseDistance: number;
+  botKickIntervalMs: number;
+  botHandIntervalMs: number;
+  botHeadIntervalMs: number;
+  botJumpChance: number;
+}
+
+export type GameSettingInput = "number" | "range" | "checkbox";
+
+export interface GameSettingSchemaItem {
+  key: keyof GameSettings;
+  group: string;
+  label: string;
+  description: string;
+  input: GameSettingInput;
+  min?: number;
+  max?: number;
+  step?: number;
+  restartPhysics?: boolean;
+}
+
+export const DEFAULT_GAME_SETTINGS: GameSettings = {
+  fieldWidth: FIELD_WIDTH,
+  fieldLength: FIELD_LENGTH,
+  goalWidth: GOAL_WIDTH,
+  goalDepth: GOAL_DEPTH,
+  goalPostRadius: 0.19,
+  goalCrossbarHeight: 2.18,
+  goalCrossbarRadius: 0.16,
+  maxActivePlayers: MAX_ACTIVE_PLAYERS,
+  dayCycleSeconds: DAY_CYCLE_SECONDS,
+  dayStartSeconds: DAY_START_SECONDS,
+  sunIntensity: 1,
+  moonIntensity: 1,
+  ambientIntensity: 1,
+  floodlightIntensity: 1,
+  toneMappingExposure: 1,
+  weatherChangeMinMs: 60000,
+  weatherChangeMaxMs: 120000,
+  weatherDawnWeight: 3,
+  weatherClearWeight: 12,
+  weatherRainWeight: 1,
+  weatherSnowWeight: 1,
+  playerRadius: PLAYER_RADIUS,
+  playerHeight: PLAYER_HEIGHT,
+  playerSpeed: PLAYER_SPEED,
+  playerInputAxisAcceleration: PLAYER_INPUT_AXIS_ACCELERATION,
+  playerInputAxisReleaseDecay: PLAYER_INPUT_AXIS_RELEASE_DECAY,
+  playerInputAxisOppositeAcceleration: PLAYER_INPUT_AXIS_OPPOSITE_ACCELERATION,
+  playerMovementAcceleration: PLAYER_MOVEMENT_ACCELERATION,
+  playerMovementDeceleration: PLAYER_MOVEMENT_DECELERATION,
+  playerMovementTurnAcceleration: PLAYER_MOVEMENT_TURN_ACCELERATION,
+  playerSprintMultiplier: PLAYER_SPRINT_MULTIPLIER,
+  playerExhaustedSpeedMultiplier: PLAYER_EXHAUSTED_SPEED_MULTIPLIER,
+  playerExhaustedRecoveryThreshold: PLAYER_EXHAUSTED_RECOVERY_THRESHOLD,
+  playerStaminaMax: PLAYER_STAMINA_MAX,
+  playerStaminaSprintDrainPerSecond: PLAYER_STAMINA_SPRINT_DRAIN_PER_SECOND,
+  playerStaminaJumpCost: PLAYER_STAMINA_JUMP_COST,
+  playerStaminaHitCost: PLAYER_STAMINA_HIT_COST,
+  playerStaminaRecoveryDelayMs: PLAYER_STAMINA_RECOVERY_DELAY_MS,
+  playerStaminaRecoveryPerSecond: PLAYER_STAMINA_RECOVERY_PER_SECOND,
+  playerHitRecoveryDelayMs: 600,
+  playerJumpStrength: PLAYER_JUMP_STRENGTH,
+  playerJumpCooldownMs: PLAYER_JUMP_COOLDOWN_MS,
+  playerGravity: PLAYER_GRAVITY,
+  playerAirControlMultiplier: PLAYER_AIR_CONTROL_MULTIPLIER,
+  playerRagdollMinMs: PLAYER_RAGDOLL_MIN_MS,
+  playerRagdollFrictionPerSecond: PLAYER_RAGDOLL_FRICTION_PER_SECOND,
+  playerRagdollHitKnockback: PLAYER_RAGDOLL_HIT_KNOCKBACK,
+  playerRagdollVerticalKnockback: PLAYER_RAGDOLL_VERTICAL_KNOCKBACK,
+  ballRadius: BALL_RADIUS,
+  ballDensity: BALL_DENSITY,
+  ballRestitution: BALL_RESTITUTION,
+  kickRange: KICK_RANGE,
+  footKickAssistRange: FOOT_KICK_ASSIST_RANGE,
+  handKickAssistRange: HAND_KICK_ASSIST_RANGE,
+  headKickAssistRange: HEAD_KICK_ASSIST_RANGE,
+  footKickStrength: FOOT_KICK_STRENGTH,
+  handHitStrength: HAND_HIT_STRENGTH,
+  headKickStrength: HEAD_KICK_STRENGTH,
+  kickCooldownMs: KICK_COOLDOWN_MS,
+  handCooldownMs: HAND_COOLDOWN_MS,
+  headCooldownMs: HEAD_COOLDOWN_MS,
+  ballHitBasePowerMultiplier: BALL_HIT_BASE_POWER_MULTIPLIER,
+  leftKickInputBufferMs: 180,
+  leftKickChargeSeconds: LEFT_KICK_CHARGE_SECONDS,
+  leftKickFullChargePowerMultiplier: LEFT_KICK_FULL_CHARGE_POWER_MULTIPLIER,
+  footPlayerStaminaDamage: FOOT_PLAYER_STAMINA_DAMAGE,
+  handPlayerStaminaDamage: HAND_PLAYER_STAMINA_DAMAGE,
+  headPlayerStaminaDamage: HEAD_PLAYER_STAMINA_DAMAGE,
+  airborneHeadStaminaDamageBonus: AIRBORNE_HEAD_STAMINA_DAMAGE_BONUS,
+  bodyBumpRange: BODY_BUMP_RANGE,
+  bodyBumpMinSpeed: BODY_BUMP_MIN_SPEED,
+  bodyBumpStrength: BODY_BUMP_STRENGTH,
+  bodyBumpCooldownMs: BODY_BUMP_COOLDOWN_MS,
+  propImpulseMultiplier: 1,
+  propDamping: 2.4,
+  propReturnStrength: 1.25,
+  propMaxDisplacementMultiplier: 1,
+  postGoalCelebrationMs: POST_GOAL_CELEBRATION_MS,
+  postGoalBallReturnMs: POST_GOAL_BALL_RETURN_MS,
+  kickoffCountdownMs: KICKOFF_COUNTDOWN_MS,
+  celebrationWindowMs: CELEBRATION_WINDOW_MS,
+  celebrationDurationMs: CELEBRATION_DURATION_MS,
+  botsEnabled: true,
+  botTargetActivePlayers: MAX_ACTIVE_PLAYERS,
+  botAggression: 0.38,
+  botShootDistance: 4.15,
+  botFightDistance: 1.28,
+  botChaseDistance: 5.4,
+  botSprintDistance: 6.8,
+  botShotAlignmentMin: 0.18,
+  botSupportReleaseDistance: 2.2,
+  botKickIntervalMs: 440,
+  botHandIntervalMs: 1150,
+  botHeadIntervalMs: 1100,
+  botJumpChance: 0.015
+};
+
+export const GAME_SETTINGS_SCHEMA: GameSettingSchemaItem[] = [
+  { key: "fieldWidth", group: "Поле", label: "Ширина поля", description: "Игровая ширина поля в метрах мира. Пересобирает физические границы и размещение погодных препятствий.", input: "range", min: 24, max: 96, step: 1, restartPhysics: true },
+  { key: "fieldLength", group: "Поле", label: "Длина поля", description: "Игровая длина поля в метрах мира. Пересобирает ворота, границы, спавны и погодные препятствия.", input: "range", min: 36, max: 144, step: 1, restartPhysics: true },
+  { key: "goalWidth", group: "Поле", label: "Ширина ворот", description: "Ширина открытого створа ворот. Больше значение облегчает голы.", input: "range", min: 6, max: 22, step: 0.25, restartPhysics: true },
+  { key: "goalDepth", group: "Поле", label: "Глубина ворот", description: "Насколько далеко ворота уходят за лицевую линию. Влияет на удержание мяча и проверки сброса.", input: "range", min: 1.5, max: 8, step: 0.1, restartPhysics: true },
+  { key: "goalPostRadius", group: "Поле", label: "Толщина штанг", description: "Радиус физического коллайдера штанг. Чем выше значение, тем сильнее отскок от штанги.", input: "range", min: 0.05, max: 0.35, step: 0.01, restartPhysics: true },
+  { key: "goalCrossbarHeight", group: "Поле", label: "Высота перекладины", description: "Высота перекладины и верхней границы легального створа ворот.", input: "range", min: 1.5, max: 3.2, step: 0.01, restartPhysics: true },
+  { key: "goalCrossbarRadius", group: "Поле", label: "Толщина перекладины", description: "Радиус физического коллайдера перекладины.", input: "range", min: 0.04, max: 0.28, step: 0.01, restartPhysics: true },
+  { key: "maxActivePlayers", group: "Матч", label: "Активные игроки", description: "Максимум активных игроков на поле, включая ботов.", input: "range", min: 1, max: MAX_ACTIVE_PLAYERS, step: 1 },
+  { key: "dayCycleSeconds", group: "Мир", label: "Длина суток", description: "Сколько реальных секунд длится полный цикл день/ночь.", input: "range", min: 60, max: 900, step: 5 },
+  { key: "dayStartSeconds", group: "Мир", label: "Стартовое время", description: "Время суток при запуске сервера в секундах от полуночи. 21600 значит 06:00, рассвет.", input: "number", min: 0, max: 86399, step: 60 },
+  { key: "sunIntensity", group: "Мир", label: "Яркость солнца", description: "Множитель прямого солнечного света и видимого свечения солнца.", input: "range", min: 0, max: 4, step: 0.01 },
+  { key: "moonIntensity", group: "Мир", label: "Яркость луны", description: "Множитель видимого маркера луны ночью.", input: "range", min: 0, max: 3, step: 0.01 },
+  { key: "ambientIntensity", group: "Мир", label: "Фоновый свет", description: "Множитель рассеянного света, небесной заливки и отраженного света двора.", input: "range", min: 0.1, max: 3, step: 0.01 },
+  { key: "floodlightIntensity", group: "Мир", label: "Мощность прожекторов", description: "Множитель ночных прожекторов и объемных световых конусов.", input: "range", min: 0, max: 4, step: 0.01 },
+  { key: "toneMappingExposure", group: "Мир", label: "Экспозиция камеры", description: "Множитель экспозиции tone mapping в рендерере.", input: "range", min: 0.35, max: 2.4, step: 0.01 },
+  { key: "weatherChangeMinMs", group: "Мир", label: "Мин. интервал погоды", description: "Минимум миллисекунд до следующей смены погоды.", input: "number", min: 10000, max: 600000, step: 1000 },
+  { key: "weatherChangeMaxMs", group: "Мир", label: "Макс. интервал погоды", description: "Максимум миллисекунд до следующей смены погоды.", input: "number", min: 10000, max: 900000, step: 1000 },
+  { key: "weatherDawnWeight", group: "Мир", label: "Вес рассветной погоды", description: "Относительная вероятность сухой рассветной погоды при ротации.", input: "range", min: 0, max: 24, step: 1 },
+  { key: "weatherClearWeight", group: "Мир", label: "Вес ясной погоды", description: "Относительная вероятность ясной яркой погоды. Держи высоким, если игра должна чаще быть солнечной.", input: "range", min: 0, max: 32, step: 1 },
+  { key: "weatherRainWeight", group: "Мир", label: "Вес дождя", description: "Относительная вероятность дождя и луж.", input: "range", min: 0, max: 16, step: 1 },
+  { key: "weatherSnowWeight", group: "Мир", label: "Вес снега", description: "Относительная вероятность снега, слякоти и сугробов.", input: "range", min: 0, max: 16, step: 1 },
+  { key: "playerRadius", group: "Игрок", label: "Радиус игрока", description: "Радиус серверного коллайдера игрока. Влияет на контакты, удары и обход мяча.", input: "range", min: 0.25, max: 1.2, step: 0.01, restartPhysics: true },
+  { key: "playerHeight", group: "Игрок", label: "Рост игрока", description: "Высота серверного коллайдера игрока и базовая высота контактов.", input: "range", min: 1, max: 2.4, step: 0.01, restartPhysics: true },
+  { key: "playerSpeed", group: "Игрок", label: "Скорость ходьбы", description: "Базовая горизонтальная скорость до множителей спринта, стамины, воздуха и погоды.", input: "range", min: 2, max: 18, step: 0.1 },
+  { key: "playerSprintMultiplier", group: "Игрок", label: "Множитель спринта", description: "Множитель скорости при зажатом Shift и наличии стамины.", input: "range", min: 1, max: 3, step: 0.01 },
+  { key: "playerExhaustedSpeedMultiplier", group: "Игрок", label: "Скорость без стамины", description: "Множитель скорости, когда стамина полностью потрачена.", input: "range", min: 0.1, max: 1, step: 0.01 },
+  { key: "playerExhaustedRecoveryThreshold", group: "Игрок", label: "Порог выхода из усталости", description: "Сколько стамины надо восстановить, чтобы игрок снова мог нормально бежать.", input: "range", min: 0, max: 100, step: 1 },
+  { key: "playerStaminaMax", group: "Игрок", label: "Максимум стамины", description: "Максимальная стамина для спринта, прыжков и драки.", input: "range", min: 25, max: 250, step: 1 },
+  { key: "playerStaminaSprintDrainPerSecond", group: "Игрок", label: "Расход спринта", description: "Стамина, которая тратится за секунду спринта.", input: "range", min: 1, max: 80, step: 1 },
+  { key: "playerStaminaJumpCost", group: "Игрок", label: "Цена прыжка", description: "Стамина, которую тратит прыжок на Space.", input: "range", min: 0, max: 80, step: 1 },
+  { key: "playerStaminaHitCost", group: "Игрок", label: "Цена удара", description: "Стамина, которую атакующий платит за удары рукой и ногой.", input: "range", min: 0, max: 60, step: 1 },
+  { key: "playerStaminaRecoveryDelayMs", group: "Игрок", label: "Задержка восстановления", description: "Миллисекунды до начала восстановления после траты или урона стамине.", input: "number", min: 0, max: 5000, step: 50 },
+  { key: "playerStaminaRecoveryPerSecond", group: "Игрок", label: "Скорость восстановления", description: "Сколько стамины восстанавливается в секунду после задержки.", input: "range", min: 0, max: 80, step: 1 },
+  { key: "playerHitRecoveryDelayMs", group: "Игрок", label: "Задержка после удара", description: "Миллисекунды до восстановления стамины после урона от другого игрока.", input: "number", min: 0, max: 6000, step: 50 },
+  { key: "playerJumpStrength", group: "Игрок", label: "Сила прыжка", description: "Вертикальный импульс прыжка на Space.", input: "range", min: 1, max: 14, step: 0.1 },
+  { key: "playerJumpCooldownMs", group: "Игрок", label: "Кулдаун прыжка", description: "Минимальная пауза между прыжками в миллисекундах.", input: "number", min: 0, max: 2500, step: 10 },
+  { key: "playerGravity", group: "Игрок", label: "Гравитация игрока", description: "Гравитация для прыжков и падений ragdoll.", input: "range", min: 4, max: 35, step: 0.1 },
+  { key: "playerAirControlMultiplier", group: "Игрок", label: "Управление в воздухе", description: "Множитель управления движением, пока игрок в прыжке.", input: "range", min: 0, max: 1.5, step: 0.01 },
+  { key: "playerRagdollMinMs", group: "Игрок", label: "Мин. время ragdoll", description: "Минимальное время, которое игрок остается в падении после нокаута.", input: "number", min: 0, max: 6000, step: 50 },
+  { key: "playerRagdollFrictionPerSecond", group: "Игрок", label: "Трение ragdoll", description: "Как быстро лежащий игрок теряет скорость скольжения.", input: "range", min: 0, max: 6, step: 0.05 },
+  { key: "playerRagdollHitKnockback", group: "Игрок", label: "Отброс ragdoll", description: "Горизонтальная сила отброса при падении от удара.", input: "range", min: 0, max: 30, step: 0.1 },
+  { key: "playerRagdollVerticalKnockback", group: "Игрок", label: "Подброс ragdoll", description: "Вертикальная сила подброса при падении от удара.", input: "range", min: 0, max: 15, step: 0.1 },
+  { key: "playerInputAxisAcceleration", group: "Игрок", label: "Разгон оси клавиатуры", description: "Как быстро зажатые WASD-оси доходят до полной силы.", input: "range", min: 1, max: 80, step: 1 },
+  { key: "playerInputAxisReleaseDecay", group: "Игрок", label: "Затухание отпущенной оси", description: "Как плавно отпущенная ось движения исчезает из вектора.", input: "range", min: 1, max: 40, step: 1 },
+  { key: "playerInputAxisOppositeAcceleration", group: "Игрок", label: "Победа противоположной оси", description: "Как быстро противоположное направление перебивает старую отпущенную ось.", input: "range", min: 1, max: 100, step: 1 },
+  { key: "playerMovementAcceleration", group: "Игрок", label: "Разгон движения", description: "Как быстро фактическая скорость догоняет желаемое направление.", input: "range", min: 1, max: 80, step: 1 },
+  { key: "playerMovementDeceleration", group: "Игрок", label: "Торможение движения", description: "Как быстро игрок замедляется после отпускания ввода.", input: "range", min: 1, max: 60, step: 1 },
+  { key: "playerMovementTurnAcceleration", group: "Игрок", label: "Разворот движения", description: "Как быстро игрок меняет направление на противоположное.", input: "range", min: 1, max: 100, step: 1 },
+  { key: "ballRadius", group: "Мяч", label: "Радиус мяча", description: "Авторитетный радиус коллайдера мяча. Требует пересброса физики.", input: "range", min: 0.12, max: 0.8, step: 0.01, restartPhysics: true },
+  { key: "ballDensity", group: "Мяч", label: "Плотность мяча", description: "Плотность массы мяча. Чем выше значение, тем труднее его разогнать.", input: "range", min: 0.2, max: 12, step: 0.1, restartPhysics: true },
+  { key: "ballRestitution", group: "Мяч", label: "Прыгучесть мяча", description: "Коэффициент отскока от земли, стен, штанг и коллайдера мяча.", input: "range", min: 0, max: 1.8, step: 0.01, restartPhysics: true },
+  { key: "kickRange", group: "Удары", label: "Точная дистанция удара", description: "Близкая дистанция удара вокруг рассчитанной точки ноги, руки или головы.", input: "range", min: 0.4, max: 4, step: 0.05 },
+  { key: "footKickAssistRange", group: "Удары", label: "Ассист удара ногой", description: "Прощающая горизонтальная дистанция для контакта ЛКМ-ударом по мячу.", input: "range", min: 0.6, max: 5, step: 0.05 },
+  { key: "handKickAssistRange", group: "Удары", label: "Ассист удара рукой", description: "Прощающая горизонтальная дистанция для контакта ПКМ-ударом рукой.", input: "range", min: 0.4, max: 4, step: 0.05 },
+  { key: "headKickAssistRange", group: "Удары", label: "Ассист игры головой", description: "Прощающая горизонтальная дистанция для контакта колесиком/головой.", input: "range", min: 0.4, max: 4, step: 0.05 },
+  { key: "footKickStrength", group: "Удары", label: "Сила ноги", description: "Базовый импульс ЛКМ-удара до множителя заряда.", input: "range", min: 0.2, max: 12, step: 0.05 },
+  { key: "handHitStrength", group: "Удары", label: "Сила руки", description: "Базовый импульс ПКМ-удара по мячу.", input: "range", min: 0.1, max: 8, step: 0.05 },
+  { key: "headKickStrength", group: "Удары", label: "Сила головы", description: "Базовый импульс удара головой через колесико.", input: "range", min: 0.2, max: 12, step: 0.05 },
+  { key: "kickCooldownMs", group: "Удары", label: "Кулдаун ноги", description: "Минимальная пауза между ударами ногой.", input: "number", min: 50, max: 3000, step: 10 },
+  { key: "handCooldownMs", group: "Удары", label: "Кулдаун руки", description: "Минимальная пауза между ударами рукой.", input: "number", min: 50, max: 3000, step: 10 },
+  { key: "headCooldownMs", group: "Удары", label: "Кулдаун головы", description: "Минимальная пауза между ударами головой.", input: "number", min: 50, max: 3000, step: 10 },
+  { key: "ballHitBasePowerMultiplier", group: "Удары", label: "Базовый множитель удара", description: "Общий множитель силы обычных ударов по мячу.", input: "range", min: 0.2, max: 6, step: 0.05 },
+  { key: "leftKickInputBufferMs", group: "Удары", label: "Буфер ЛКМ", description: "Сколько миллисекунд ранний клик удара ногой хранится, пока игрок добегает до мяча.", input: "number", min: 0, max: 1000, step: 10 },
+  { key: "leftKickChargeSeconds", group: "Удары", label: "Время заряда", description: "Сколько секунд надо держать ЛКМ для полного заряда удара ногой.", input: "range", min: 0.1, max: 3, step: 0.05 },
+  { key: "leftKickFullChargePowerMultiplier", group: "Удары", label: "Множитель полного заряда", description: "Множитель силы при полностью заряженном ЛКМ-ударе.", input: "range", min: 0.5, max: 10, step: 0.05 },
+  { key: "footPlayerStaminaDamage", group: "Удары", label: "Урон стамине ногой", description: "Сколько стамины снимает удар ногой по другому игроку.", input: "range", min: 0, max: 80, step: 1 },
+  { key: "handPlayerStaminaDamage", group: "Удары", label: "Урон стамине рукой", description: "Сколько стамины снимает удар рукой по другому игроку.", input: "range", min: 0, max: 80, step: 1 },
+  { key: "headPlayerStaminaDamage", group: "Удары", label: "Урон стамине головой", description: "Сколько стамины снимает удар головой по другому игроку.", input: "range", min: 0, max: 80, step: 1 },
+  { key: "airborneHeadStaminaDamageBonus", group: "Удары", label: "Бонус головы в прыжке", description: "Дополнительный урон стамине, если удар головой сделан в воздухе.", input: "range", min: 0, max: 50, step: 1 },
+  { key: "bodyBumpRange", group: "Удары", label: "Дистанция толчка телом", description: "Радиус пассивного контакта телом, который может слегка толкнуть мяч.", input: "range", min: 0.1, max: 2, step: 0.01 },
+  { key: "bodyBumpMinSpeed", group: "Удары", label: "Мин. скорость толчка", description: "Минимальная скорость игрока, при которой пассивный толчок телом активен.", input: "range", min: 0, max: 12, step: 0.1 },
+  { key: "bodyBumpStrength", group: "Удары", label: "Сила толчка телом", description: "Пассивный импульс контакта телом, применяемый к мячу.", input: "range", min: 0, max: 2, step: 0.01 },
+  { key: "bodyBumpCooldownMs", group: "Удары", label: "Кулдаун толчка телом", description: "Минимальная пауза между пассивными толчками телом.", input: "number", min: 0, max: 2000, step: 10 },
+  { key: "propImpulseMultiplier", group: "Объекты", label: "Импульс объектов", description: "Общий множитель толчков от игроков и мяча по физическим объектам окружения.", input: "range", min: 0, max: 4, step: 0.01 },
+  { key: "propDamping", group: "Объекты", label: "Затухание объектов", description: "Как быстро подвижные объекты теряют скорость после толчка.", input: "range", min: 0.1, max: 8, step: 0.05 },
+  { key: "propReturnStrength", group: "Объекты", label: "Возврат объектов", description: "Пружинная сила, возвращающая локальные объекты окружения к домашней позиции.", input: "range", min: 0, max: 6, step: 0.05 },
+  { key: "propMaxDisplacementMultiplier", group: "Объекты", label: "Лимит сдвига объектов", description: "Множитель максимального смещения каждого физического объекта от домашней точки.", input: "range", min: 0.25, max: 4, step: 0.05 },
+  { key: "postGoalCelebrationMs", group: "Матч", label: "Празднование гола", description: "Миллисекунды после гола до начала возврата мяча.", input: "number", min: 0, max: 20000, step: 100 },
+  { key: "postGoalBallReturnMs", group: "Матч", label: "Возврат мяча", description: "Миллисекунды, за которые мяч летит обратно к центру после гола.", input: "number", min: 100, max: 5000, step: 100 },
+  { key: "kickoffCountdownMs", group: "Матч", label: "Отсчет розыгрыша", description: "Миллисекунды отсчета перед розыгрышем после возврата мяча.", input: "number", min: 0, max: 10000, step: 100 },
+  { key: "celebrationWindowMs", group: "Матч", label: "Окно эмоции гола", description: "Сколько миллисекунд игроки могут запускать празднование после гола.", input: "number", min: 0, max: 20000, step: 100 },
+  { key: "celebrationDurationMs", group: "Матч", label: "Длительность эмоции", description: "Сколько миллисекунд длится выбранная анимация празднования.", input: "number", min: 0, max: 10000, step: 100 },
+  { key: "botsEnabled", group: "Боты", label: "Включить ботов", description: "Заполняет ли сервер свободные активные слоты AI-игроками.", input: "checkbox" },
+  { key: "botTargetActivePlayers", group: "Боты", label: "Цель заполнения ботами", description: "Желаемое число активных игроков на поле, включая людей и ботов.", input: "range", min: 0, max: MAX_ACTIVE_PLAYERS, step: 1 },
+  { key: "botAggression", group: "Боты", label: "Агрессия", description: "Большее значение заставляет ботов чаще выбирать драку.", input: "range", min: 0, max: 1, step: 0.01 },
+  { key: "botShootDistance", group: "Боты", label: "Дистанция удара по воротам", description: "Дистанция до мяча, на которой бот пытается пробить.", input: "range", min: 1.2, max: 8, step: 0.05 },
+  { key: "botFightDistance", group: "Боты", label: "Дистанция драки", description: "Дистанция до соперника, на которой бот рассматривает удары руками и ногами.", input: "range", min: 0.8, max: 4, step: 0.05 },
+  { key: "botChaseDistance", group: "Боты", label: "Дистанция погони", description: "Дистанция до мяча, на которой бот активно включается в преследование.", input: "range", min: 1, max: 12, step: 0.05 },
+  { key: "botSprintDistance", group: "Боты", label: "Дистанция спринта", description: "Порог дистанции, после которого бот начинает спринтовать.", input: "range", min: 0, max: 18, step: 0.1 },
+  { key: "botShotAlignmentMin", group: "Боты", label: "Выравнивание удара", description: "Минимальная направленность вперед, чтобы бот считал мяч удобным для удара.", input: "range", min: -0.5, max: 1, step: 0.01 },
+  { key: "botSupportReleaseDistance", group: "Боты", label: "Выход из поддержки", description: "Дополнительная дистанция погони, после которой неосновные боты уходят с позиции поддержки.", input: "range", min: 0, max: 8, step: 0.05 },
+  { key: "botKickIntervalMs", group: "Боты", label: "Интервал ноги бота", description: "Минимум миллисекунд между ударами ногой у бота.", input: "number", min: 120, max: 3000, step: 10 },
+  { key: "botHandIntervalMs", group: "Боты", label: "Интервал руки бота", description: "Минимум миллисекунд между ударами рукой у бота.", input: "number", min: 120, max: 4000, step: 10 },
+  { key: "botHeadIntervalMs", group: "Боты", label: "Интервал головы бота", description: "Минимум миллисекунд между ударами головой у бота.", input: "number", min: 120, max: 4000, step: 10 },
+  { key: "botJumpChance", group: "Боты", label: "Шанс прыжка бота", description: "Шанс за тик, который бот использует для ситуативных прыжков.", input: "range", min: 0, max: 0.25, step: 0.001 }
+];
+
+export function normalizeGameSettingsPatch(value: unknown, fallback: GameSettings = DEFAULT_GAME_SETTINGS): GameSettings {
+  const source = typeof value === "object" && value !== null ? value as Partial<Record<keyof GameSettings, unknown>> : {};
+  const result = { ...fallback };
+  for (const item of GAME_SETTINGS_SCHEMA) {
+    const raw = source[item.key];
+    if (raw === undefined) continue;
+    if (item.input === "checkbox") {
+      result[item.key] = Boolean(raw) as never;
+      continue;
+    }
+    const numberValue = Number(raw);
+    if (!Number.isFinite(numberValue)) continue;
+    const min = item.min ?? Number.NEGATIVE_INFINITY;
+    const max = item.max ?? Number.POSITIVE_INFINITY;
+    const step = item.step ?? 0.001;
+    const clamped = clamp(numberValue, min, max);
+    const decimals = step < 1 ? Math.min(6, Math.max(0, String(step).split(".")[1]?.length || 0)) : 0;
+    result[item.key] = Number(clamped.toFixed(decimals)) as never;
+  }
+  if (result.weatherChangeMaxMs < result.weatherChangeMinMs) result.weatherChangeMaxMs = result.weatherChangeMinMs;
+  if (result.playerExhaustedRecoveryThreshold > result.playerStaminaMax) {
+    result.playerExhaustedRecoveryThreshold = result.playerStaminaMax;
+  }
+  if (result.botTargetActivePlayers > result.maxActivePlayers) result.botTargetActivePlayers = result.maxActivePlayers;
+  return result;
+}
+
 export function teamName(team: TeamId | null): string {
   if (team === 0) return "\u0421\u0438\u043d\u0438\u0435";
   if (team === 1) return "\u041e\u0440\u0430\u043d\u0436\u0435\u0432\u044b\u0435";
@@ -291,4 +683,9 @@ export function sanitizePlayerName(value: unknown): string {
   const raw = typeof value === "string" ? value : "";
   const clean = raw.replace(/[^\p{L}\p{N}_ .-]/gu, "").trim().slice(0, 18);
   return clean || "\u0418\u0433\u0440\u043e\u043a";
+}
+
+export function emotionChoiceById(value: unknown): typeof EMOTION_CHOICES[number] | null {
+  const id = typeof value === "string" ? value : "";
+  return EMOTION_CHOICES.find((choice) => choice.id === id) || null;
 }

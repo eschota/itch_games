@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>UnSoccer v0.0.031 | Ragdoll Soccer II</title>
+    <title>UnSoccer v0.0.033 | Ragdoll Soccer II</title>
     <meta
       name="description"
-      content="UnSoccer v0.0.031: server bots fill active slots, player fighting has visible foot/hand whiffs, stamina damage, velocity ragdoll knockdowns, smoother character movement, user-friendly active strike assist, LMB charge, height-aware ball contact, dense Free3D courtyard props, wider night floodlights, lerped camera anchor, team markers, random characters, stamina HUD, closed goal nets, day cycle, jump, and hits."
+      content="UnSoccer v0.0.033: player emotion wheel, compact chat, nickname/skin/user_pic profiles, side-aware alternating hand punches, trailing-foot kicks, runtime settings admin, server bots, stamina damage, velocity ragdoll knockdowns, smoother character movement, active strike assist, LMB charge, height-aware ball contact, dense Free3D courtyard props, team markers, day cycle, jump, and hits."
     />
     <link rel="icon" href="data:," />
     <style>
@@ -150,9 +150,9 @@
         }
       }
     </style>
-    <script type="module" crossorigin src="./assets/main-BzFJygZT.js"></script>
-    <link rel="modulepreload" crossorigin href="./assets/character-controller-BQR-AboA.js">
-    <link rel="stylesheet" crossorigin href="./assets/main-dudkSTR9.css">
+    <script type="module" crossorigin src="./assets/main-CGQbwnoi.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/textureless-pbr-converter-CPRYpzHP.js">
+    <link rel="stylesheet" crossorigin href="./assets/main-CGdqL17i.css">
   </head>
   <body>
     <main id="app" aria-label="UnSoccer">
@@ -192,13 +192,26 @@
         </div>
       </section>
       <div id="control-hints" class="control-hints" aria-live="polite"></div>
+      <section id="game-chat" class="game-chat" aria-label="Player chat">
+        <div id="chat-log" class="chat-log" aria-live="polite"></div>
+        <form id="chat-form" class="chat-form" autocomplete="off">
+          <div class="profile-strip">
+            <span id="profile-avatar" class="profile-avatar" aria-hidden="true"></span>
+            <input id="profile-name" type="text" maxlength="18" aria-label="Nickname" />
+            <select id="profile-skin" aria-label="Skin"></select>
+            <input id="profile-pic" type="text" maxlength="96" aria-label="user_pic" />
+          </div>
+          <input id="chat-input" type="text" maxlength="160" placeholder="Enter - chat" aria-label="Chat message" />
+        </form>
+      </section>
+      <div id="emotion-wheel" class="emotion-wheel" aria-label="Emotion wheel" hidden></div>
       <div id="toolbar" class="toolbar" aria-label="UnSoccer controls">
         <button id="settings-button" class="icon-button" type="button" title="Settings" aria-label="Settings">SET</button>
         <button id="mute-button" class="icon-button" type="button" title="Mute" aria-label="Mute">AUD</button>
         <button id="fullscreen-button" class="icon-button" type="button" title="Fullscreen" aria-label="Fullscreen">FS</button>
         <button id="camera-reset-button" class="icon-button" type="button" title="Camera reset" aria-label="Camera reset">CAM</button>
       </div>
-      <div id="version-badge">v0.0.031 / 83.79 MB</div>
+      <div id="version-badge">v0.0.033 / 83.79 MB</div>
       <section id="settings-panel" class="settings-panel" aria-modal="true" role="dialog" aria-labelledby="settings-title" hidden>
         <form id="settings-form" class="settings-shell">
           <header class="settings-header">

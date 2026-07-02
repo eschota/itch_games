@@ -1,6 +1,13 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { FIELD_LENGTH, FIELD_WIDTH } from "@itch-games/unsoccer-shared";
+import {
+  BALL_RADIUS,
+  FIELD_LENGTH,
+  FIELD_WIDTH,
+  PLAYER_RADIUS,
+  type ServerState
+} from "@itch-games/unsoccer-shared";
+import { bakeTexturelessPbr, type TexturelessPbrBakeResult } from "./textureless-pbr-converter";
 
 interface Free3dEnvironmentAsset {
   guid: string;
@@ -31,11 +38,30 @@ interface CourtyardEnvironmentOptions {
   resolveClientAsset: (src: string) => string;
 }
 
+export interface CourtyardEnvironmentRuntime {
+  update(state: ServerState, deltaSeconds: number): void;
+  readonly rigidBodyCount: number;
+}
+
+interface EnvironmentRigidBody {
+  object: THREE.Group;
+  kind: string;
+  mass: number;
+  invMass: number;
+  radius: number;
+  home: THREE.Vector3;
+  velocity: THREE.Vector3;
+  rotationVelocity: number;
+  maxDisplacement: number;
+  movable: boolean;
+}
+
 const free3dEnvironmentLoader = new GLTFLoader();
 const free3dEnvironmentTemplates = new Map<string, Promise<THREE.Object3D>>();
 const tempBox = new THREE.Box3();
 const tempSize = new THREE.Vector3();
 const tempCenter = new THREE.Vector3();
+const tempVector = new THREE.Vector3();
 
 const surfaceMaterial = new THREE.MeshStandardMaterial({ color: 0x2f3b38, roughness: 0.97, metalness: 0.01 });
 const roadMaterial = new THREE.MeshStandardMaterial({ color: 0x202927, roughness: 0.94 });
@@ -53,19 +79,154 @@ const glowMaterial = new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent:
 
 let proceduralEnvironmentInstances = 0;
 let free3dEnvironmentInstances = 0;
+let free3dEnvironmentTexturelessTemplates = 0;
+let free3dEnvironmentTexturelessFailures = 0;
+let free3dEnvironmentRuntimeTextureCount = 0;
+let free3dEnvironmentRigidBodyCount = 0;
+let free3dEnvironmentColliderCount = 0;
+let free3dEnvironmentMassKg = 0;
 
-export function installCourtyardEnvironment({ root, resolveClientAsset }: CourtyardEnvironmentOptions): void {
+class LocalCourtyardEnvironmentRuntime implements CourtyardEnvironmentRuntime {
+  private readonly bodies: EnvironmentRigidBody[] = [];
+  private impulseEvents = 0;
+
+  get rigidBodyCount(): number {
+    return this.bodies.length;
+  }
+
+  addPropBody(object: THREE.Group, placement: Free3dEnvironmentPlacement): void {
+    const physics = physicsProfileForKind(placement.kind, placement.size);
+    const body: EnvironmentRigidBody = {
+      object,
+      kind: placement.kind,
+      mass: physics.mass,
+      invMass: physics.movable ? 1 / physics.mass : 0,
+      radius: physics.radius,
+      home: object.position.clone(),
+      velocity: new THREE.Vector3(),
+      rotationVelocity: 0,
+      maxDisplacement: physics.maxDisplacement,
+      movable: physics.movable
+    };
+    object.userData.rigidBody = "local-dynamic-prop";
+    object.userData.massKg = physics.mass;
+    object.userData.collider = {
+      type: "cylinder",
+      radius: physics.radius,
+      height: physics.height
+    };
+    object.userData.vertexPbrOnly = true;
+    this.bodies.push(body);
+    syncPropPhysicsDatasets(this.bodies);
+  }
+
+  update(state: ServerState, deltaSeconds: number): void {
+    if (this.bodies.length === 0) return;
+    const dt = THREE.MathUtils.clamp(deltaSeconds, 0.001, 0.05);
+    const propImpulseMultiplier = state.settings?.propImpulseMultiplier ?? 1;
+    const propDamping = state.settings?.propDamping ?? 2.4;
+    const propReturnStrength = state.settings?.propReturnStrength ?? 1.25;
+    const propMaxDisplacementMultiplier = state.settings?.propMaxDisplacementMultiplier ?? 1;
+    let movedBodies = 0;
+    for (const body of this.bodies) {
+      if (body.movable) {
+        for (const player of state.players) {
+          if (player.role !== "player") continue;
+          this.applyDiscImpulse(
+            body,
+            player.position.x,
+            player.position.z,
+            PLAYER_RADIUS + body.radius,
+            player.velocity.x,
+            player.velocity.z,
+            7.5 * propImpulseMultiplier
+          );
+        }
+        this.applyDiscImpulse(
+          body,
+          state.ball.position.x,
+          state.ball.position.z,
+          BALL_RADIUS + body.radius,
+          state.ball.velocity.x,
+          state.ball.velocity.z,
+          13.5 * propImpulseMultiplier
+        );
+        tempVector.copy(body.object.position).sub(body.home);
+        const maxDisplacement = body.maxDisplacement * propMaxDisplacementMultiplier;
+        if (tempVector.length() > maxDisplacement) {
+          tempVector.setLength(maxDisplacement);
+          body.object.position.copy(body.home).add(tempVector);
+        }
+        body.velocity.addScaledVector(tempVector, -propReturnStrength * dt);
+        body.velocity.multiplyScalar(Math.exp(-propDamping * dt));
+        body.object.position.addScaledVector(body.velocity, dt);
+        body.object.position.y = body.home.y;
+        body.rotationVelocity *= Math.exp(-2.8 * dt);
+        body.object.rotation.y += body.rotationVelocity * dt;
+        if (body.object.position.distanceTo(body.home) > 0.035 || body.velocity.lengthSq() > 0.0025) {
+          movedBodies += 1;
+        }
+      }
+    }
+    document.documentElement.dataset.free3dEnvironmentActiveRigidBodies = String(this.bodies.length);
+    document.documentElement.dataset.free3dEnvironmentMovedRigidBodies = String(movedBodies);
+    document.documentElement.dataset.free3dEnvironmentImpulseEvents = String(this.impulseEvents);
+    document.documentElement.dataset.free3dEnvironmentPropImpulseMultiplier = propImpulseMultiplier.toFixed(3);
+    document.documentElement.dataset.free3dEnvironmentPropDamping = propDamping.toFixed(3);
+    document.documentElement.dataset.free3dEnvironmentPropReturnStrength = propReturnStrength.toFixed(3);
+  }
+
+  private applyDiscImpulse(
+    body: EnvironmentRigidBody,
+    sourceX: number,
+    sourceZ: number,
+    contactRadius: number,
+    sourceVelocityX: number,
+    sourceVelocityZ: number,
+    impulseScale: number
+  ): void {
+    const dx = body.object.position.x - sourceX;
+    const dz = body.object.position.z - sourceZ;
+    const distance = Math.hypot(dx, dz);
+    if (distance >= contactRadius || distance < 0.0001) return;
+    const nx = dx / distance;
+    const nz = dz / distance;
+    const sourceSpeedTowardBody = Math.max(0, sourceVelocityX * nx + sourceVelocityZ * nz);
+    const penetration = contactRadius - distance;
+    const impulse = (penetration * 16 + sourceSpeedTowardBody * impulseScale) * body.invMass;
+    body.velocity.x += nx * impulse;
+    body.velocity.z += nz * impulse;
+    body.rotationVelocity += THREE.MathUtils.clamp((nx * sourceVelocityZ - nz * sourceVelocityX) * body.invMass * 0.9, -2.5, 2.5);
+    this.impulseEvents += 1;
+  }
+}
+
+export function installCourtyardEnvironment({ root, resolveClientAsset }: CourtyardEnvironmentOptions): CourtyardEnvironmentRuntime {
   proceduralEnvironmentInstances = 0;
   free3dEnvironmentInstances = 0;
+  free3dEnvironmentTexturelessTemplates = 0;
+  free3dEnvironmentTexturelessFailures = 0;
+  free3dEnvironmentRuntimeTextureCount = 0;
+  free3dEnvironmentRigidBodyCount = 0;
+  free3dEnvironmentColliderCount = 0;
+  free3dEnvironmentMassKg = 0;
   document.documentElement.dataset.proceduralEnvironmentInstances = "0";
   document.documentElement.dataset.free3dEnvironmentInstances = "0";
   document.documentElement.dataset.free3dEnvironmentLoaded = "false";
   document.documentElement.dataset.environmentModelTarget = "100-plus";
+  document.documentElement.dataset.environmentSmallProceduralProps = "removed";
+  document.documentElement.dataset.environmentAssetMode = "free3d-textureless-vertex-pbr-only";
+  document.documentElement.dataset.free3dEnvironmentTexturelessPbr = "false";
+  document.documentElement.dataset.free3dEnvironmentRuntimeTextureCount = "0";
+  document.documentElement.dataset.free3dEnvironmentRigidBodies = "0";
+  document.documentElement.dataset.free3dEnvironmentColliders = "0";
+  document.documentElement.dataset.free3dEnvironmentMassKg = "0";
   syncEnvironmentInstanceDatasets();
 
+  const runtime = new LocalCourtyardEnvironmentRuntime();
   addExtendedCourtyardSurfaces(root);
-  addDenseCourtyardDressing(root);
-  void hydrateFree3dEnvironment(root, resolveClientAsset);
+  void hydrateFree3dEnvironment(root, resolveClientAsset, runtime);
+  return runtime;
 }
 
 function syncEnvironmentInstanceDatasets(): void {
@@ -74,12 +235,74 @@ function syncEnvironmentInstanceDatasets(): void {
   document.documentElement.dataset.environmentModelInstances = String(
     proceduralEnvironmentInstances + free3dEnvironmentInstances
   );
+  document.documentElement.dataset.free3dEnvironmentTexturelessTemplates = String(free3dEnvironmentTexturelessTemplates);
+  document.documentElement.dataset.free3dEnvironmentTexturelessFailures = String(free3dEnvironmentTexturelessFailures);
+  document.documentElement.dataset.free3dEnvironmentRuntimeTextureCount = String(free3dEnvironmentRuntimeTextureCount);
+  document.documentElement.dataset.free3dEnvironmentTexturelessPbr = String(
+    free3dEnvironmentInstances > 0 && free3dEnvironmentRuntimeTextureCount === 0
+  );
+  document.documentElement.dataset.free3dEnvironmentRigidBodies = String(free3dEnvironmentRigidBodyCount);
+  document.documentElement.dataset.free3dEnvironmentColliders = String(free3dEnvironmentColliderCount);
+  document.documentElement.dataset.free3dEnvironmentMassKg = String(Math.round(free3dEnvironmentMassKg));
 }
 
 function registerProceduralEnvironmentInstance(root: THREE.Group, object: THREE.Object3D, kind: string): void {
   object.userData.environmentKind = kind;
   proceduralEnvironmentInstances += 1;
   root.add(object);
+}
+
+function syncPropPhysicsDatasets(bodies: EnvironmentRigidBody[]): void {
+  free3dEnvironmentRigidBodyCount = bodies.length;
+  free3dEnvironmentColliderCount = bodies.length;
+  free3dEnvironmentMassKg = bodies.reduce((total, body) => total + body.mass, 0);
+  syncEnvironmentInstanceDatasets();
+}
+
+function physicsProfileForKind(kind: string, size: number): {
+  mass: number;
+  radius: number;
+  height: number;
+  maxDisplacement: number;
+  movable: boolean;
+} {
+  if (kind.includes("traffic-cone")) {
+    return { mass: 3.2, radius: Math.max(0.26, size * 0.34), height: size, maxDisplacement: 2.8, movable: true };
+  }
+  if (kind.includes("trash-bin")) {
+    return { mass: 22, radius: Math.max(0.42, size * 0.42), height: size * 1.2, maxDisplacement: 1.35, movable: true };
+  }
+  if (kind.includes("bench")) {
+    return { mass: 58, radius: Math.max(0.88, size * 0.44), height: size * 0.45, maxDisplacement: 0.62, movable: true };
+  }
+  return { mass: 1200, radius: Math.max(2.2, size * 0.42), height: size, maxDisplacement: 0.04, movable: false };
+}
+
+function countTextureMaps(root: THREE.Object3D): number {
+  const textures = new Set<THREE.Texture>();
+  root.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return;
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    for (const material of materials) {
+      if (!material) continue;
+      for (const key of [
+        "map",
+        "normalMap",
+        "roughnessMap",
+        "metalnessMap",
+        "aoMap",
+        "emissiveMap",
+        "alphaMap",
+        "bumpMap",
+        "displacementMap",
+        "lightMap"
+      ] as Array<keyof THREE.MeshStandardMaterial>) {
+        const value = (material as unknown as Record<string, unknown>)[key];
+        if (value instanceof THREE.Texture) textures.add(value);
+      }
+    }
+  });
+  return textures.size;
 }
 
 function addExtendedCourtyardSurfaces(root: THREE.Group): void {
@@ -571,7 +794,8 @@ function addPuddle(root: THREE.Group, x: number, z: number, scale: number): void
 
 async function hydrateFree3dEnvironment(
   root: THREE.Group,
-  resolveClientAsset: (src: string) => string
+  resolveClientAsset: (src: string) => string,
+  runtime: LocalCourtyardEnvironmentRuntime
 ): Promise<void> {
   try {
     document.documentElement.dataset.free3dEnvironmentMode = "loading-local-roster";
@@ -596,6 +820,7 @@ async function hydrateFree3dEnvironment(
         const template = await loadFree3dEnvironmentTemplate(asset, resolveClientAsset);
         const instance = createFree3dEnvironmentInstance(template, placement, asset);
         free3dEnvironmentInstances += 1;
+        runtime.addPropBody(instance, placement);
         root.add(instance);
         syncEnvironmentInstanceDatasets();
       } catch (error) {
@@ -631,7 +856,13 @@ function loadFree3dEnvironmentTemplate(
           child.receiveShadow = true;
           child.geometry.computeVertexNormals();
         });
-        resolve(scene);
+        bakeEnvironmentTemplate(scene, asset)
+          .then(() => resolve(scene))
+          .catch((error) => {
+            free3dEnvironmentTexturelessFailures += 1;
+            syncEnvironmentInstanceDatasets();
+            reject(error);
+          });
       },
       undefined,
       reject
@@ -639,6 +870,27 @@ function loadFree3dEnvironmentTemplate(
   });
   free3dEnvironmentTemplates.set(asset.src, promise);
   return promise;
+}
+
+async function bakeEnvironmentTemplate(scene: THREE.Object3D, asset: Free3dEnvironmentAsset): Promise<void> {
+  const result: TexturelessPbrBakeResult = await bakeTexturelessPbr(scene, {
+    bakeGeometryAo: true,
+    aoContrast: 1.35,
+    aoSamples: 8,
+    yieldEveryVertices: 3072
+  });
+  scene.userData.texturelessPbr = result;
+  scene.userData.vertexPbrOnly = true;
+  scene.userData.free3dGuid = asset.guid;
+  free3dEnvironmentTexturelessTemplates += 1;
+  free3dEnvironmentRuntimeTextureCount += countTextureMaps(scene);
+  document.documentElement.dataset.free3dEnvironmentLastBake = [
+    asset.guid,
+    result.vertexCount,
+    result.strippedTextureCount,
+    result.averageAo.toFixed(3)
+  ].join(":");
+  syncEnvironmentInstanceDatasets();
 }
 
 function createFree3dEnvironmentInstance(

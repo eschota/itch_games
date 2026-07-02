@@ -69,6 +69,9 @@ Use this file for work inside `/itch_games`.
   `unsoccer/client/src/character-controller-test.ts`: standalone local
   controller validation page that does not require the multiplayer server and
   cycles the local 11-character Free3D/AutoRig roster with arrow keys plus UI.
+- `unsoccer/client/public/game-settings.html`: static schema-driven runtime
+  admin page for `/api/game-settings` tuning with sliders, numbers,
+  checkboxes, tooltips, apply/reload, and patch preview.
 - `unsoccer/client/src/settings.ts`: UI/settings defaults, validation, local
   persistence, reset, and binding-conflict helpers.
 - `unsoccer/client/src/input-map.ts`: key/mouse binding resolution, movement
@@ -78,7 +81,10 @@ Use this file for work inside `/itch_games`.
 - `unsoccer/client/src/weather.ts`: weather visuals with runtime graphics/UI
   options for particles and reduced opacity.
 - `unsoccer/server/`: authoritative Node/Rapier/WebSocket server.
-- `unsoccer/shared/`: shared protocol, constants, and gameplay tuning.
+- `unsoccer/game-settings.json`: runtime tuning source for UnSoccer gameplay,
+  world, bot, lighting, and prop parameters.
+- `unsoccer/shared/`: shared protocol, constants, gameplay tuning, and
+  `GameSettings`/`GAME_SETTINGS_SCHEMA`.
 - `unsoccer/assets/`: local runtime assets plus Free3D roster/provenance files.
 - `art_director/`: non-runtime Art Director workspace for audits, checks,
   references, briefs, prompts, temp documents, and QA evidence.
@@ -118,6 +124,8 @@ Use this file for work inside `/itch_games`.
   message storage for the shared development-agent chat.
 - `ai_chat/deploy/deploy.skill.md`: deployment reference rules for nginx,
   systemd, webhook deploy, and rollback notes.
+- `ai_chat/deploy/itch-games-*-moscow.*`: Moscow mirror nginx, systemd, and
+  webhook deploy references for `moscow-io-games.mecharulez.com`.
 
 ## Role Skills
 
@@ -164,6 +172,10 @@ Use this file for work inside `/itch_games`.
 - On the Qwertystock migration target, run the chat with
   `ai_chat/server_node.js` from `/home/generic/itch_games`; the target system
   Python is 3.5.
+- On the Moscow mirror, run the chat with `ai_chat/server_node.js` from
+  `/itch_games`, serve the independent host
+  `moscow-io-games.mecharulez.com`, and keep its webhook deploy script pointed
+  at `/usr/local/bin/itch-games-autodeploy-moscow.sh`.
 - Keep IO Games isolated behind `server_name io-games.mecharulez.com`; do not
   add it as a location inside the main
   `qwertystock.com` site.
@@ -188,8 +200,8 @@ Use this file for work inside `/itch_games`.
 
 ## Versioning
 
-- Current release: `v0.0.030`.
-- `unsoccer` release: `v0.0.030`.
+- Current release: `v0.0.033`.
+- `unsoccer` release: `v0.0.033`.
 - Game releases start at `v0.0.001` and every behavior change increments the
   version.
 - The visible bottom-left badge, `package.json.gameVersion`, README, and skill
@@ -227,26 +239,42 @@ Use this file for work inside `/itch_games`.
 10. For UnSoccer audio, confirm `npm run test:unsoccer:acceptance` reports
   `websocket no-join has no phantom roster audio`, `websocket join audioEvents`,
   `server audioEvents roster`, and `server audioEvents kicks/body/goal/countdown`.
-11. For UnSoccer browser audio, confirm a real trusted click/touch/key makes
+11. For UnSoccer runtime tuning, confirm `/api/game-settings` returns
+    `settings`, `defaults`, `schema`, and `state.settingsRevision`, and confirm
+    `unsoccer/client/public/game-settings.html` can load, edit, apply, and
+    reload a setting through the same API. Any new tunable feature must update
+    `GameSettings`, `DEFAULT_GAME_SETTINGS`, `GAME_SETTINGS_SCHEMA`,
+    `unsoccer/game-settings.json`, and the admin page contract in the same
+    change. The settings admin is Russian-facing, `GAME_SETTINGS_SCHEMA` must
+    cover every JSON/defaults key, and acceptance must prove per-key apply and
+    readback through `/api/game-settings`.
+12. For UnSoccer communication/personalization QA, confirm `Enter` opens the
+    compact bottom-right chat, repeated `Enter` sends and closes it, the
+    profile strip can change nickname, skin, and `userPic`, mouse wheel opens a
+    local-only 9-emotion wheel above the local player for a 2-second idle
+    window, any click applies the selected emotion, and acceptance proves
+    `PlayerSnapshot.emotion`, chat ring messages, profile state, alternating
+    hand `lastActionSide`, and trailing-foot kicks.
+13. For UnSoccer browser audio, confirm a real trusted click/touch/key makes
     `data-audio-context="running"`, `data-audio-unlocked="true"`, and
     `data-audio-played-events` increase; also inspect
     `data-audio-server-event-id` and `data-audio-server-primed`.
     Automation-only clicks may leave Chromium `AudioContext` suspended.
-12. For UnSoccer UI/settings, confirm the v0.0.010 client shows
+14. For UnSoccer UI/settings, confirm the v0.0.010 client shows
     `v0.0.010 / 0.61 MB`, opens `#settings-panel`, exposes settings/audio/
     graphics/remapping controls, and records a nonblank runtime screenshot plus
     JSON evidence under `ui_designer/public_pages/`; current final local
     evidence is
     `ui_designer/public_pages/unsoccer-ui-final-local-gate-v0.0.010-rerun.json`.
-13. Confirm `/unsoccer/` never exposes a directory listing on local or
+14. Confirm `/unsoccer/` never exposes a directory listing on local or
     production static hosts.
-14. For UnSoccer v0.0.012 local QA, confirm browser datasets show
+15. For UnSoccer v0.0.012 local QA, confirm browser datasets show
     `data-daylight="1.000"` during clear daytime, `data-dark-hours="20:00-04:00"`,
     `data-weather-particles-visible="false"`, `data-sun-path-visible="false"`,
     `data-active-ball-model="free3d-vertex-color-glb"`,
     `data-goal-net-mode="local-verlet-cloth-no-network"`, and
     `data-goal-post-radius="0.38"`.
-15. For UnSoccer v0.0.013 character QA, confirm browser datasets show
+16. For UnSoccer v0.0.013 character QA, confirm browser datasets show
     `data-player-rig="free3d-skinned-mixamo-character"`,
     `data-player-rig-asset="6300420"`, `data-player-rig-clip-count="1"`, and
     a visible skinned footballer instead of the primitive Capsule/Sphere/Box

@@ -1,6 +1,6 @@
-export declare const GAME_VERSION = "v0.0.031";
+export declare const GAME_VERSION = "v0.0.033";
 export declare const ROOM_ID = "unsoccer-default-room";
-export declare const MAX_ACTIVE_PLAYERS = 4;
+export declare const MAX_ACTIVE_PLAYERS = 10;
 export declare const MAX_ROOM_CLIENTS = 32;
 export declare const SERVER_TICK_RATE = 60;
 export declare const SNAPSHOT_RATE = 20;
@@ -74,6 +74,46 @@ export type WeatherKind = "clear" | "dawn" | "rain" | "snow";
 export type HazardType = "puddle" | "slush" | "snowbank";
 export type AudioEventKind = "roster" | "kick" | "goal" | "countdown" | "celebration";
 export type RosterAudioChange = "join" | "leave" | "spectator";
+export type StrikeSide = "left" | "right";
+export declare const EMOTION_CHOICES: readonly [{
+    readonly id: "angry";
+    readonly emoji: "😡";
+    readonly label: "Злость";
+}, {
+    readonly id: "heart";
+    readonly emoji: "❤️";
+    readonly label: "Сердце";
+}, {
+    readonly id: "laugh";
+    readonly emoji: "😂";
+    readonly label: "Смех";
+}, {
+    readonly id: "wow";
+    readonly emoji: "😮";
+    readonly label: "Вау";
+}, {
+    readonly id: "sad";
+    readonly emoji: "😢";
+    readonly label: "Грусть";
+}, {
+    readonly id: "fire";
+    readonly emoji: "🔥";
+    readonly label: "Огонь";
+}, {
+    readonly id: "gg";
+    readonly emoji: "🤝";
+    readonly label: "Хорошая игра";
+}, {
+    readonly id: "goal";
+    readonly emoji: "⚽";
+    readonly label: "Гол";
+}, {
+    readonly id: "crown";
+    readonly emoji: "👑";
+    readonly label: "Корона";
+}];
+export declare const DEFAULT_USER_PICS: readonly ["⚽", "⭐", "🔥", "👑", "😎", "🤝", "🚀", "🎯", "🧤"];
+export type EmotionId = typeof EMOTION_CHOICES[number]["id"];
 export interface Vec3 {
     x: number;
     y: number;
@@ -93,13 +133,36 @@ export interface InputState {
     sprint: boolean;
     yaw: number;
 }
+export interface PlayerProfileSnapshot {
+    nickname: string;
+    skinId: string;
+    userPic: string;
+}
+export interface PlayerEmotionSnapshot {
+    id: EmotionId;
+    emoji: string;
+    label: string;
+    appliedAt: number;
+    expiresAt: number;
+}
+export interface ChatMessageSnapshot {
+    id: number;
+    playerId: string;
+    name: string;
+    userPic: string;
+    text: string;
+    createdAt: number;
+}
 export interface PlayerSnapshot {
     id: string;
     name: string;
+    profile: PlayerProfileSnapshot;
+    userPic: string;
     controller: PlayerController;
     role: PlayerRole;
     team: TeamId | null;
     index: number;
+    goals: number;
     characterId: string;
     position: Vec3;
     velocity: Vec3;
@@ -112,10 +175,14 @@ export interface PlayerSnapshot {
     ragdollAt: number;
     grounded: boolean;
     lastAction: KickKind | null;
+    lastActionSide: StrikeSide | null;
     lastActionAt: number;
+    trailingFoot: StrikeSide;
+    stancePhase: number;
     celebration: CelebrationKind | null;
     celebrationAt: number;
     celebrationAvailableUntil: number;
+    emotion: PlayerEmotionSnapshot | null;
 }
 export interface BallSnapshot {
     position: Vec3;
@@ -184,21 +251,29 @@ export interface CelebrationAudioEvent extends ServerAudioEventBase {
 export type ServerAudioEvent = RosterAudioEvent | KickAudioEvent | GoalAudioEvent | CountdownAudioEvent | CelebrationAudioEvent;
 export interface JoinRequest {
     name?: string;
+    clientFingerprint?: string;
+    profile?: Partial<PlayerProfileSnapshot>;
+    skinId?: string;
+    userPic?: string;
 }
 export interface JoinAccepted {
     id: string;
     role: PlayerRole;
     team: TeamId | null;
     index: number;
+    goals: number;
     characterId: string;
+    profile: PlayerProfileSnapshot;
     version: string;
     maxActivePlayers: number;
     maxRoomClients: number;
 }
 export interface ServerState {
     version: string;
+    settingsRevision: number;
     serverTime: number;
     dayTimeSeconds: number;
+    settings: GameSettings;
     tick: number;
     players: PlayerSnapshot[];
     ball: BallSnapshot;
@@ -207,6 +282,7 @@ export interface ServerState {
     countdown: number;
     goalReset: GoalResetSnapshot;
     weather: WeatherSnapshot;
+    chatMessages: ChatMessageSnapshot[];
     audioEvents: ServerAudioEvent[];
 }
 export interface ClientInputMessage {
@@ -216,6 +292,7 @@ export interface ClientInputMessage {
 export interface ServerInfo {
     ok: boolean;
     version: string;
+    settingsRevision: number;
     activePlayers: number;
     connectedClients: number;
     maxActivePlayers: number;
@@ -227,6 +304,119 @@ export interface ServerInfo {
 }
 export declare const DEFAULT_INPUT: InputState;
 export declare const CHARACTER_ROSTER: readonly ["6299851", "6243756", "6270571", "6324128", "6244727", "6288738", "6304269", "6298522", "6255142", "6294728", "666dc6f4-0cc4-4714-a7cf-39cfb6655fe8"];
+export interface GameSettings {
+    fieldWidth: number;
+    fieldLength: number;
+    goalWidth: number;
+    goalDepth: number;
+    goalPostRadius: number;
+    goalCrossbarHeight: number;
+    goalCrossbarRadius: number;
+    maxActivePlayers: number;
+    dayCycleSeconds: number;
+    dayStartSeconds: number;
+    sunIntensity: number;
+    moonIntensity: number;
+    ambientIntensity: number;
+    floodlightIntensity: number;
+    toneMappingExposure: number;
+    weatherChangeMinMs: number;
+    weatherChangeMaxMs: number;
+    weatherDawnWeight: number;
+    weatherClearWeight: number;
+    weatherRainWeight: number;
+    weatherSnowWeight: number;
+    playerRadius: number;
+    playerHeight: number;
+    playerSpeed: number;
+    playerInputAxisAcceleration: number;
+    playerInputAxisReleaseDecay: number;
+    playerInputAxisOppositeAcceleration: number;
+    playerMovementAcceleration: number;
+    playerMovementDeceleration: number;
+    playerMovementTurnAcceleration: number;
+    playerSprintMultiplier: number;
+    playerExhaustedSpeedMultiplier: number;
+    playerExhaustedRecoveryThreshold: number;
+    playerStaminaMax: number;
+    playerStaminaSprintDrainPerSecond: number;
+    playerStaminaJumpCost: number;
+    playerStaminaHitCost: number;
+    playerStaminaRecoveryDelayMs: number;
+    playerStaminaRecoveryPerSecond: number;
+    playerHitRecoveryDelayMs: number;
+    playerJumpStrength: number;
+    playerJumpCooldownMs: number;
+    playerGravity: number;
+    playerAirControlMultiplier: number;
+    playerRagdollMinMs: number;
+    playerRagdollFrictionPerSecond: number;
+    playerRagdollHitKnockback: number;
+    playerRagdollVerticalKnockback: number;
+    ballRadius: number;
+    ballDensity: number;
+    ballRestitution: number;
+    kickRange: number;
+    footKickAssistRange: number;
+    handKickAssistRange: number;
+    headKickAssistRange: number;
+    footKickStrength: number;
+    handHitStrength: number;
+    headKickStrength: number;
+    kickCooldownMs: number;
+    handCooldownMs: number;
+    headCooldownMs: number;
+    ballHitBasePowerMultiplier: number;
+    leftKickInputBufferMs: number;
+    leftKickChargeSeconds: number;
+    leftKickFullChargePowerMultiplier: number;
+    footPlayerStaminaDamage: number;
+    handPlayerStaminaDamage: number;
+    headPlayerStaminaDamage: number;
+    airborneHeadStaminaDamageBonus: number;
+    bodyBumpRange: number;
+    bodyBumpMinSpeed: number;
+    bodyBumpStrength: number;
+    bodyBumpCooldownMs: number;
+    propImpulseMultiplier: number;
+    propDamping: number;
+    propReturnStrength: number;
+    propMaxDisplacementMultiplier: number;
+    postGoalCelebrationMs: number;
+    postGoalBallReturnMs: number;
+    kickoffCountdownMs: number;
+    celebrationWindowMs: number;
+    celebrationDurationMs: number;
+    botsEnabled: boolean;
+    botTargetActivePlayers: number;
+    botAggression: number;
+    botShootDistance: number;
+    botFightDistance: number;
+    botChaseDistance: number;
+    botSprintDistance: number;
+    botShotAlignmentMin: number;
+    botSupportReleaseDistance: number;
+    botKickIntervalMs: number;
+    botHandIntervalMs: number;
+    botHeadIntervalMs: number;
+    botJumpChance: number;
+}
+export type GameSettingInput = "number" | "range" | "checkbox";
+export interface GameSettingSchemaItem {
+    key: keyof GameSettings;
+    group: string;
+    label: string;
+    description: string;
+    input: GameSettingInput;
+    min?: number;
+    max?: number;
+    step?: number;
+    restartPhysics?: boolean;
+}
+export declare const DEFAULT_GAME_SETTINGS: GameSettings;
+export declare const GAME_SETTINGS_SCHEMA: GameSettingSchemaItem[];
+export declare function normalizeGameSettingsPatch(value: unknown, fallback?: GameSettings): GameSettings;
 export declare function teamName(team: TeamId | null): string;
 export declare function clamp(value: number, min: number, max: number): number;
 export declare function sanitizePlayerName(value: unknown): string;
+export declare function emotionChoiceById(value: unknown): typeof EMOTION_CHOICES[number] | null;

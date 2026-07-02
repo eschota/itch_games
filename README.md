@@ -141,3 +141,12 @@ Every created game starts at `v0.0.001`. Every shipped change increments the
 version, the current version must be visible in the bottom-left corner of the
 game, and each version bump is expected to be committed, pushed to GitHub, and
 autodeployed.
+
+This clone uses `git config core.hooksPath tools/hooks`; commits to `main`
+trigger the tracked post-commit hook, push to GitHub, and let the signed
+server webhook mirror production. Clean source-only UnSoccer commits create a
+generated dist artifact commit before push; if the tree is dirty, the server
+rebuild path is forced instead of trusting stale dist markers.
+
+Set `ITCH_IO_TARGET=owner/game:channel` to let the same post-commit flow publish
+UnSoccer to itch.io after production is ready.

@@ -18,6 +18,9 @@ Use this file for work inside `/itch_games/tools`.
 - `package_itch.py`: creates player-facing HTML5 upload zips under `dist/`.
   For UnSoccer it packages the already built client dist; the npm
   `package:unsoccer` script must rebuild before calling it.
+- `publish_unsoccer_itch.ps1`: verifies and publishes the UnSoccer HTML5 zip
+  to itch.io with butler when `ITCH_IO_TARGET=owner/game:channel` is set.
+- `itch.skill.md`: itch.io/butler transport rules.
 - `unsoccer_acceptance.mjs`: starts an isolated `UNSOCCER_TEST_MODE=1` server
   and verifies authoritative spectator assignment, HTTP fallback join/input/
   state, kick/body contacts, goal reset behavior, and server audioEvents.
@@ -40,6 +43,8 @@ Use this file for work inside `/itch_games/tools`.
   intentional fast production releases.
 - Git hooks must keep secrets out of the repository and use the existing signed
   GitHub push webhook rather than local copies of server HMAC credentials.
+- Itch publishing must keep secrets out of the repository and use local butler
+  credentials or `BUTLER_API_KEY` from the environment only.
 - `npm run test:unsoccer:acceptance` must use an isolated test server and must
   stop it before finishing.
 - `unsoccer_acceptance.mjs` derives the expected release from

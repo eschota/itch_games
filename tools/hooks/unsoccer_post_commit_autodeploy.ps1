@@ -89,6 +89,50 @@ function Test-CommittedUnsoccerDistReady {
   return $html.Contains($ExpectedVersion) -and $html.Contains($ExpectedWeight) -and $server.Contains("GAME_VERSION") -and $shared.Contains($ExpectedVersion)
 }
 
+function Test-HeadChangedUnsoccerSourceWithoutDist {
+  try {
+    & git rev-parse --verify "HEAD^" *> $null
+  } catch {
+    return $false
+  }
+  $changed = @(& git diff --name-only "HEAD^" HEAD -- package.json package-lock.json tools/unsoccer_acceptance.mjs unsoccer/client unsoccer/server unsoccer/shared)
+  $sourceChanged = @($changed | Where-Object {
+    $_ -match "^(package-lock\.json|package\.json|tools/unsoccer_acceptance\.mjs|unsoccer/(client|server|shared)/)" -and
+    $_ -notmatch "^unsoccer/(client|server|shared)/dist/"
+  })
+  $distChanged = @($changed | Where-Object { $_ -match "^unsoccer/(client|server|shared)/dist/" })
+  return $sourceChanged.Count -gt 0 -and $distChanged.Count -eq 0
+}
+
+function Invoke-WithPostCommitAutodeployDisabled {
+  param([scriptblock] $Command)
+  $previous = $env:ITCH_GAMES_POST_COMMIT_AUTODEPLOY
+  $env:ITCH_GAMES_POST_COMMIT_AUTODEPLOY = "0"
+  try {
+    & $Command
+  } finally {
+    if ($null -eq $previous) {
+      Remove-Item Env:ITCH_GAMES_POST_COMMIT_AUTODEPLOY -ErrorAction SilentlyContinue
+    } else {
+      $env:ITCH_GAMES_POST_COMMIT_AUTODEPLOY = $previous
+    }
+  }
+}
+
+function Publish-ItchIfConfigured {
+  if ($env:ITCH_IO_AUTOPUBLISH_UNSOCCER -eq "0") {
+    Write-Log "[post-commit-autodeploy] itch.io publish skipped: ITCH_IO_AUTOPUBLISH_UNSOCCER=0"
+    return
+  }
+  if (-not $env:ITCH_IO_TARGET) {
+    Write-Log "[post-commit-autodeploy] itch.io publish skipped: set ITCH_IO_TARGET=user/game:channel to enable"
+    return
+  }
+  Invoke-Logged "publishing UnSoccer to itch.io" {
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "tools/publish_unsoccer_itch.ps1") -Target $env:ITCH_IO_TARGET -SkipBuild
+  }
+}
+
 try {
   Write-Log "[post-commit-autodeploy] commit=$commit branch=$branch"
   Write-Log "[post-commit-autodeploy] log=$logFile"
@@ -102,6 +146,11 @@ try {
   Write-Log "[post-commit-autodeploy] expected UnSoccer version=$expectedVersion"
   Write-Log "[post-commit-autodeploy] expected UnSoccer weight=$expectedWeight"
 
+  $committedDistReady = Test-CommittedUnsoccerDistReady -ExpectedVersion $expectedVersion -ExpectedWeight $expectedWeight
+  if ($committedDistReady -and (Test-HeadChangedUnsoccerSourceWithoutDist)) {
+    Write-Log "[post-commit-autodeploy] committed dist markers match, but HEAD changed UnSoccer source without dist; local/server rebuild is required"
+    $committedDistReady = $false
+  }
   $dirty = @(& git status --porcelain --untracked-files=no)
   $allowedGenerated = "^( M| D|M |D |MM|MD|AM|AD|A |R |C ) (unsoccer/(client|server|shared)/dist/|dist/)"
   $dirtyBlockers = @($dirty | Where-Object { $_ -and ($_ -notmatch $allowedGenerated) })
@@ -111,19 +160,50 @@ try {
     foreach ($line in $dirtyBlockers) {
       Write-Log $line
     }
-    if (Test-CommittedUnsoccerDistReady -ExpectedVersion $expectedVersion -ExpectedWeight $expectedWeight) {
+    if ($committedDistReady) {
       Write-Log "[post-commit-autodeploy] committed UnSoccer dist is ready; skipping dirty working-tree gate and pushing fast-release artifact"
       $skipLocalGate = $true
     } else {
-      Write-Log "[post-commit-autodeploy] abort: dist is not ready, so dirty working-tree validation would be unsafe"
-      Write-Log "[post-commit-autodeploy] commit stayed local; push manually after cleaning or committing the remaining files"
-      exit 1
+      Write-Log "[post-commit-autodeploy] committed dist is not ready and working tree is dirty; pushing source-only so the server mirror builds it"
+      Write-Log "[post-commit-autodeploy] clean commits auto-create a fast dist artifact commit; dirty commits preserve unrelated local work"
+      $skipLocalGate = $true
     }
+  }
+
+  if ($committedDistReady -and -not $skipLocalGate) {
+    Write-Log "[post-commit-autodeploy] committed UnSoccer dist is ready; skipping local gate and pushing fast-release artifact"
+    $skipLocalGate = $true
   }
 
   if (-not $skipLocalGate) {
     Invoke-Logged "running acceptance gate" { cmd.exe /d /s /c "npm run test:unsoccer:acceptance 2>&1" }
     Invoke-Logged "packaging itch artifact" { cmd.exe /d /s /c "npm run package:unsoccer 2>&1" }
+    if ($env:ITCH_GAMES_AUTO_DIST_COMMIT -ne "0") {
+      $stagedBefore = @(& git diff --cached --name-only)
+      if ($stagedBefore.Count -gt 0) {
+        Write-Log "[post-commit-autodeploy] skip automatic dist commit: index already has staged files"
+      } else {
+        Invoke-Logged "staging generated UnSoccer dist artifacts" { cmd.exe /d /s /c "git add -f -- unsoccer/client/dist unsoccer/server/dist unsoccer/shared/dist 2>&1" }
+        $stagedDist = @(& git diff --cached --name-only -- unsoccer/client/dist unsoccer/server/dist unsoccer/shared/dist)
+        $stagedAll = @(& git diff --cached --name-only)
+        $stagedOutsideDist = @($stagedAll | Where-Object { $_ -notmatch "^(unsoccer/client/dist/|unsoccer/server/dist/|unsoccer/shared/dist/)" })
+        if ($stagedOutsideDist.Count -gt 0) {
+          foreach ($line in $stagedOutsideDist) { Write-Log "[post-commit-autodeploy] staged outside dist: $line" }
+          throw "automatic dist commit would include files outside UnSoccer dist"
+        }
+        if ($stagedDist.Count -gt 0) {
+          Invoke-Logged "creating automatic UnSoccer dist artifact commit" {
+            Invoke-WithPostCommitAutodeployDisabled {
+              cmd.exe /d /s /c "git commit -m `"Auto-build UnSoccer $expectedVersion dist artifacts`" 2>&1"
+            }
+          }
+          $commit = (& git rev-parse --short HEAD).Trim()
+          Write-Log "[post-commit-autodeploy] auto dist commit=$commit"
+        } else {
+          Write-Log "[post-commit-autodeploy] generated UnSoccer dist already matches HEAD"
+        }
+      }
+    }
   }
   Invoke-Logged "pushing main to origin; GitHub webhook will trigger production autodeploy" { cmd.exe /d /s /c "git push origin HEAD:main 2>&1" }
 
@@ -154,6 +234,7 @@ try {
         Write-Log "[post-commit-autodeploy] health commit=$remoteCommit version=$remoteVersion public_api=$publicApiVersion ready=$ready running=$running"
         if ($remoteCommit -eq $commit -and $remoteVersion -eq $expectedVersion -and $publicApiVersion -eq $expectedVersion -and $ready) {
           Write-Log "[post-commit-autodeploy] production ready for $expectedVersion at commit $commit"
+          Publish-ItchIfConfigured
           exit 0
         }
       } catch {

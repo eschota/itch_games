@@ -64,9 +64,9 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
   `node_modules` exists, it may reuse the current install to keep asset-only
   deploys inside the webhook timeout. It must delete generated UnSoccer dist
   folders before rebuilding, then verify `unsoccer/client/dist/index.html` against
-  `package.json.games.unsoccer.version`, the `BUILD_WEIGHT_LABEL` from
-  `unsoccer/client/src/main.ts` (currently `1.31 MB`), every referenced asset
-  path, at least one built JS asset, the
+  `package.json.games.unsoccer.version`, the current `BUILD_WEIGHT_LABEL` from
+  `unsoccer/client/src/main.ts`, every referenced asset path, at least one
+  built JS asset, the
   `residential-courtyard` client marker inside built assets, and that the server
   bundle does not import geckos.io, `ws`, or `node-datachannel` before nginx
   reload.
@@ -76,6 +76,10 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
   imports `GAME_VERSION` from shared and does not need to contain the literal
   version. The deploy must still run artifact checks and restart the UnSoccer
   service.
+- If the just-pulled commit changed UnSoccer source, package manifests, or
+  `tools/unsoccer_acceptance.mjs` without changing `unsoccer/client/dist`,
+  `unsoccer/server/dist`, or `unsoccer/shared/dist`, the deploy must ignore
+  stale committed dist and rebuild on the server.
 - After nginx reload, the qwertystock autodeploy must smoke the public
   `/unsoccer/` route for the same version and weight markers plus
   `/unsoccer/api/health` for the matching server version. `/api/deploy-health`

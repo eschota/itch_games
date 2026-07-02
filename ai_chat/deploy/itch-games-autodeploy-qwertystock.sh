@@ -24,6 +24,17 @@ git checkout main
 git pull --ff-only origin main
 git rev-parse --short HEAD
 git status --short
+previous_head="$(git rev-parse HEAD@{1} 2>/dev/null || true)"
+source_changed_without_dist=0
+if [ -n "$previous_head" ]; then
+  changed_files="$(git diff --name-only "$previous_head" HEAD -- package.json package-lock.json tools/unsoccer_acceptance.mjs unsoccer/client unsoccer/server unsoccer/shared || true)"
+  non_dist_changed="$(printf '%s\n' "$changed_files" | grep -E '^(package-lock\.json|package\.json|tools/unsoccer_acceptance\.mjs|unsoccer/(client|server|shared)/)' | grep -Ev '^unsoccer/(client|server|shared)/dist/' || true)"
+  dist_changed="$(printf '%s\n' "$changed_files" | grep -E '^unsoccer/(client|server|shared)/dist/' || true)"
+  if [ -n "$non_dist_changed" ] && [ -z "$dist_changed" ]; then
+    source_changed_without_dist=1
+    echo "UnSoccer source changed without committed dist; forcing server build"
+  fi
+fi
 stage "node and npm"
 echo "node: $(node -v)"
 echo "npm: $(npm -v)"
@@ -47,13 +58,12 @@ if [ -s "unsoccer/client/dist/index.html" ] && [ -s "unsoccer/server/dist/index.
     dist_ready=1
   fi
 fi
-if [ "$dist_ready" -eq 1 ]; then
+if [ "$dist_ready" -eq 1 ] && [ "$source_changed_without_dist" -eq 0 ]; then
   stage "committed dist ready"
   echo "using committed UnSoccer dist for ${expected_version}; skipping npm ci/build"
 else
   stage "npm dependencies"
   rm -rf node_modules/@geckos.io node_modules/node-datachannel node_modules/ws node_modules/@types/ws
-  previous_head="$(git rev-parse HEAD@{1} 2>/dev/null || true)"
   package_changed=1
   if [ -n "$previous_head" ] && git diff --quiet "$previous_head" HEAD -- package.json package-lock.json unsoccer/shared/package.json unsoccer/server/package.json unsoccer/client/package.json; then
     package_changed=0

@@ -196,9 +196,11 @@ Use this file for work inside `/itch_games`.
   docs must stay synchronized. Multi-game versions also update
   `package.json.games`.
 - Version bumps are committed, pushed to GitHub, and autodeployed.
-- The local clone may install `.git/hooks/post-commit` as a wrapper around
-  `tools/hooks/unsoccer_post_commit_autodeploy.ps1`; keep the tracked hook
-  script secret-free and routed through GitHub push webhook deployment.
+- The local clone uses `git config core.hooksPath tools/hooks`; keep
+  `tools/hooks/post-commit` and `tools/hooks/unsoccer_post_commit_autodeploy.ps1`
+  secret-free and routed through GitHub push webhook deployment.
+- Set `ITCH_IO_TARGET=owner/game:channel` to let the hook publish UnSoccer to
+  itch.io after production becomes ready.
 
 ## Validation
 

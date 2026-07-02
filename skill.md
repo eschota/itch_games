@@ -72,8 +72,11 @@ Use this root skill when changing, packaging, validating, or publishing the
       `ai_chat/deploy/itch-games-unsoccer-server-qwertystock.service`
 - Tools: `tools/tools.skill.md`
   - Itch package helper: `tools/package_itch.py`
+  - Itch.io publish transport: `tools/itch.skill.md`
+    - UnSoccer butler publisher: `tools/publish_unsoccer_itch.ps1`
   - UnSoccer acceptance gate: `tools/unsoccer_acceptance.mjs`
   - Local git hooks: `tools/hooks/hooks.skill.md`
+    - Tracked post-commit entrypoint: `tools/hooks/post-commit`
     - UnSoccer post-commit autodeploy:
       `tools/hooks/unsoccer_post_commit_autodeploy.ps1`
 
@@ -107,11 +110,17 @@ Use this root skill when changing, packaging, validating, or publishing the
   for dynamic behavior.
 - Treat GitHub `eschota/itch_games` as the public source repository.
 - Version bumps must be committed, pushed to GitHub, and autodeployed.
-- This local clone installs `.git/hooks/post-commit` as a thin wrapper around
-  `tools/hooks/unsoccer_post_commit_autodeploy.ps1`, so commits to `main` run
-  the UnSoccer acceptance/package gate, push to GitHub, and let the signed
-  GitHub webhook publish production. Use `ITCH_GAMES_POST_COMMIT_AUTODEPLOY=0`
-  or `[skip deploy]` only for intentional local-only commits.
+- This local clone uses `git config core.hooksPath tools/hooks`, where
+  `tools/hooks/post-commit` runs
+  `tools/hooks/unsoccer_post_commit_autodeploy.ps1`. Commits to `main` push to
+  GitHub and let the signed webhook publish production. Clean source-only
+  commits auto-create generated UnSoccer dist artifact commits before push;
+  dirty-tree commits preserve local work and force the server rebuild path when
+  committed dist is stale. Use `ITCH_GAMES_POST_COMMIT_AUTODEPLOY=0` or
+  `[skip deploy]` only for intentional local-only commits.
+- Set `ITCH_IO_TARGET=owner/game:channel` to let the post-commit hook publish
+  UnSoccer to itch.io after production is ready. The butler publisher is
+  `tools/publish_unsoccer_itch.ps1`; keep itch credentials out of the repo.
 - Use `art_director_skill.md` for art direction, visual quality, 3D, animation,
   VFX, lighting, rendering, screenshots, trailers, and audio-visual mood work.
 - Put Art Director working artifacts that are not runtime code and not final
@@ -224,8 +233,8 @@ Use this root skill when changing, packaging, validating, or publishing the
 
 ## Current Behavior
 
-- Current game release: `v0.0.030`.
-- `unsoccer` current prototype release: `v0.0.030`.
+- Current game release: `v0.0.031`.
+- `unsoccer` current prototype release: `v0.0.031`.
 - `unsoccer` uses a headless authoritative Node server with Rapier3D physics,
   plain WebSocket transport, and HTTP polling fallback; the itch package is
   static client-only and needs the live game server for multiplayer.
@@ -399,6 +408,11 @@ Use this root skill when changing, packaging, validating, or publishing the
   foot/hand/head hits get player-centered assist reach, LMB clicks buffer for a
   short ball-contact window, active strike inputs suppress same-frame passive
   body bump, and body-only ball contact is softer and less frequent.
+- `unsoccer` v0.0.031 adds server-authoritative bots that fill active player
+  slots to four, give humans priority by removing/backfilling bot actors on
+  join/leave, expose `controller` metadata in snapshots, keep bot actors out of
+  connected-client capacity, and provide a static `client/public/bot-tuning.html`
+  page backed by `/api/bot-settings` for local save/apply tuning.
 - `v0.0.006` adds procedural Web Audio feedback and exposes
   `window.orbitalCourierAudio` plus `orbital-courier:audio-event` so future
   network code can replicate semantic sound events instead of audio files.

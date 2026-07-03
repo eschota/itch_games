@@ -33,5 +33,6 @@ ui_designer/public_pages/unsoccer-yandex-games-assets/source/
 # optimized textureless assets under unsoccer/client/public and dist.
 unsoccer/assets/models/characters/autorig/raw/
 unsoccer/assets/models/characters/free3d/raw/*-textured-rig/
+unsoccer/assets/models/characters/free3d/raw/*-textured-rig-*/
 unsoccer/assets/models/characters/free3d/raw/*-all-animations*.glb
 unsoccer/assets/models/environment/free3d/raw/

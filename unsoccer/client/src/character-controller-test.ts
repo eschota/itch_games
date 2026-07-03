@@ -118,7 +118,15 @@ const aoContrastValueEl = document.querySelector<HTMLOutputElement>("#ao-contras
 const environmentGallery = document.querySelector<HTMLElement>("#environment-gallery");
 const characterRow = document.querySelector<HTMLElement>(".character-row");
 const batchConvertButton = document.querySelector<HTMLButtonElement>("#btn-batch-convert-pbr");
+const footButton = document.querySelector<HTMLButtonElement>("#btn-foot");
+const handButton = document.querySelector<HTMLButtonElement>("#btn-hand");
+const headButton = document.querySelector<HTMLButtonElement>("#btn-head");
+const jumpButton = document.querySelector<HTMLButtonElement>("#btn-jump");
+const sprintJumpButton = document.querySelector<HTMLButtonElement>("#btn-sprint-jump");
 const ragdollButton = document.querySelector<HTMLButtonElement>("#btn-ragdoll");
+const celebrate1Button = document.querySelector<HTMLButtonElement>("#btn-celebrate-1");
+const celebrate2Button = document.querySelector<HTMLButtonElement>("#btn-celebrate-2");
+const celebrate3Button = document.querySelector<HTMLButtonElement>("#btn-celebrate-3");
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -199,6 +207,7 @@ let channelViewMode: ChannelViewMode = "rendered";
 let aoContrast = 1.35;
 let pbrBatchInProgress = false;
 let loadSequence = 0;
+let triggerSequence = 0;
 const channelOriginalMaterials = new WeakMap<THREE.Mesh, THREE.Material | THREE.Material[]>();
 const channelDebugMaterials = new Map<ChannelViewMode, THREE.ShaderMaterial>();
 
@@ -481,6 +490,22 @@ function parseChannelViewMode(value: string): ChannelViewMode {
   return Object.prototype.hasOwnProperty.call(channelModeIds, value) ? value as ChannelViewMode : "rendered";
 }
 
+function bindButtonPress(button: HTMLButtonElement | null, handler: () => void): void {
+  if (!button) return;
+  let pointerPressAt = 0;
+  button.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    pointerPressAt = Date.now();
+    event.preventDefault();
+    button.focus();
+    handler();
+  });
+  button.addEventListener("click", () => {
+    if (Date.now() - pointerPressAt < 240) return;
+    handler();
+  });
+}
+
 function updateAoContrast(value: number): void {
   aoContrast = THREE.MathUtils.clamp(Number.isFinite(value) ? value : 1.35, 0.45, 3);
   if (aoContrastInput) aoContrastInput.value = aoContrast.toFixed(2);
@@ -633,7 +658,14 @@ function updateEnvironmentUi(asset: EnvironmentAsset | null, loaded = false, tex
 }
 
 function trigger(action: KickKind, sprintJump = false): void {
-  if (ragdoll) return;
+  triggerSequence += 1;
+  document.documentElement.dataset.characterControllerTriggerAttempt = action;
+  document.documentElement.dataset.characterControllerTriggerSequence = String(triggerSequence);
+  if (ragdoll) {
+    document.documentElement.dataset.characterControllerTriggerBlocked = "ragdoll";
+    return;
+  }
+  document.documentElement.dataset.characterControllerTriggerBlocked = "";
   celebration = null;
   celebrationAt = 0;
   celebrationAvailableUntil = 0;
@@ -645,6 +677,8 @@ function trigger(action: KickKind, sprintJump = false): void {
     lastActionSide = null;
   }
   lastActionAt = Date.now();
+  document.documentElement.dataset.characterControllerTrigger = action;
+  document.documentElement.dataset.characterControllerTriggerSide = lastActionSide || "";
   if (action === "jump" && !airborne && stamina >= 12) {
     airborne = true;
     verticalVelocity = sprintJump ? 6.35 : 5.8;
@@ -729,6 +763,9 @@ function resetCharacterRuntimeState(): void {
   sprinting = false;
   sprintJumpUntil = 0;
   yaw = Math.PI;
+  document.documentElement.dataset.characterControllerTrigger = "";
+  document.documentElement.dataset.characterControllerTriggerSide = "";
+  document.documentElement.dataset.characterControllerTriggerBlocked = "";
   syncRagdollButton();
 }
 
@@ -1394,15 +1431,15 @@ canvas.addEventListener("auxclick", (event) => {
 canvas.addEventListener("wheel", (event) => {
   event.preventDefault();
 }, { passive: false });
-document.querySelector("#btn-foot")?.addEventListener("click", () => trigger("left"));
-document.querySelector("#btn-hand")?.addEventListener("click", () => trigger("hand"));
-document.querySelector("#btn-head")?.addEventListener("click", () => trigger("head"));
-document.querySelector("#btn-jump")?.addEventListener("click", () => trigger("jump"));
-document.querySelector("#btn-sprint-jump")?.addEventListener("click", () => trigger("jump", true));
-ragdollButton?.addEventListener("click", () => toggleRagdoll());
-document.querySelector("#btn-celebrate-1")?.addEventListener("click", () => celebrate("celebrate1"));
-document.querySelector("#btn-celebrate-2")?.addEventListener("click", () => celebrate("celebrate2"));
-document.querySelector("#btn-celebrate-3")?.addEventListener("click", () => celebrate("celebrate3"));
+bindButtonPress(footButton, () => trigger("left"));
+bindButtonPress(handButton, () => trigger("hand"));
+bindButtonPress(headButton, () => trigger("head"));
+bindButtonPress(jumpButton, () => trigger("jump"));
+bindButtonPress(sprintJumpButton, () => trigger("jump", true));
+bindButtonPress(ragdollButton, () => toggleRagdoll());
+bindButtonPress(celebrate1Button, () => celebrate("celebrate1"));
+bindButtonPress(celebrate2Button, () => celebrate("celebrate2"));
+bindButtonPress(celebrate3Button, () => celebrate("celebrate3"));
 document.querySelector("#btn-prev-character")?.addEventListener("click", () => void nextCharacter(-1));
 document.querySelector("#btn-next-character")?.addEventListener("click", () => void nextCharacter(1));
 characterSelect?.addEventListener("change", () => void selectCharacter(characterSelect.value));

@@ -109,6 +109,21 @@ export const EMOTION_CHOICES = [
 
 export const DEFAULT_USER_PICS = ["⚽", "⭐", "🔥", "👑", "😎", "🤝", "🚀", "🎯", "🧤"] as const;
 
+export const BALL_SKIN_ROSTER = [
+  "6493457",
+  "6493379",
+  "6493403",
+  "6493239",
+  "6493488",
+  "6493371",
+  "6493256",
+  "6493342",
+  "6493507",
+  "6493481"
+] as const;
+
+export const DEFAULT_BALL_SKIN_ID = BALL_SKIN_ROSTER[0];
+
 export type EmotionId = typeof EMOTION_CHOICES[number]["id"];
 
 export interface Vec3 {
@@ -137,6 +152,7 @@ export interface InputState {
 export interface PlayerProfileSnapshot {
   nickname: string;
   skinId: string;
+  ballSkinId: string;
   userPic: string;
 }
 
@@ -193,6 +209,7 @@ export interface BallSnapshot {
   position: Vec3;
   velocity: Vec3;
   variant: number;
+  skinId: string;
   ownerPlayerId: string | null;
 }
 

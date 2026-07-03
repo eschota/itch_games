@@ -2,10 +2,12 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import {
   BALL_RADIUS,
+  BALL_SKIN_ROSTER,
   CELEBRATION_DURATION_MS,
   CHARACTER_ROSTER,
   DAY_CYCLE_SECONDS,
   DAY_START_SECONDS,
+  DEFAULT_BALL_SKIN_ID,
   DEFAULT_GAME_SETTINGS,
   DEFAULT_USER_PICS,
   DEFAULT_VISUAL_SETTINGS,
@@ -279,6 +281,13 @@ const fullscreenButton = requireElement<HTMLButtonElement>("#fullscreen-button")
 const cameraResetButton = requireElement<HTMLButtonElement>("#camera-reset-button");
 const AUDIO_ON_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Zm13.3-1.7-1.4 1.4a4.6 4.6 0 0 1 0 6.6l1.4 1.4a6.6 6.6 0 0 0 0-9.4Zm2.8-2.8-1.4 1.4a8.6 8.6 0 0 1 0 12.2l1.4 1.4a10.6 10.6 0 0 0 0-15Z"/></svg>';
 const AUDIO_OFF_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Zm12.4 3 2.8-2.8-1.4-1.4-2.8 2.8-2.8-2.8-1.4 1.4 2.8 2.8-2.8 2.8 1.4 1.4 2.8-2.8 2.8 2.8 1.4-1.4-2.8-2.8Z"/></svg>';
+const skinShopButton = requireElement<HTMLButtonElement>("#skin-shop-button");
+const skinShopBalanceEl = requireElement<HTMLElement>("#skin-shop-balance");
+const skinShopPanel = requireElement<HTMLElement>("#skin-shop-panel");
+const skinShopCloseButton = requireElement<HTMLButtonElement>("#skin-shop-close-button");
+const skinShopStatusEl = requireElement<HTMLElement>("#skin-shop-status");
+const skinShopPlayerGrid = requireElement<HTMLElement>("#skin-shop-players");
+const skinShopBallGrid = requireElement<HTMLElement>("#skin-shop-balls");
 const settingsPanel = requireElement<HTMLElement>("#settings-panel");
 const settingsForm = requireElement<HTMLFormElement>("#settings-form");
 const settingsSaveStateEl = requireElement<HTMLElement>("#settings-save-state");
@@ -672,6 +681,9 @@ const CELEBRATION_TELEGRAPH: Record<CelebrationKind, {
 type LocalPlayerProfile = PlayerProfileSnapshot;
 
 const PROFILE_STORAGE_KEY = "unsoccer.profile.v1";
+const SKIN_STORE_STORAGE_KEY = "unsoccer.skinStore.v1";
+const CHARACTER_SKIN_ROSTER_SRC = "assets/characters/free3d-10k/roster.json";
+const BALL_SKIN_ROSTER_SRC = "assets/balls/free3d/roster.json";
 const BROWSER_FINGERPRINT_STORAGE_KEY = "unsoccer.browserFingerprint.v1";
 const EMOTION_WHEEL_IDLE_MS = 2000;
 const APPLIED_EMOTION_FALLBACK_MS = 4200;
@@ -741,6 +753,11 @@ let pendingRebindAction: InputAction | null = null;
 let latestSnapshotReceivedAt = 0;
 let localProfile: LocalPlayerProfile = loadLocalProfile();
 const localBrowserFingerprint = loadBrowserFingerprint();
+let skinStore = loadSkinStore();
+let skinShopOpen = false;
+let skinShopTab: "players" | "balls" = "players";
+let characterSkinCatalog: SkinCatalogItem[] = [];
+let ballSkinCatalog: SkinCatalogItem[] = [];
 let profileSendTimer = 0;
 let emotionWheelOpen = false;
 let emotionWheelSelectedIndex = 0;
@@ -794,6 +811,10 @@ function sanitizeLocalUserPic(value: string): string {
 
 function sanitizeLocalSkin(value: string): string {
   return (CHARACTER_ROSTER as readonly string[]).includes(value) ? value : rosterSkinFallback();
+}
+
+function sanitizeLocalBallSkin(value: string | undefined): string {
+  return (BALL_SKIN_ROSTER as readonly string[]).includes(value || "") ? String(value) : DEFAULT_BALL_SKIN_ID;
 }
 
 function migrateStoredSkin(value: string | undefined, hasExplicitSkin: boolean): string {
@@ -856,6 +877,7 @@ function loadLocalProfile(): LocalPlayerProfile {
   const fallback: LocalPlayerProfile = {
     nickname: sanitizeLocalName(query.get("name") || ""),
     skinId: sanitizeLocalSkin(explicitSkin || ""),
+    ballSkinId: sanitizeLocalBallSkin(query.get("ballSkin") || query.get("ballSkinId") || undefined),
     userPic: sanitizeLocalUserPic(query.get("user_pic") || query.get("userPic") || "")
   };
   try {
@@ -864,6 +886,7 @@ function loadLocalProfile(): LocalPlayerProfile {
     return {
       nickname: sanitizeLocalName(query.get("name") || stored.nickname || fallback.nickname),
       skinId: explicitSkin ? sanitizeLocalSkin(explicitSkin) : migrateStoredSkin(stored.skinId || fallback.skinId, false),
+      ballSkinId: sanitizeLocalBallSkin(query.get("ballSkin") || query.get("ballSkinId") || stored.ballSkinId || fallback.ballSkinId),
       userPic: sanitizeLocalUserPic(query.get("user_pic") || query.get("userPic") || stored.userPic || fallback.userPic)
     };
   } catch (_) {
@@ -873,6 +896,54 @@ function loadLocalProfile(): LocalPlayerProfile {
 
 function saveLocalProfile(): void {
   localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(localProfile));
+}
+
+function defaultSkinStore(): SkinStoreState {
+  return {
+    ownedCharacters: [rosterSkinFallback()],
+    ownedBalls: [DEFAULT_BALL_SKIN_ID],
+    spentGoals: 0
+  };
+}
+
+function normalizeSkinStore(value: Partial<SkinStoreState> | null | undefined): SkinStoreState {
+  const fallback = defaultSkinStore();
+  const ownedCharacters = new Set([fallback.ownedCharacters[0]]);
+  const ownedBalls = new Set([fallback.ownedBalls[0]]);
+  for (const id of value?.ownedCharacters || []) {
+    if ((CHARACTER_ROSTER as readonly string[]).includes(id)) ownedCharacters.add(id);
+  }
+  for (const id of value?.ownedBalls || []) {
+    if ((BALL_SKIN_ROSTER as readonly string[]).includes(id)) ownedBalls.add(id);
+  }
+  return {
+    ownedCharacters: [...ownedCharacters],
+    ownedBalls: [...ownedBalls],
+    spentGoals: Math.max(0, Math.floor(Number(value?.spentGoals || 0)))
+  };
+}
+
+function loadSkinStore(): SkinStoreState {
+  try {
+    return normalizeSkinStore(JSON.parse(localStorage.getItem(SKIN_STORE_STORAGE_KEY) || "null") as Partial<SkinStoreState> | null);
+  } catch (_) {
+    return defaultSkinStore();
+  }
+}
+
+function saveSkinStore(): void {
+  skinStore = normalizeSkinStore(skinStore);
+  localStorage.setItem(SKIN_STORE_STORAGE_KEY, JSON.stringify(skinStore));
+}
+
+function localGoalsEarned(): number {
+  const localId = localJoin?.id;
+  const player = localId ? latestState?.players.find((entry) => entry.id === localId) : null;
+  return Math.max(0, Math.floor(player?.goals ?? localJoin?.goals ?? 0));
+}
+
+function localGoalBalance(): number {
+  return Math.max(0, localGoalsEarned() - skinStore.spentGoals);
 }
 
 function skinLabel(id: string, index: number): string {
@@ -888,6 +959,7 @@ function syncProfileUi(): void {
   profileAvatarEl.style.backgroundImage = isImageUserPic(localProfile.userPic) ? `url("${cssUrl(localProfile.userPic)}")` : "";
   document.documentElement.dataset.localProfileName = localProfile.nickname;
   document.documentElement.dataset.localProfileSkin = localProfile.skinId;
+  document.documentElement.dataset.localProfileBallSkin = localProfile.ballSkinId;
   document.documentElement.dataset.localUserPic = localProfile.userPic;
   document.documentElement.dataset.localFingerprint = localBrowserFingerprint;
 }
@@ -896,9 +968,13 @@ function readProfileUi(): boolean {
   const next: LocalPlayerProfile = {
     nickname: sanitizeLocalName(profileNameInput.value),
     skinId: sanitizeLocalSkin(profileSkinSelect.value),
+    ballSkinId: sanitizeLocalBallSkin(localProfile.ballSkinId),
     userPic: sanitizeLocalUserPic(profilePicInput.value)
   };
-  const changed = next.nickname !== localProfile.nickname || next.skinId !== localProfile.skinId || next.userPic !== localProfile.userPic;
+  const changed = next.nickname !== localProfile.nickname
+    || next.skinId !== localProfile.skinId
+    || next.ballSkinId !== localProfile.ballSkinId
+    || next.userPic !== localProfile.userPic;
   localProfile = next;
   saveLocalProfile();
   syncProfileUi();
@@ -937,7 +1013,183 @@ function initializeProfileControls(): void {
     .join("");
   syncProfileUi();
   renderEmotionWheel();
+  renderSkinShop();
+  void loadSkinCatalogs();
   updateChatUi(latestState);
+}
+
+function hashSkinColor(id: string, salt: number): string {
+  let hash = 2166136261 + salt * 16777619;
+  for (let index = 0; index < id.length; index += 1) {
+    hash ^= id.charCodeAt(index) + salt;
+    hash = Math.imul(hash, 16777619);
+  }
+  const hue = Math.abs(hash) % 360;
+  const saturation = 52 + Math.abs(hash >> 8) % 28;
+  const lightness = 38 + Math.abs(hash >> 16) % 22;
+  return `hsl(${hue} ${saturation}% ${lightness}%)`;
+}
+
+function characterSkinPrice(index: number): number {
+  return index === 0 ? 0 : 1 + Math.floor(index / 3);
+}
+
+function ballSkinPrice(index: number): number {
+  return index === 0 ? 0 : 1 + Math.floor(index / 4);
+}
+
+function fallbackCharacterCatalog(): SkinCatalogItem[] {
+  return CHARACTER_ROSTER.map((id, index) => ({
+    id,
+    title: skinLabel(id, index),
+    price: characterSkinPrice(index),
+    subtitle: "10k vertex PBR",
+    swatchA: hashSkinColor(id, 1),
+    swatchB: hashSkinColor(id, 5)
+  }));
+}
+
+function fallbackBallCatalog(): SkinCatalogItem[] {
+  return BALL_SKIN_ROSTER.map((id, index) => ({
+    id,
+    title: index === 0 ? "Standard Soccer Ball" : `Ball Skin ${index + 1}`,
+    price: ballSkinPrice(index),
+    subtitle: index === 0 ? "Default match ball" : "Vertex PBR ball",
+    swatchA: hashSkinColor(id, 2),
+    swatchB: hashSkinColor(id, 9)
+  }));
+}
+
+async function loadSkinCatalogs(): Promise<void> {
+  characterSkinCatalog = fallbackCharacterCatalog();
+  ballSkinCatalog = fallbackBallCatalog();
+  renderSkinShop();
+  try {
+    const [characterResponse, ballResponse] = await Promise.all([
+      fetch(resolveClientAsset(CHARACTER_SKIN_ROSTER_SRC), { cache: "no-cache" }),
+      fetch(resolveClientAsset(BALL_SKIN_ROSTER_SRC), { cache: "no-cache" })
+    ]);
+    if (characterResponse.ok) {
+      const roster = await characterResponse.json() as { assets?: Array<{ guid: string; title: string; sourceLod?: string; vertexColors?: number; vertexColorAccessors?: number }> };
+      const byGuid = new Map((roster.assets || []).map((asset) => [asset.guid, asset]));
+      characterSkinCatalog = CHARACTER_ROSTER.map((id, index) => {
+        const asset = byGuid.get(id);
+        return {
+          id,
+          title: asset?.title || skinLabel(id, index),
+          price: characterSkinPrice(index),
+          subtitle: `${asset?.sourceLod || "10k"} vertex PBR`,
+          swatchA: hashSkinColor(id, 1),
+          swatchB: hashSkinColor(id, 5)
+        };
+      });
+    }
+    if (ballResponse.ok) {
+      const roster = await ballResponse.json() as Free3dBallRoster;
+      const byGuid = new Map((roster.assets || []).map((asset) => [asset.guid, asset]));
+      ballSkinCatalog = BALL_SKIN_ROSTER.map((id, index) => {
+        const asset = byGuid.get(id);
+        return {
+          id,
+          title: index === 0 ? "Standard Soccer Ball" : asset?.title || `Ball Skin ${index + 1}`,
+          price: ballSkinPrice(index),
+          subtitle: asset?.lod ? `${asset.lod} vertex ball` : "Vertex PBR ball",
+          swatchA: hashSkinColor(id, 2),
+          swatchB: hashSkinColor(id, 9)
+        };
+      });
+    }
+  } catch (error) {
+    console.warn("Skin catalog load failed", error);
+  }
+  renderSkinShop();
+}
+
+function setSkinShopTab(tab: "players" | "balls"): void {
+  skinShopTab = tab;
+  for (const button of skinShopPanel.querySelectorAll<HTMLButtonElement>("[data-skin-shop-tab]")) {
+    button.setAttribute("aria-selected", String(button.dataset.skinShopTab === tab));
+  }
+  skinShopPlayerGrid.hidden = tab !== "players";
+  skinShopBallGrid.hidden = tab !== "balls";
+  document.documentElement.dataset.skinShopTab = tab;
+}
+
+function setSkinShopOpen(open: boolean): void {
+  skinShopOpen = open;
+  skinShopPanel.hidden = !open;
+  document.documentElement.dataset.skinShopOpen = String(open);
+  if (open) renderSkinShop();
+}
+
+function renderSkinShop(): void {
+  const balance = localGoalBalance();
+  skinShopBalanceEl.textContent = String(balance);
+  skinShopStatusEl.textContent = `${balance} goals`;
+  document.documentElement.dataset.skinShopGoals = String(localGoalsEarned());
+  document.documentElement.dataset.skinShopBalance = String(balance);
+  document.documentElement.dataset.skinShopSpentGoals = String(skinStore.spentGoals);
+  renderSkinShopGrid(skinShopPlayerGrid, characterSkinCatalog.length ? characterSkinCatalog : fallbackCharacterCatalog(), "character");
+  renderSkinShopGrid(skinShopBallGrid, ballSkinCatalog.length ? ballSkinCatalog : fallbackBallCatalog(), "ball");
+  setSkinShopTab(skinShopTab);
+}
+
+function renderSkinShopGrid(root: HTMLElement, items: SkinCatalogItem[], kind: "character" | "ball"): void {
+  const owned = new Set(kind === "character" ? skinStore.ownedCharacters : skinStore.ownedBalls);
+  const selectedId = kind === "character" ? localProfile.skinId : localProfile.ballSkinId;
+  root.innerHTML = items.map((item) => {
+    const isOwned = owned.has(item.id);
+    const isSelected = item.id === selectedId;
+    const canBuy = localGoalBalance() >= item.price;
+    const state = isSelected ? "Selected" : isOwned ? "Select" : `Buy`;
+    const disabled = isSelected || (!isOwned && !canBuy) ? " disabled" : "";
+    const classes = `skin-card${isSelected ? " is-selected" : ""}${isOwned ? "" : " is-locked"}`;
+    const price = item.price <= 0 ? "Free" : `${item.price} G`;
+    const swatchClass = kind === "ball" ? "skin-swatch ball" : "skin-swatch";
+    return (
+      `<article class="${classes}" data-skin-kind="${kind}" data-skin-id="${escapeHtml(item.id)}">` +
+      `<div class="${swatchClass}" style="--skin-a:${escapeHtml(item.swatchA)};--skin-b:${escapeHtml(item.swatchB)}"></div>` +
+      `<h2>${escapeHtml(item.title)}</h2>` +
+      `<p>${escapeHtml(item.subtitle)}</p>` +
+      `<div class="skin-card-footer"><span class="skin-price">${escapeHtml(isOwned ? "Owned" : price)}</span>` +
+      `<button type="button" data-skin-action="${kind}" data-skin-id="${escapeHtml(item.id)}"${disabled}>${escapeHtml(state)}</button></div>` +
+      `</article>`
+    );
+  }).join("");
+}
+
+function selectCharacterSkin(id: string): void {
+  localProfile.skinId = sanitizeLocalSkin(id);
+  saveLocalProfile();
+  syncProfileUi();
+  renderSkinShop();
+  scheduleProfileSend();
+}
+
+function selectBallSkin(id: string): void {
+  localProfile.ballSkinId = sanitizeLocalBallSkin(id);
+  saveLocalProfile();
+  syncProfileUi();
+  renderSkinShop();
+  scheduleProfileSend();
+}
+
+function buyOrSelectSkin(kind: "character" | "ball", id: string): void {
+  const catalog = kind === "character" ? characterSkinCatalog : ballSkinCatalog;
+  const item = catalog.find((entry) => entry.id === id);
+  if (!item) return;
+  const ownedList = kind === "character" ? skinStore.ownedCharacters : skinStore.ownedBalls;
+  if (!ownedList.includes(id)) {
+    if (localGoalBalance() < item.price) {
+      skinShopStatusEl.textContent = `Need ${item.price} goals`;
+      return;
+    }
+    ownedList.push(id);
+    skinStore.spentGoals += item.price;
+    saveSkinStore();
+  }
+  if (kind === "character") selectCharacterSkin(id);
+  else selectBallSkin(id);
 }
 
 function scheduleProfileSend(): void {
@@ -1795,6 +2047,21 @@ interface Free3dBallRoster {
   version: string;
   mode: string;
   assets: Free3dBallAsset[];
+}
+
+interface SkinCatalogItem {
+  id: string;
+  title: string;
+  price: number;
+  subtitle: string;
+  swatchA: string;
+  swatchB: string;
+}
+
+interface SkinStoreState {
+  ownedCharacters: string[];
+  ownedBalls: string[];
+  spentGoals: number;
 }
 
 let free3dCharacterAttachCount = 0;

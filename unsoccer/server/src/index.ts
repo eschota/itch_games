@@ -7,7 +7,9 @@ import { fileURLToPath } from "node:url";
 import express, { type Request, type Response } from "express";
 import RAPIER from "@dimforge/rapier3d-compat";
 import {
+  BALL_SKIN_ROSTER,
   CHARACTER_ROSTER,
+  DEFAULT_BALL_SKIN_ID,
   DEFAULT_USER_PICS,
   DEFAULT_INPUT,
   DEFAULT_GAME_SETTINGS,
@@ -231,6 +233,7 @@ interface PlayerRuntime {
   goals: number;
   joinOrder: number;
   characterId: string;
+  ballSkinId: string;
   userPic: string;
   clientFingerprint: string | null;
   emotion: PlayerEmotionSnapshot | null;
@@ -303,6 +306,7 @@ interface PersistedPlayerSession {
   id: string;
   name: string;
   characterId: string;
+  ballSkinId: string;
   userPic: string;
   goals: number;
 }
@@ -676,6 +680,11 @@ function sanitizeSkinId(value: unknown, fallback: string): string {
   return (CHARACTER_ROSTER as readonly string[]).includes(raw) ? raw : fallback;
 }
 
+function sanitizeBallSkinId(value: unknown, fallback = DEFAULT_BALL_SKIN_ID): string {
+  const raw = typeof value === "string" ? value : "";
+  return (BALL_SKIN_ROSTER as readonly string[]).includes(raw) ? raw : fallback;
+}
+
 function sanitizeUserPic(value: unknown, fallback: string): string {
   const raw = typeof value === "string" ? value.trim() : "";
   if (!raw) return fallback;
@@ -701,6 +710,7 @@ function profileFromPlayer(player: PlayerRuntime): PlayerProfileSnapshot {
   return {
     nickname: player.name,
     skinId: player.characterId,
+    ballSkinId: player.ballSkinId,
     userPic: player.userPic
   };
 }
@@ -741,6 +751,7 @@ class UnsoccerServer {
   private testDayTimeOverrideSeconds: number | null = null;
   private testNow = this.startedAt;
   private activeBallVariant = 0;
+  private activeBallSkinId = DEFAULT_BALL_SKIN_ID;
   private goalReset: GoalResetRuntime | null = null;
   private botSettings: BotSettings = { ...DEFAULT_BOT_SETTINGS };
   private nextBotId = 1;
@@ -1308,6 +1319,7 @@ class UnsoccerServer {
       id: player.id,
       name: player.name,
       characterId: player.characterId,
+      ballSkinId: player.ballSkinId,
       userPic: player.userPic,
       goals: player.goals
     });
@@ -1602,6 +1614,7 @@ class UnsoccerServer {
       joinOrder: this.joinCounter++,
       goals: persisted?.goals || 0,
       characterId: persisted?.characterId || this.nextCharacterId(),
+      ballSkinId: sanitizeBallSkinId(persisted?.ballSkinId),
       clientFingerprint: options.clientFingerprint || null,
       userPic: DEFAULT_USER_PICS[botSeed % DEFAULT_USER_PICS.length] || DEFAULT_USER_PICS[0] || "⚽",
       emotion: null,
@@ -1666,6 +1679,7 @@ class UnsoccerServer {
     const nameValue = source.nickname !== undefined ? source.nickname : source.name;
     if (nameValue !== undefined) player.name = sanitizePlayerName(nameValue);
     player.characterId = sanitizeSkinId(source.skinId ?? source.characterId, player.characterId);
+    player.ballSkinId = sanitizeBallSkinId(source.ballSkinId ?? source.ball_skin_id, player.ballSkinId);
     player.userPic = sanitizeUserPic(source.userPic ?? source.user_pic, player.userPic);
   }
 
@@ -2745,6 +2759,7 @@ class UnsoccerServer {
     this.lastBallTouchPlayerId = player.id;
     this.lastBallTouchTeam = player.team;
     this.lastBallTouchAt = now;
+    this.activeBallSkinId = sanitizeBallSkinId(player.ballSkinId);
   }
 
   private ballOwner(): PlayerRuntime | null {
@@ -3351,6 +3366,7 @@ class UnsoccerServer {
     this.ballBody.setLinvel(zeroVec(), true);
     this.ballBody.setAngvel(zeroVec(), true);
     this.activeBallVariant = (this.activeBallVariant + 1) % BALL_VARIANT_COUNT;
+    this.activeBallSkinId = DEFAULT_BALL_SKIN_ID;
     this.countdownUntil = now + this.settings.kickoffCountdownMs;
     this.goalReset = null;
     this.message = "\u0420\u043e\u0437\u044b\u0433\u0440\u044b\u0448 \u0441 \u0446\u0435\u043d\u0442\u0440\u0430";
@@ -3612,6 +3628,7 @@ class UnsoccerServer {
     this.ballBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.ballBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.activeBallVariant = (this.activeBallVariant + 1) % BALL_VARIANT_COUNT;
+    this.activeBallSkinId = DEFAULT_BALL_SKIN_ID;
     this.countdownUntil = now + this.settings.kickoffCountdownMs;
     this.resetPlayersForKickoff();
   }
@@ -3654,6 +3671,7 @@ class UnsoccerServer {
       position: vec3FromRapier(this.ballBody.translation()),
       velocity: vec3FromRapier(this.ballBody.linvel()),
       variant: this.activeBallVariant,
+      skinId: this.activeBallSkinId,
       ownerPlayerId: this.ballOwnerPlayerId
     };
     return {

@@ -1,0 +1,12 @@
+[Unit]
+Description=Check itch_games Moscow mirror for GitHub updates every minute
+
+[Timer]
+OnBootSec=45s
+OnUnitActiveSec=60s
+AccuracySec=10s
+Persistent=true
+Unit=itch-games-autodeploy-moscow.service
+
+[Install]
+WantedBy=timers.target

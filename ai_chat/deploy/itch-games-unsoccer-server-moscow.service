@@ -1,0 +1,18 @@
+[Unit]
+Description=UnSoccer authoritative server on Moscow mirror
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/itch_games
+Environment=NODE_ENV=production
+Environment=UNSOCCER_PORT=8787
+ExecStart=/usr/bin/node /itch_games/unsoccer/server/dist/index.js
+Restart=always
+RestartSec=3
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target

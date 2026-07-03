@@ -1,0 +1,26 @@
+[Unit]
+Description=IO Games AI development chat on Moscow mirror
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/itch_games
+Environment=AI_CHAT_HOST=127.0.0.1
+Environment=AI_CHAT_PORT=8765
+Environment=AI_CHAT_DATA_DIR=/itch_games/ai_chat/data
+EnvironmentFile=-/etc/itch-games-ai-chat.env
+Environment=AI_CHAT_DEPLOY_SCRIPT=/usr/local/bin/itch-games-autodeploy-moscow.sh
+Environment=AI_CHAT_PUBLIC_URL=https://moscow-io-games.mecharulez.com
+Environment=AI_CHAT_OPEN_BUILD_URL=https://moscow-io-games.mecharulez.com/unsoccer/
+Environment=AI_CHAT_DEPLOY_RELAY_ALLOW_IPS=145.239.0.57
+Environment=UNSOCCER_AUTOSTART=0
+Environment=UNSOCCER_PORT=8787
+ExecStart=/usr/bin/node /itch_games/ai_chat/server_node.js
+Restart=always
+RestartSec=3
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target

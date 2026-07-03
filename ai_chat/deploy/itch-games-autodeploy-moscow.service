@@ -1,0 +1,14 @@
+[Unit]
+Description=Autodeploy itch_games Moscow mirror from GitHub when origin/main changes
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/itch_games
+Environment=ITCH_GAMES_ROOT=/itch_games
+Environment=ITCH_GAMES_REMOTE=origin
+Environment=ITCH_GAMES_BRANCH=main
+Environment=ITCH_GAMES_PUBLIC_HOST=moscow-io-games.mecharulez.com
+Environment=ITCH_GAMES_PUBLIC_IP=5.42.121.207
+ExecStart=/usr/local/bin/itch-games-autodeploy-moscow-if-changed.sh

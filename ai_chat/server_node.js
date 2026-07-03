@@ -901,6 +901,13 @@ function publicSiteBaseUrl() {
   return configured || "https://io-games.mecharulez.com";
 }
 
+function envList(name) {
+  return String(process.env[name] || "")
+    .split(/[,\s]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 function openBuildUrl() {
   const configured = String(process.env.AI_CHAT_OPEN_BUILD_URL || process.env.AI_CHAT_BUILD_URL || "").trim();
   return configured || `${publicSiteBaseUrl()}/unsoccer/`;
@@ -1304,6 +1311,96 @@ function verifyGithubSignature(headers, body) {
   return [true, "ok"];
 }
 
+function normalizeIp(value) {
+  const ip = String(value || "").trim();
+  if (!ip) return "";
+  if (ip.startsWith("::ffff:")) return ip.slice("::ffff:".length);
+  if (ip === "::1") return "127.0.0.1";
+  return ip;
+}
+
+function requestClientIp(req) {
+  const realIp = normalizeIp(req.headers["x-real-ip"]);
+  if (realIp) return realIp;
+  const forwarded = String(req.headers["x-forwarded-for"] || "").split(",")[0];
+  const forwardedIp = normalizeIp(forwarded);
+  if (forwardedIp) return forwardedIp;
+  return normalizeIp(req.socket && req.socket.remoteAddress);
+}
+
+function verifyDeployRelayRequest(req) {
+  const allowedIps = envList("AI_CHAT_DEPLOY_RELAY_ALLOW_IPS").map(normalizeIp);
+  if (!allowedIps.length) return [false, "deploy relay is not configured"];
+  const clientIp = requestClientIp(req);
+  if (!allowedIps.includes(clientIp)) return [false, `deploy relay source is not allowed: ${clientIp || "unknown"}`];
+  const token = String(process.env.AI_CHAT_DEPLOY_RELAY_TOKEN || "");
+  if (token && !safeEqual(req.headers["x-io-games-relay-token"] || "", token)) {
+    return [false, "invalid deploy relay token"];
+  }
+  return [true, "ok"];
+}
+
+function postDeployRelay(targetUrl, body, headers) {
+  return new Promise((resolve, reject) => {
+    const target = new URL(targetUrl);
+    const transport = target.protocol === "https:" ? https : http;
+    const timeoutMs = Number(process.env.AI_CHAT_DEPLOY_RELAY_TIMEOUT_MS || "10000") || 10000;
+    const requestHeaders = {
+      "Content-Type": "application/json",
+      "Content-Length": String(body.length),
+      "X-GitHub-Event": String(headers["x-github-event"] || "push"),
+      "X-GitHub-Delivery": String(headers["x-github-delivery"] || ""),
+      "X-AI-Chat-Relay": "1",
+      "X-IO-Games-Relay-Source": publicSiteBaseUrl(),
+      "User-Agent": "ai-chat-deploy-relay",
+    };
+    const token = String(process.env.AI_CHAT_DEPLOY_RELAY_TOKEN || "");
+    if (token) requestHeaders["X-IO-Games-Relay-Token"] = token;
+    const req = transport.request({
+      method: "POST",
+      protocol: target.protocol,
+      hostname: target.hostname,
+      port: target.port,
+      path: `${target.pathname}${target.search}`,
+      headers: requestHeaders,
+      timeout: 10000,
+    }, (res) => {
+      const chunks = [];
+      res.on("data", (chunk) => chunks.push(chunk));
+      res.on("end", () => {
+        const raw = Buffer.concat(chunks).toString("utf8");
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve({ statusCode: res.statusCode, body: raw.slice(0, 300) });
+        } else {
+          reject(new Error(`HTTP ${res.statusCode}`));
+        }
+      });
+    });
+    req.setTimeout(timeoutMs);
+    req.on("timeout", () => req.destroy(new Error("deploy relay request timed out")));
+    req.on("error", reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+async function relayDeployWebhook(body, headers, payload) {
+  if (headers["x-ai-chat-relay"]) return;
+  const targets = envList("AI_CHAT_DEPLOY_RELAY_URLS");
+  if (!targets.length) return;
+  const ref = String(payload.ref || "unknown");
+  const head = payload.head_commit || {};
+  const headId = String(head.id || "").slice(0, 12) || "unknown";
+  await Promise.all(targets.map(async (target) => {
+    try {
+      const result = await postDeployRelay(target, body, headers);
+      appendMessage("Deploy Webhook", `Relayed GitHub push \`${ref}\` at \`${headId}\` to \`${target}\` (${result.statusCode}).`);
+    } catch (error) {
+      appendMessage("Deploy Webhook", `Deploy relay failed for \`${target}\` on \`${ref}\` at \`${headId}\`: ${error.message}`);
+    }
+  }));
+}
+
 function runDeployFromWebhook(payload) {
   if (deployRunning) {
     appendMessage("Deploy Webhook", "Deploy webhook received, but another deploy is already running.");
@@ -1498,6 +1595,32 @@ function execFileReport(command, args, timeoutMs) {
   });
 }
 
+function sanitizeRelayTarget(targetUrl) {
+  try {
+    const parsed = new URL(targetUrl);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch (_) {
+    return "invalid-url";
+  }
+}
+
+function deployRelayHealth() {
+  const relayTargets = envList("AI_CHAT_DEPLOY_RELAY_URLS").map(sanitizeRelayTarget);
+  const allowIps = envList("AI_CHAT_DEPLOY_RELAY_ALLOW_IPS").map(normalizeIp);
+  const timeoutMs = Number(process.env.AI_CHAT_DEPLOY_RELAY_TIMEOUT_MS || "10000") || 10000;
+  return {
+    relay_route: "/api/deploy-relay",
+    fanout_enabled: relayTargets.length > 0,
+    fanout_target_count: relayTargets.length,
+    fanout_targets: relayTargets,
+    accept_enabled: allowIps.length > 0,
+    accept_allowed_ip_count: allowIps.length,
+    accept_allowed_ips: allowIps,
+    relay_token_configured: Boolean(process.env.AI_CHAT_DEPLOY_RELAY_TOKEN || ""),
+    timeout_ms: timeoutMs,
+  };
+}
+
 function unsoccerChildStatus() {
   return {
     pid: unsoccerChild && unsoccerChild.pid ? unsoccerChild.pid : null,
@@ -1554,6 +1677,7 @@ async function deployHealthSnapshot() {
     expected_weight_label: expectedWeightLabel,
     git: gitContext(),
     deploy_running: deployRunning,
+    deploy_relay: deployRelayHealth(),
     urls: {
       public_game: `${publicBaseUrl}/unsoccer/`,
       public_api_health: `${publicBaseUrl}/unsoccer/api/health`,
@@ -1946,8 +2070,38 @@ async function handlePost(req, res, parsed) {
       jsonResponse(res, 200, { ok: true, ignored: true, event, ref });
       return;
     }
+    setImmediate(() => relayDeployWebhook(body, req.headers, payload));
     setImmediate(() => runDeployFromWebhook(payload));
     jsonResponse(res, 202, { ok: true, accepted: true, event, ref });
+    return;
+  }
+
+  if (pathname === "/api/deploy-relay") {
+    const body = await readBody(req, 262144);
+    const [ok, reason] = verifyDeployRelayRequest(req);
+    if (!ok) {
+      errorJson(res, 403, reason);
+      return;
+    }
+    let payload;
+    try {
+      payload = JSON.parse(body.toString("utf8"));
+    } catch (_) {
+      errorJson(res, 400, "invalid json");
+      return;
+    }
+    const event = req.headers["x-github-event"] || "";
+    if (event && event !== "push") {
+      jsonResponse(res, 200, { ok: true, ignored: true, event });
+      return;
+    }
+    const ref = String(payload.ref || "");
+    if (ref !== "refs/heads/main") {
+      jsonResponse(res, 200, { ok: true, ignored: true, event: event || "relay", ref });
+      return;
+    }
+    setImmediate(() => runDeployFromWebhook(payload));
+    jsonResponse(res, 202, { ok: true, accepted: true, event: event || "relay", ref });
     return;
   }
 

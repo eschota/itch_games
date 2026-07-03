@@ -200,8 +200,11 @@ Use this file for work inside `/itch_games`.
 
 ## Versioning
 
-- Current release: `v0.0.053`.
-- `unsoccer` release: `v0.0.053`.
+- Current release: `v0.0.054`.
+- `unsoccer` release: `v0.0.054`.
+- `unsoccer` v0.0.054 mirrors orange-team left/right input in client code
+  while preserving the current blue-team mapping and without changing the
+  controls GUI.
 - `unsoccer` v0.0.053 keeps the v0.0.052 gameplay contract and adds the
   hosted itch.io/itch.zone transport fallback so packaged iframe builds connect
   to the production WebSocket/API host.

@@ -26,7 +26,9 @@ export function resolveMovementInput(
   let xAxis = side;
   let zAxis = -forward;
   if (settings.movementMode === "team-goal") zAxis = team === 0 ? forward : -forward;
-  if (settings.mirrorOnTeamSide && team === 1) xAxis *= -1;
+  // Server movement mirrors only forward/back by team; mirror side input here
+  // so orange keeps intuitive left/right controls without changing the UI.
+  if (team === 1) xAxis *= -1;
 
   const next = { ...DEFAULT_INPUT, ...baseInput };
   next.left = xAxis < -0.05;

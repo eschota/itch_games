@@ -1,5 +1,11 @@
 # Changelog
 
+## unsoccer v0.0.054
+
+- Fix orange-team keyboard side control: the client now mirrors left/right input
+  for orange players in code while preserving the existing blue-team mapping and
+  without changing the settings UI.
+
 ## unsoccer v0.0.053
 
 - Add an itch.io/itch.zone hosted-build transport fallback: packaged iframe

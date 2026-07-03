@@ -270,8 +270,11 @@ Use this root skill when changing, packaging, validating, or publishing the
 
 ## Current Behavior
 
-- Current game release: `v0.0.053`.
-- `unsoccer` current prototype release: `v0.0.053`.
+- Current game release: `v0.0.054`.
+- `unsoccer` current prototype release: `v0.0.054`.
+- `unsoccer` v0.0.054 mirrors orange-team left/right input in client code
+  while preserving the current blue-team mapping and without changing the
+  controls GUI.
 - `unsoccer` uses a headless authoritative Node server with Rapier3D physics,
   plain WebSocket transport, and HTTP polling fallback; the itch package is
   static client-only and needs the live game server for multiplayer.

@@ -1,7 +1,7 @@
 {
   "name": "itch-games",
-  "version": "0.0.53",
-  "gameVersion": "v0.0.053",
+  "version": "0.0.54",
+  "gameVersion": "v0.0.054",
   "private": true,
   "description": "Shared IO Games browser-game repository.",
   "workspaces": [
@@ -15,7 +15,7 @@
       "path": "orbital-courier"
     },
     "unsoccer": {
-      "version": "v0.0.053",
+      "version": "v0.0.054",
       "path": "unsoccer"
     }
   },

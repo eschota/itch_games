@@ -25,7 +25,10 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 
 ## Rules
 
-- Current release: `v0.0.053`.
+- Current release: `v0.0.054`.
+- `v0.0.054` mirrors orange-team left/right input in client code while
+  preserving the current blue-team mapping and without changing the controls
+  GUI.
 - Keep client and server separated; browser bundles must not import server-only
   modules.
 - The server is authoritative for room assignment, teams, player physics, ball

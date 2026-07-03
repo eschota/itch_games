@@ -1,4 +1,4 @@
-export declare const GAME_VERSION = "v0.0.053";
+export declare const GAME_VERSION = "v0.0.054";
 export declare const ROOM_ID = "unsoccer-default-room";
 export declare const MAX_ACTIVE_PLAYERS = 10;
 export declare const MAX_ROOM_CLIENTS = 32;

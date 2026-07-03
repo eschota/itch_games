@@ -1,4 +1,4 @@
-export const GAME_VERSION = "v0.0.054";
+export const GAME_VERSION = "v0.0.055";
 export const ROOM_ID = "unsoccer-default-room";
 export const MAX_ACTIVE_PLAYERS = 10;
 export const MAX_ROOM_CLIENTS = 32;
@@ -39,10 +39,10 @@ export const PLAYER_RAGDOLL_VERTICAL_KNOCKBACK = 4.4;
 export const BALL_RADIUS = 0.24;
 export const BALL_DENSITY = 3.6;
 export const BALL_RESTITUTION = 1.05;
-export const KICK_RANGE = 2.05;
-export const FOOT_KICK_ASSIST_RANGE = 2.55;
-export const HAND_KICK_ASSIST_RANGE = 2.25;
-export const HEAD_KICK_ASSIST_RANGE = 1.85;
+export const KICK_RANGE = 1.25;
+export const FOOT_KICK_ASSIST_RANGE = 1.35;
+export const HAND_KICK_ASSIST_RANGE = 1.15;
+export const HEAD_KICK_ASSIST_RANGE = 1.05;
 export const FOOT_KICK_STRENGTH = 2.4;
 export const HAND_HIT_STRENGTH = 1.35;
 export const HEAD_KICK_STRENGTH = 3.15;
@@ -847,7 +847,7 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   httpClientStaleMs: 12000,
   websocketClientStaleMs: 12000,
   botsEnabled: true,
-  botTargetActivePlayers: MAX_ACTIVE_PLAYERS,
+  botTargetActivePlayers: 3,
   botAggression: 0.5,
   botCombatAggressionThreshold: 0.5,
   botCombatCollapseGuardRatio: 0.25,
@@ -918,10 +918,10 @@ export const GAME_SETTINGS_SCHEMA: GameSettingSchemaItem[] = [
   { key: "ballRadius", group: "Мяч", label: "Радиус мяча", description: "Авторитетный радиус коллайдера мяча. Требует пересброса физики.", input: "range", min: 0.12, max: 0.8, step: 0.01, restartPhysics: true },
   { key: "ballDensity", group: "Мяч", label: "Плотность мяча", description: "Плотность массы мяча. Чем выше значение, тем труднее его разогнать.", input: "range", min: 0.2, max: 12, step: 0.1, restartPhysics: true },
   { key: "ballRestitution", group: "Мяч", label: "Прыгучесть мяча", description: "Коэффициент отскока от земли, стен, штанг и коллайдера мяча.", input: "range", min: 0, max: 1.8, step: 0.01, restartPhysics: true },
-  { key: "kickRange", group: "Удары", label: "Точная дистанция удара", description: "Близкая дистанция удара вокруг рассчитанной точки ноги, руки или головы.", input: "range", min: 0.4, max: 4, step: 0.05 },
-  { key: "footKickAssistRange", group: "Удары", label: "Ассист удара ногой", description: "Прощающая горизонтальная дистанция для контакта ЛКМ-ударом по мячу.", input: "range", min: 0.6, max: 5, step: 0.05 },
-  { key: "handKickAssistRange", group: "Удары", label: "Ассист удара рукой", description: "Прощающая горизонтальная дистанция для контакта ПКМ-ударом рукой.", input: "range", min: 0.4, max: 4, step: 0.05 },
-  { key: "headKickAssistRange", group: "Удары", label: "Ассист игры головой", description: "Прощающая горизонтальная дистанция для контакта колесиком/головой.", input: "range", min: 0.4, max: 4, step: 0.05 },
+  { key: "kickRange", group: "Удары", label: "Точная дистанция удара по мячу", description: "Близкий радиус вокруг рассчитанной точки ноги, руки или головы. Уменьшай, если удар срабатывает слишком далеко.", input: "range", min: 0.4, max: 4, step: 0.05 },
+  { key: "footKickAssistRange", group: "Удары", label: "Дальность ЛКМ-удара по мячу", description: "Прощающая горизонтальная дистанция для контакта ЛКМ-ударом ногой по мячу.", input: "range", min: 0.6, max: 5, step: 0.05 },
+  { key: "handKickAssistRange", group: "Удары", label: "Дальность ПКМ-удара по мячу", description: "Прощающая горизонтальная дистанция для контакта ПКМ-ударом рукой по мячу.", input: "range", min: 0.4, max: 4, step: 0.05 },
+  { key: "headKickAssistRange", group: "Удары", label: "Дальность удара головой по мячу", description: "Прощающая горизонтальная дистанция для контакта колесиком/головой по мячу.", input: "range", min: 0.4, max: 4, step: 0.05 },
   { key: "footKickStrength", group: "Удары", label: "Сила ноги", description: "Базовый импульс ЛКМ-удара до множителя заряда.", input: "range", min: 0.2, max: 12, step: 0.05 },
   { key: "handHitStrength", group: "Удары", label: "Сила руки", description: "Базовый импульс ПКМ-удара по мячу.", input: "range", min: 0.1, max: 8, step: 0.05 },
   { key: "headKickStrength", group: "Удары", label: "Сила головы", description: "Базовый импульс удара головой через колесико.", input: "range", min: 0.2, max: 12, step: 0.05 },

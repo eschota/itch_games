@@ -469,14 +469,19 @@ as_root systemctl daemon-reload
 as_root systemctl enable --now nginx
 
 stage "restart unsoccer"
-as_root systemctl enable --now itch-games-unsoccer-server.service
-as_root systemctl restart itch-games-unsoccer-server.service
+as_root systemctl enable itch-games-unsoccer-server.service
+as_root systemctl stop itch-games-unsoccer-server.service || true
+as_root pkill -f "${ROOT}/unsoccer/server/dist/index.js" || true
+as_root systemctl start itch-games-unsoccer-server.service
 sleep 2
-if ! curl -fsS "http://127.0.0.1:${UNSOCCER_PORT}/api/health"; then
+api_health="$(curl -fsS "http://127.0.0.1:${UNSOCCER_PORT}/api/health" || true)"
+if ! grep -q "\"version\":\"${expected_version}\"" <<< "$api_health"; then
   as_root systemctl restart itch-games-unsoccer-server.service
   sleep 3
+  api_health="$(curl -fsS "http://127.0.0.1:${UNSOCCER_PORT}/api/health")"
 fi
-curl -fsS "http://127.0.0.1:${UNSOCCER_PORT}/api/health"
+printf '%s\n' "$api_health"
+grep -q "\"version\":\"${expected_version}\"" <<< "$api_health"
 
 stage "restart chat and reload nginx"
 as_root systemctl enable --now itch-games-ai-chat.service
@@ -495,5 +500,5 @@ api_health="$(curl -fsS "https://${HOST}/unsoccer/api/health")"
 grep -q "\"version\":\"${expected_version}\"" <<< "$api_health"
 
 stage "delayed chat restart"
-(sleep 2; as_root systemctl restart itch-games-ai-chat.service) >/dev/null 2>&1 &
+(sleep 12; as_root systemctl restart itch-games-ai-chat.service) >/dev/null 2>&1 &
 echo "moscow deploy complete for ${expected_version} on https://${HOST}/unsoccer/"

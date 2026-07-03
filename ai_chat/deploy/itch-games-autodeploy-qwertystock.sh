@@ -120,14 +120,19 @@ sudo -n rm -f /etc/nginx/sites-enabled/itch-games-orbital-courier.conf
 sudo -n nginx -t
 sudo -n systemctl daemon-reload
 stage "restart unsoccer"
-sudo -n systemctl enable --now itch-games-unsoccer-server.service
-sudo -n systemctl restart itch-games-unsoccer-server.service
+sudo -n systemctl enable itch-games-unsoccer-server.service
+sudo -n systemctl stop itch-games-unsoccer-server.service || true
+sudo -n pkill -f '/home/generic/itch_games/unsoccer/server/dist/index.js' || true
+sudo -n systemctl start itch-games-unsoccer-server.service
 sleep 2
-if ! curl -fsS http://127.0.0.1:8787/api/health; then
+api_health="$(curl -fsS http://127.0.0.1:8787/api/health || true)"
+if ! grep -q "\"version\":\"${expected_version}\"" <<< "$api_health"; then
   sudo -n systemctl restart itch-games-unsoccer-server.service
   sleep 3
+  api_health="$(curl -fsS http://127.0.0.1:8787/api/health)"
 fi
-curl -fsS http://127.0.0.1:8787/api/health
+printf '%s\n' "$api_health"
+grep -q "\"version\":\"${expected_version}\"" <<< "$api_health"
 stage "restart chat and reload nginx"
 sudo -n systemctl enable --now itch-games-ai-chat.service
 curl -fsS http://127.0.0.1:8765/api/health
@@ -138,4 +143,4 @@ grep -q "$expected_version" <<< "$public_html"
 grep -q "$expected_weight" <<< "$public_html"
 api_health="$(curl -fsS https://io-games.mecharulez.com/unsoccer/api/health)"
 grep -q "\"version\":\"${expected_version}\"" <<< "$api_health"
-(sleep 2; sudo -n systemctl restart itch-games-ai-chat.service) >/dev/null 2>&1 &
+(sleep 12; sudo -n systemctl restart itch-games-ai-chat.service) >/dev/null 2>&1 &

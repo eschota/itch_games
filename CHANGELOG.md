@@ -1,5 +1,14 @@
 # Changelog
 
+## unsoccer v0.0.055
+
+- Add a local `/admin` entry for the runtime settings page so tuning can start
+  from `http://127.0.0.1:5195/admin` without opening the legacy filename.
+- Make ball-strike trigger distances shorter by default and label the foot,
+  hand, head, and precise kick range controls for tuning in the admin page.
+- Reduce default bot fill to three active players while preserving explicit
+  full-match bot scenarios in acceptance tests.
+
 ## unsoccer v0.0.054
 
 - Fix orange-team keyboard side control: the client now mirrors left/right input

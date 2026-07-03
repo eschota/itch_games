@@ -18,9 +18,9 @@ function argValue(name, fallback) {
 function currentGameVersion() {
   try {
     const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, "package.json"), "utf8"));
-    return packageJson.games?.unsoccer?.version || packageJson.gameVersion || "v0.0.052";
+    return packageJson.games?.unsoccer?.version || packageJson.gameVersion || "v0.0.053";
   } catch (_) {
-    return "v0.0.052";
+    return "v0.0.053";
   }
 }
 
@@ -36,7 +36,7 @@ function currentWeightLabel() {
 
 const mode = argValue("--mode", "report");
 if (!["report", "live"].includes(mode)) {
-  console.error("usage: node ui_designer/public_pages/verify-yandex-upload-pack.mjs [--mode=report|live] [--game-version=v0.0.052] [--weight-label=\"40.05 MB\"] [--entry-count=105] [--pack=PATH] [--ffprobe=PATH]");
+  console.error("usage: node ui_designer/public_pages/verify-yandex-upload-pack.mjs [--mode=report|live] [--game-version=v0.0.053] [--weight-label=\"40.05 MB\"] [--entry-count=105] [--pack=PATH] [--ffprobe=PATH]");
   process.exit(2);
 }
 
@@ -45,6 +45,7 @@ const weightLabel = argValue("--weight-label", currentWeightLabel());
 const expectedEntryCounts = {
   "v0.0.033": 140,
   "v0.0.052": 105,
+  "v0.0.053": 105,
 };
 const expectedEntryCount = Number(argValue("--entry-count", String(expectedEntryCounts[gameVersion] || 0)));
 const defaultPackDir = path.resolve(projectRoot, "dist", `yandex-upload-547090-${gameVersion}`);
@@ -90,6 +91,18 @@ const expectedSha256ByVersion = {
     "08-screenshot-01-gameplay-1280x720.png": "b964328404359685bd9a0f5dace6aaad697c6b1aef70b2524cdee60f6460f876",
     "09-screenshot-02-gameplay-1280x720.png": "8c1c04f50db2190c688fd6ebbdd02c400574e40cdd94ec9cc16b9c79aa12dc1a",
     "README.txt": "e12b9213d786dc05839f2ccfb863df704b5b9115268a2c4e0df5fcc30607f952",
+  },
+  "v0.0.053": {
+    "01-unsoccer-archive-v0.0.053.zip": "af037e1587fd9f7c6264a73a50308ec0282909f76afde256f8f0d066f7f0834e",
+    "02-icon-512x512.png": "0eb80588edd9f799877028ec3a983f06ce16b3c428ebc3fead85a90263353fc7",
+    "03-maskable-icon-512x512.png": "6877c8eb50f4e958f144aede7c070958f33b3d2b576053946ef14f7ad40ad21a",
+    "04-cover-800x470.png": "4aabb927e521b12a2249ea8b365519e641389bd10e66fb5f80bada38aaea47ab",
+    "05-showcase-cover-1560x520.png": "4e7aded895f004dbf6a490b89c810cf7449677fb85397db0309dfbd8d02c40d1",
+    "06-gameplay-horizontal-1280x720.mp4": "e670e754502d5f2c9077172091a33144d3a14beb41918d995794d5cbce4eb1f5",
+    "07-gameplay-preview-480x270.gif": "ea8095495471c2e3a7dada7b38ad03534a56234501473d54422475dfb1d31c8d",
+    "08-screenshot-01-gameplay-1280x720.png": "b964328404359685bd9a0f5dace6aaad697c6b1aef70b2524cdee60f6460f876",
+    "09-screenshot-02-gameplay-1280x720.png": "8c1c04f50db2190c688fd6ebbdd02c400574e40cdd94ec9cc16b9c79aa12dc1a",
+    "README.txt": "9aa1b16df57b1f63991f9acc136dcd893db8f34885a25aaeacd85121ae00c871",
   },
 };
 const expectedSha256 = expectedSha256ByVersion[gameVersion] || {};

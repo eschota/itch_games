@@ -25,7 +25,7 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 
 ## Rules
 
-- Current release: `v0.0.052`.
+- Current release: `v0.0.053`.
 - Keep client and server separated; browser bundles must not import server-only
   modules.
 - The server is authoritative for room assignment, teams, player physics, ball
@@ -115,6 +115,8 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
   apply one-hit stamina damage and ragdoll knockback. Acceptance now also
   release-gates finite active bot positions/roles/ids, non-test human join
   backfill, default bot roster stability, and LMB+Shift possession shots.
+- `v0.0.053` keeps the accepted gameplay math and adds an itch.io/itch.zone
+  hosted-build transport fallback to the production WebSocket/API endpoints.
 - `v0.0.002` engine pass must preserve the Producer requirements: Russian
   player-facing text, HDR-style environment lighting, visible sun, 120-second
   realtime day cycle, reactive lighting, inertial perspective camera over the

@@ -17,6 +17,7 @@
     <child path="ui_designer/public_pages/unsoccer-public-pages.md" role="unsoccer-public-pages-brief" />
     <child path="ui_designer/public_pages/unsoccer-itch-page-copy.md" role="unsoccer-itch-copy" />
     <child path="ui_designer/public_pages/unsoccer-itch-publishing-checklist.md" role="unsoccer-itch-publish-checklist" />
+    <child path="ui_designer/public_pages/unsoccer-itch-publication-v0.0.052.md" role="unsoccer-itch-publication-v0.0.052-evidence" />
     <child path="ui_designer/public_pages/unsoccer-itch-assets" role="unsoccer-itch-storefront-assets" />
     <child path="ui_designer/public_pages/unsoccer-yandex-games-assets" role="unsoccer-yandex-games-media-pack" />
     <child path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="unsoccer-yandex-games-upload-handoff-current" />
@@ -25,6 +26,8 @@
     <child path="ui_designer/public_pages/unsoccer-vkplay-release-gate.md" role="unsoccer-vkplay-release-gate" />
     <child path="ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md" role="unsoccer-vkplay-upload-handoff-current" />
     <child path="ui_designer/public_pages/prepare-vkplay-upload-pack.mjs" role="unsoccer-vkplay-upload-pack-generator" />
+    <child path="ui_designer/public_pages/unsoccer-crazygames-upload-handoff-v0.0.053.md" role="unsoccer-crazygames-upload-handoff-current" />
+    <child path="ui_designer/public_pages/prepare-crazygames-upload-pack.mjs" role="unsoccer-crazygames-upload-pack-generator" />
     <child path="ui_designer/public_pages/unsoccer-ui-settings-redesign-v0.0.008.md" role="unsoccer-ui-settings-brief-implemented-v0.0.009" />
     <child path="ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.json" role="unsoccer-ui-v0.0.009-runtime-smoke-json" />
     <child path="ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.png" role="unsoccer-ui-v0.0.009-runtime-smoke-screenshot" />
@@ -128,6 +131,7 @@
           <node path="ui_designer/public_pages/unsoccer-public-pages.md" role="public-page-brief" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-itch-page-copy.md" role="itch-page-copy" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-itch-publishing-checklist.md" role="itch-publish-checklist" owner="UI Designer" />
+          <node path="ui_designer/public_pages/unsoccer-itch-publication-v0.0.052.md" role="itch-publication-evidence" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-itch-assets" role="itch-storefront-assets" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-yandex-games-assets" role="yandex-games-media-pack" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md" role="yandex-games-upload-handoff" owner="UI Designer" />
@@ -136,6 +140,8 @@
           <node path="ui_designer/public_pages/unsoccer-vkplay-release-gate.md" role="vkplay-release-gate" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md" role="vkplay-upload-handoff-current" owner="UI Designer" />
           <node path="ui_designer/public_pages/prepare-vkplay-upload-pack.mjs" role="vkplay-upload-pack-generator" owner="UI Designer" />
+          <node path="ui_designer/public_pages/unsoccer-crazygames-upload-handoff-v0.0.053.md" role="crazygames-upload-handoff-current" owner="UI Designer" />
+          <node path="ui_designer/public_pages/prepare-crazygames-upload-pack.mjs" role="crazygames-upload-pack-generator" owner="UI Designer" />
         </node>
       </node>
       <node path="art_director" skill="art_director/art_director.skill.md">
@@ -238,6 +244,7 @@
       <artifact path="ui_designer/public_pages/unsoccer-public-pages.md" role="unsoccer-public-page-source-of-truth" />
       <artifact path="ui_designer/public_pages/unsoccer-itch-page-copy.md" role="unsoccer-itch-copy" />
       <artifact path="ui_designer/public_pages/unsoccer-itch-publishing-checklist.md" role="unsoccer-itch-publish-checklist" />
+      <artifact path="ui_designer/public_pages/unsoccer-itch-publication-v0.0.052.md" role="unsoccer-itch-publication-v0.0.052-evidence" />
       <artifact path="ui_designer/public_pages/unsoccer-itch-assets" role="unsoccer-itch-storefront-assets" />
       <artifact path="ui_designer/public_pages/unsoccer-yandex-games-assets" role="unsoccer-yandex-games-media-pack" />
       <artifact path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md" role="unsoccer-yandex-games-upload-handoff" />
@@ -246,6 +253,8 @@
       <artifact path="ui_designer/public_pages/unsoccer-vkplay-release-gate.md" role="unsoccer-vkplay-release-gate" />
       <artifact path="ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md" role="unsoccer-vkplay-upload-handoff-current" />
       <artifact path="ui_designer/public_pages/prepare-vkplay-upload-pack.mjs" role="unsoccer-vkplay-upload-pack-generator" />
+      <artifact path="ui_designer/public_pages/unsoccer-crazygames-upload-handoff-v0.0.053.md" role="unsoccer-crazygames-upload-handoff-current" />
+      <artifact path="ui_designer/public_pages/prepare-crazygames-upload-pack.mjs" role="unsoccer-crazygames-upload-pack-generator" />
     </workspace>
     <workspace name="game_designer" rootSkill="game_designer_skill.md" directorySkill="game_designer/game_designer.skill.md">
       <rule>Use game_designer/ for non-runtime ideas, systems, tuning, level notes, playtests, and briefs.</rule>
@@ -294,7 +303,7 @@
     <rule>Set ITCH_IO_TARGET=owner/game:channel to let the post-commit hook publish UnSoccer to itch.io after production is ready.</rule>
     <rule>Packaging fails if internal skill, role, agent coordination, deploy, or source-control docs leak into the public zip.</rule>
   </tooling>
-  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.052">
+  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.053">
     <client path="unsoccer/client" package="dist/unsoccer-itch.zip" productionPath="/unsoccer/" productionStatic="unsoccer/client/dist" />
     <server path="unsoccer/server" port="8787" health="/api/health" transport="plain-websocket-json" fallback="http-polling" productionApiPath="/unsoccer/api/" productionSocketPath="/unsoccer/socket/" />
     <shared path="unsoccer/shared" />
@@ -354,6 +363,7 @@
     <rule>v0.0.050 makes WebSocket leave/backfill explicit: browser pagehide sends /api/leave for WebSocket and HTTP players, /api/leave removes WebSocket players and closes their channel, and default websocketClientStaleMs is 12000 so stale human slots stop hiding bots quickly. Airborne LMB dash-kicks have wider swept player-hit reach for reliable jump knockouts. Exhausted standing players cannot own/capture the ball; high-aggression bots can finish exhausted opponents into ragdoll, while default bot combat pressure stays gated above the default aggression so bot-only football matches do not collapse.</rule>
     <rule>v0.0.051 lets default-aggression bots visibly brawl again without breaking bot fill. botCombatAggressionThreshold, botCombatCollapseGuardRatio, and botCombatCollapseGuardMinDisabled live in game-settings.json and the admin schema, and acceptance proves one-hit bot knockout, stable bot ids, active bot fill, and no fill suppression.</rule>
     <rule>v0.0.052 fixes point-blank no-ball strikes so overlap-range LMB/RMB contacts apply the same one-hit stamina knockout and ragdoll knockback as visible strikes. Acceptance also validates active bot ids, roles, finite playable-area positions, non-test human join backfill, and LMB+Shift possession shots with Shift remaining a strong-shot modifier.</rule>
+    <rule>v0.0.053 keeps the v0.0.052 gameplay contract and adds an itch.io/itch.zone hosted-build transport fallback to the production WebSocket/API endpoints.</rule>
     <rule>Local browser play servers for UnSoccer must run without UNSOCCER_TEST_MODE; that flag is only for isolated acceptance and prevents normal default bot fill unless /api/test/bots enables it.</rule>
     <rule>tools/unsoccer_acceptance.mjs derives the expected version from package.json.games.unsoccer.version and checks HTTP fallback join/input/state.</rule>
     <rule>npm run package:unsoccer rebuilds before writing dist/unsoccer-itch.zip so stale dist output cannot become the release package.</rule>
@@ -377,6 +387,7 @@
     <surface path="ui_designer/public_pages/unsoccer-public-pages.md" role="unsoccer-itch-and-local-page-brief" />
     <surface path="ui_designer/public_pages/unsoccer-itch-page-copy.md" role="unsoccer-itch-page-copy" />
     <surface path="ui_designer/public_pages/unsoccer-itch-publishing-checklist.md" role="unsoccer-itch-publish-checklist" />
+    <surface path="ui_designer/public_pages/unsoccer-itch-publication-v0.0.052.md" role="unsoccer-itch-publication-evidence" />
     <surface path="ui_designer/public_pages/unsoccer-itch-assets" role="unsoccer-itch-storefront-assets" />
     <surface path="ui_designer/public_pages/unsoccer-yandex-games-assets" role="unsoccer-yandex-games-media-pack" />
     <surface path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md" role="unsoccer-yandex-games-upload-handoff" />
@@ -385,6 +396,8 @@
     <surface path="ui_designer/public_pages/unsoccer-vkplay-release-gate.md" role="unsoccer-vkplay-release-gate" />
     <surface path="ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md" role="unsoccer-vkplay-upload-handoff-current" />
     <surface path="ui_designer/public_pages/prepare-vkplay-upload-pack.mjs" role="unsoccer-vkplay-upload-pack-generator" />
+    <surface path="ui_designer/public_pages/unsoccer-crazygames-upload-handoff-v0.0.053.md" role="unsoccer-crazygames-upload-handoff-current" />
+    <surface path="ui_designer/public_pages/prepare-crazygames-upload-pack.mjs" role="unsoccer-crazygames-upload-pack-generator" />
     <surface path="ui_designer/public_pages/unsoccer-ui-settings-redesign-v0.0.008.md" role="unsoccer-ui-settings-design-and-implementation-status" />
     <surface path="ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.json" role="unsoccer-ui-runtime-smoke-evidence" />
     <surface path="ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.png" role="unsoccer-ui-runtime-smoke-screenshot" />
@@ -395,7 +408,7 @@
     <rule>Orbital Courier itch upload must include vendored Three.js and must not require cdn.jsdelivr.net at runtime.</rule>
     <rule>External itch.io pages remain incomplete until the public URL, uploaded zip, exact live copy, screenshots, publication date, and version match are recorded under ui_designer/public_pages/.</rule>
   </publicSurfaces>
-  <versioning initial="v0.0.001" current="v0.0.052">
+  <versioning initial="v0.0.001" current="v0.0.053">
     <rule>Every created game starts at v0.0.001.</rule>
     <rule>Every shipped bump increments the version.</rule>
     <rule>The current version is visible in the bottom-left corner.</rule>

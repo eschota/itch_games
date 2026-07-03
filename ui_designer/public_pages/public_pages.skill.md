@@ -29,6 +29,12 @@ Use this file for UI Designer work inside
   background, screenshots, and asset manifest for Orbital Courier.
 - `unsoccer-public-pages.md`: Ragdoll Soccer II local route, catalog card,
   multiplayer status, and itch.io page brief.
+- `unsoccer-itch-page-copy.md`: live itch.io copy source for Ragdoll Soccer II.
+- `unsoccer-itch-publishing-checklist.md`: operational publish checklist for
+  the Ragdoll Soccer II itch.io page.
+- `unsoccer-itch-publication-v0.0.052.md`: live itch.io publication evidence
+  for Ragdoll Soccer II v0.0.052, including butler upload/build IDs, browser
+  smoke, and remaining media-upload blocker.
 - `unsoccer-ui-settings-redesign-v0.0.008.md`: original UnSoccer UI/settings
   redesign brief; current status records the runtime implementation in
   `v0.0.009`.
@@ -61,6 +67,13 @@ Use this file for UI Designer work inside
   Run after `python tools/package_itch.py unsoccer` for each new UnSoccer
   release; it verifies the archive version/weight/assets and writes
   `dist/vkplay-upload-9572-{version}/`.
+- `unsoccer-crazygames-upload-handoff-v0.0.053.md`: current CrazyGames
+  Developer Portal submit handoff for Ragdoll Soccer II v0.0.053, including
+  filled form values, upload mapping, requirements fit, and file-upload blocker.
+- `prepare-crazygames-upload-pack.mjs`: repeatable CrazyGames staging-pack
+  generator. Run after `python tools/package_itch.py unsoccer`; it verifies the
+  ZIP against CrazyGames Basic Launch size/count constraints and writes
+  `dist/crazygames-upload-{version}/`.
 - `verify-yandex-upload-pack.mjs`: read-only Yandex Games staging-pack verifier.
   It checks pinned SHA-256 for every numbered upload file, archive
   root/index/version/weight/assets, PNG/GIF dimensions, MP4 codec/pixel
@@ -78,3 +91,5 @@ Use this file for UI Designer work inside
   publication notes.
 - VK Play updates must pass `unsoccer-vkplay-release-gate.md` before the
   dashboard iframe URL is saved, incremented, published, or submitted.
+- CrazyGames submissions must use `prepare-crazygames-upload-pack.mjs` and a
+  versioned handoff before the dashboard upload is considered submitted.

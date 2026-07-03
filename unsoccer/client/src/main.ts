@@ -3286,6 +3286,9 @@ function webSocketUrl() {
   if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {
     return "ws://127.0.0.1:8787/ws";
   }
+  if (isItchHostedBuild()) {
+    return "wss://io-games.mecharulez.com/unsoccer/socket/ws";
+  }
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   return `${protocol}//${location.host}/unsoccer/socket/ws`;
 }
@@ -3306,7 +3309,14 @@ function serverApiBase() {
   if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {
     return "http://127.0.0.1:8787/api";
   }
+  if (isItchHostedBuild()) {
+    return "https://io-games.mecharulez.com/unsoccer/api";
+  }
   return `${location.origin}/unsoccer/api`;
+}
+
+function isItchHostedBuild() {
+  return location.hostname.endsWith(".itch.zone") || location.hostname.endsWith(".itch.io");
 }
 
 function prefersHttpTransport() {

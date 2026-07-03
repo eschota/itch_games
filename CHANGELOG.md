@@ -1,5 +1,13 @@
 # Changelog
 
+## unsoccer v0.0.053
+
+- Add an itch.io/itch.zone hosted-build transport fallback: packaged iframe
+  builds now connect to the production UnSoccer WebSocket and HTTP API instead
+  of trying to use the embedding host as the game server.
+- Keep the existing v0.0.052 gameplay contract unchanged while rebuilding the
+  client/server/shared release artifacts for the hosted transport fix.
+
 ## unsoccer v0.0.052
 
 - Fix point-blank/overlap player hits so a visible no-ball RMB/LMB strike also

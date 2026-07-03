@@ -34,6 +34,7 @@ Use this root skill when changing, packaging, validating, or publishing the
   - UnSoccer itch copy/checklist/assets:
     `ui_designer/public_pages/unsoccer-itch-page-copy.md`,
     `ui_designer/public_pages/unsoccer-itch-publishing-checklist.md`,
+    `ui_designer/public_pages/unsoccer-itch-publication-v0.0.052.md`,
     `ui_designer/public_pages/unsoccer-itch-assets/`
   - UnSoccer Yandex Games assets and upload handoff:
     `ui_designer/public_pages/unsoccer-yandex-games-assets/`,
@@ -43,6 +44,9 @@ Use this root skill when changing, packaging, validating, or publishing the
     `ui_designer/public_pages/unsoccer-vkplay-release-gate.md`,
     `ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md`,
     `ui_designer/public_pages/prepare-vkplay-upload-pack.mjs`
+  - UnSoccer CrazyGames handoff:
+    `ui_designer/public_pages/unsoccer-crazygames-upload-handoff-v0.0.053.md`,
+    `ui_designer/public_pages/prepare-crazygames-upload-pack.mjs`
   - UnSoccer UI/settings runtime evidence:
     `ui_designer/public_pages/unsoccer-ui-settings-redesign-v0.0.008.md`,
     `ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.json`,
@@ -190,6 +194,11 @@ Use this root skill when changing, packaging, validating, or publishing the
   VK Play pack is regenerated, primary and Moscow live health both serve the
   target version, and the VK Play iframe URL uses
   `https://moscow-io-games.mecharulez.com/unsoccer/?source=vkplay&version={GAME_VERSION}`.
+- CrazyGames submission for UnSoccer is incomplete until
+  `node ui_designer/public_pages/prepare-crazygames-upload-pack.mjs` passes,
+  the generated ZIP is selected in the CrazyGames `Upload files` field, the
+  portal preview/QA step opens the expected build, and the final submit action
+  succeeds.
 - Track cross-game external publication status in
   `ui_designer/public_pages/itch-publication-ledger.md`; per-game checklists
   remain the operational steps for each page.
@@ -259,8 +268,8 @@ Use this root skill when changing, packaging, validating, or publishing the
 
 ## Current Behavior
 
-- Current game release: `v0.0.052`.
-- `unsoccer` current prototype release: `v0.0.052`.
+- Current game release: `v0.0.053`.
+- `unsoccer` current prototype release: `v0.0.053`.
 - `unsoccer` uses a headless authoritative Node server with Rapier3D physics,
   plain WebSocket transport, and HTTP polling fallback; the itch package is
   static client-only and needs the live game server for multiplayer.
@@ -336,6 +345,9 @@ Use this root skill when changing, packaging, validating, or publishing the
   stamina damage/ragdoll, release-gates active bot ids/roles/finite positions,
   and covers LMB+Shift possession shots while preserving the Shift/damage-only
   stamina drain contract.
+- `v0.0.053` keeps that gameplay contract and adds the hosted itch.io/itch.zone
+  transport fallback so packaged iframe builds connect to the production
+  UnSoccer WebSocket/API endpoints.
 - `unsoccer` v0.0.002 has a client-only procedural Web Audio layer driven by
   authoritative server snapshots for kicks, body contacts, goals, countdown,
   roster changes, and ball rolling.

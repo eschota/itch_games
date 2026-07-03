@@ -200,8 +200,11 @@ Use this file for work inside `/itch_games`.
 
 ## Versioning
 
-- Current release: `v0.0.052`.
-- `unsoccer` release: `v0.0.052`.
+- Current release: `v0.0.053`.
+- `unsoccer` release: `v0.0.053`.
+- `unsoccer` v0.0.053 keeps the v0.0.052 gameplay contract and adds the
+  hosted itch.io/itch.zone transport fallback so packaged iframe builds connect
+  to the production WebSocket/API host.
 - `unsoccer` v0.0.052 keeps stamina/combat/bot behavior locked: point-blank
   no-ball hits apply damage/ragdoll, stamina drains only from Shift and incoming
   damage, bot ids/roles/finite positions stay stable, and LMB+Shift possession

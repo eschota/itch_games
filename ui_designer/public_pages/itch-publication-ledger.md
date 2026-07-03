@@ -7,17 +7,15 @@ here and in the per-game checklist.
 
 ## Current Local Publication Target
 
-Checked from the working copy on 2026-07-02 during the UI Designer copy pass.
-This is repo-local publication preparation, not proof that the external itch.io
-page has been changed.
+Checked from the working copy and public itch.io page on 2026-07-03.
 
 | Surface | Evidence | Status |
 | --- | --- | --- |
-| UnSoccer source/build target | `package.json` and `package.json.games.unsoccer.version` record `v0.0.029` | Use `v0.0.029` for the prepared itch.io copy |
-| UnSoccer upload package | `dist/unsoccer-itch.zip` exists locally | Ready for orchestrator upload step; not verified as uploaded to itch.io |
-| UnSoccer v0.0.029 QA | `tester/checks/2026-07-02-unsoccer-v0.0.029-kick-charge/browser-qa.json` records visible badge `v0.0.029 / 83.79 MB`, WebSocket transport, `data-local-kick-charge`, and `data-local-kick-charge-held` | Local browser evidence supports the v0.0.029 copy claims |
-| Static HTML5 contract | Itch upload is a static browser client and uses the live authoritative multiplayer server for real matches | Keep this warning visible on the itch page |
-| External itch.io | Public itch.io URL is not recorded | Do not claim external publication complete |
+| UnSoccer source/build target | `package.json` and `package.json.games.unsoccer.version` record `v0.0.053` | Current repo package target is `v0.0.053`; public itch.io is still the recorded `v0.0.052` upload until the next butler push |
+| UnSoccer upload package | `dist/unsoccer-itch.zip` was rebuilt with the itch-host default-server patch | Uploaded through butler to `eschotagmailcom/ragdoll-soccer-ii:html5` |
+| UnSoccer itch build | Butler status reports channel `html5`, upload `#18187910`, build `#1768248 (from #1768237)`, version `v0.0.052` | Public build active |
+| Static HTML5 contract | Itch upload is a static browser client and defaults to the live authoritative multiplayer server when hosted from `html-classic.itch.zone` | Embed smoke joined over WebSocket |
+| External itch.io | `https://eschotagmailcom.itch.io/ragdoll-soccer-ii` returned HTTP 200 and showed `PUBLISHED` | Public page live |
 
 ## Historical Production Evidence
 
@@ -63,39 +61,42 @@ Required final evidence:
 ### Ragdoll Soccer II
 
 - Local production URL: `https://io-games.mecharulez.com/unsoccer/`.
-- Current repo-local publication target: `v0.0.029`.
-- Current external itch.io publication status: not published/verified in this
-  ledger.
+- Current repo-local publication target: `v0.0.053`.
+- Current external itch.io publication status: published and smoke-checked on
+  2026-07-03 as `v0.0.052`; `v0.0.053` still needs a new butler upload before
+  the public itch.io page can be claimed current.
 - Upload package: `dist/unsoccer-itch.zip`.
 - Page copy: `unsoccer-itch-page-copy.md`.
 - Publish checklist: `unsoccer-itch-publishing-checklist.md`.
+- Publication evidence: `unsoccer-itch-publication-v0.0.052.md`.
 - Storefront assets: `unsoccer-itch-assets/`.
 - UI/settings redesign brief: `unsoccer-ui-settings-redesign-v0.0.008.md`.
 - UI/settings runtime evidence:
   `unsoccer-ui-final-local-gate-v0.0.010-rerun.json` and matching viewport
   screenshots.
-- Current Tester release evidence:
-  `tester/checks/2026-07-02-unsoccer-v0.0.029-kick-charge/browser-qa.json`.
-- External itch.io project URL: not recorded.
-- Publication status: draft copy/checklist are prepared for `v0.0.029`;
-  external itch.io publication is still unverified until the ledger records the
-  external URL, uploaded zip, exact live copy, screenshots, embed smoke, and
-  multiplayer server URL strategy.
+- Current browser release evidence: public itch iframe build `#1768248` showed
+  one canvas, visible `v0.0.052 / 40.05 MB`, player join, scoreboard, bot
+  roster, and `websocket` transport.
+- External itch.io project URL:
+  `https://eschotagmailcom.itch.io/ragdoll-soccer-ii`.
+- Publication status: public itch.io page is live. Cover/screenshot media still
+  need manual upload or an itch media API/session upload path.
 
 Required final evidence:
 
-- Public itch.io URL.
-- Decided published version: `v0.0.029`.
-- Uploaded zip filename and version.
+- Public itch.io URL: recorded.
+- Decided published version: `v0.0.052`; next repo upload target is
+  `v0.0.053`.
+- Uploaded zip filename/version: butler channel `html5`, upload `#18187910`,
+  build `#1768248`, version `v0.0.052`.
 - Multiplayer server URL strategy: embedded production endpoint, documented
-  `?server=` tester flow, or explicitly static-only prototype status.
-- Visible runtime badge and `data-game-version` must show `v0.0.029` after the
-  client module loads.
-- Exact live page copy or a dated note that it matches
-  `unsoccer-itch-page-copy.md`.
-- Screenshots used on the itch page, including final gameplay screenshots for
-  the selected runtime version.
-- Desktop/mobile embed smoke notes and browser console result.
+  `?server=` tester flow, or explicitly static-only prototype status. Current
+  strategy is default production endpoint for itch-hosted builds.
+- Visible runtime badge shows `v0.0.052 / 40.05 MB` after the client module
+  loads.
+- Exact live page copy matches `unsoccer-itch-page-copy.md` in substance.
+- Screenshots/cover media: still pending manual upload.
+- Desktop embed smoke: recorded in `unsoccer-itch-publication-v0.0.052.md`.
 
 ## Rules
 

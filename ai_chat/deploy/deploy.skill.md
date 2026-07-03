@@ -92,6 +92,10 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
   `/etc/itch-games-ai-chat.env`; Moscow runs UnSoccer through
   `itch-games-unsoccer-server.service`, so chat fallback autostart only creates
   duplicate `EADDRINUSE` noise in `/api/deploy-health`.
+- The Moscow deploy script rewrites `itch-games-ai-chat.service` on every full
+  deploy, so its generated unit must also keep
+  `AI_CHAT_DEPLOY_RELAY_ALLOW_IPS=145.239.0.57`; otherwise the next full deploy
+  silently disables primary-to-Moscow webhook fanout.
 - The UnSoccer production dependency preflight must import
   `@dimforge/rapier3d-compat` and `@itch-games/unsoccer-shared`; it must not
   require `ws`, geckos.io, or `node-datachannel` for the WebSocket transport.

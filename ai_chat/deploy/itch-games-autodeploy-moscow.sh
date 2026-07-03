@@ -250,6 +250,7 @@ EnvironmentFile=-/etc/itch-games-ai-chat.env
 Environment=AI_CHAT_DEPLOY_SCRIPT=/usr/local/bin/itch-games-autodeploy-moscow.sh
 Environment=AI_CHAT_PUBLIC_URL=https://${HOST}
 Environment=AI_CHAT_OPEN_BUILD_URL=https://${HOST}/unsoccer/
+Environment=AI_CHAT_DEPLOY_RELAY_ALLOW_IPS=145.239.0.57
 Environment=UNSOCCER_AUTOSTART=0
 Environment=UNSOCCER_PORT=${UNSOCCER_PORT}
 ExecStart=/usr/bin/node ${ROOT}/ai_chat/server_node.js

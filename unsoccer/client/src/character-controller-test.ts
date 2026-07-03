@@ -20,8 +20,52 @@ interface EnvironmentRoster {
   assets: EnvironmentAsset[];
 }
 
-type AssetViewMode = "character" | "environment";
-type BatchAssetKind = "character" | "environment";
+interface VehicleAsset {
+  guid: string;
+  kind: string;
+  vehicleKind: string;
+  title: string;
+  src10k: string;
+  src1k: string;
+  scale: number;
+  yawOffsetDeg?: number;
+  collider?: {
+    halfWidth: number;
+    halfLength: number;
+  };
+  seatOffset?: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  lods?: {
+    "10k"?: {
+      vertices?: number;
+      triangles?: number;
+      bytes?: number;
+      colorAccessors?: number;
+      avgRoughness?: number;
+      avgMetalness?: number;
+    };
+    "1k"?: {
+      vertices?: number;
+      triangles?: number;
+      bytes?: number;
+      colorAccessors?: number;
+      avgRoughness?: number;
+      avgMetalness?: number;
+    };
+  };
+}
+
+interface VehicleRoster {
+  version: string;
+  mode: string;
+  assets: VehicleAsset[];
+}
+
+type AssetViewMode = "character" | "environment" | "vehicle";
+type BatchAssetKind = "character" | "environment" | "vehicle";
 type ChannelViewMode =
   | "rendered"
   | "color-rgb"
@@ -109,6 +153,8 @@ declare global {
       nextCharacter: (direction?: number) => Promise<void>;
       selectEnvironment: (indexOrGuid: number | string) => Promise<void>;
       nextEnvironment: (direction?: number) => Promise<void>;
+      selectVehicle: (indexOrGuid: number | string) => Promise<void>;
+      nextVehicle: (direction?: number) => Promise<void>;
       assetMode: (mode: AssetViewMode) => Promise<void>;
       convertPbr: () => Promise<TexturelessPbrBakeResult | null>;
       convertAllPbr: () => Promise<TexturelessPbrBatchResult | null>;
@@ -118,6 +164,7 @@ declare global {
       state: () => unknown;
       roster: () => unknown;
       environmentRoster: () => unknown;
+      vehicleRoster: () => unknown;
       converterState: () => unknown;
     };
   }
@@ -128,6 +175,7 @@ if (!canvas) throw new Error("character test canvas is missing");
 
 const rosterSrc = "assets/characters/free3d-10k/roster.json";
 const environmentRosterSrc = "assets/environment/free3d/roster.json";
+const vehicleRosterSrc = "assets/vehicles/free3d/roster.json";
 const assetEl = document.querySelector<HTMLElement>("#asset");
 const modeEl = document.querySelector<HTMLElement>("#mode");
 const actionEl = document.querySelector<HTMLElement>("#action");
@@ -148,10 +196,12 @@ const characterTitleEl = document.querySelector<HTMLElement>("#character-title")
 const characterSelect = document.querySelector<HTMLSelectElement>("#character-select");
 const assetKindSelect = document.querySelector<HTMLSelectElement>("#asset-kind-select");
 const environmentSelect = document.querySelector<HTMLSelectElement>("#environment-select");
+const vehicleSelect = document.querySelector<HTMLSelectElement>("#vehicle-select");
 const channelViewSelect = document.querySelector<HTMLSelectElement>("#channel-view-select");
 const aoContrastInput = document.querySelector<HTMLInputElement>("#ao-contrast-input");
 const aoContrastValueEl = document.querySelector<HTMLOutputElement>("#ao-contrast-value");
 const environmentGallery = document.querySelector<HTMLElement>("#environment-gallery");
+const vehicleGallery = document.querySelector<HTMLElement>("#vehicle-gallery");
 const characterRow = document.querySelector<HTMLElement>(".character-row");
 const batchConvertButton = document.querySelector<HTMLButtonElement>("#btn-batch-convert-pbr");
 const footButton = document.querySelector<HTMLButtonElement>("#btn-foot");
@@ -192,6 +242,8 @@ scene.add(rim);
 
 const environmentLoader = new GLTFLoader();
 const environmentCache = new Map<string, Promise<THREE.Object3D | null>>();
+const vehicleLoader = new GLTFLoader();
+const vehicleCache = new Map<string, Promise<THREE.Object3D | null>>();
 
 const floor = new THREE.Mesh(
   new THREE.PlaneGeometry(18, 18, 1, 1),
@@ -237,6 +289,10 @@ let environmentAssets: EnvironmentAsset[] = [];
 let currentEnvironmentIndex = 0;
 let environmentPreview: THREE.Object3D | null = null;
 let environmentTurntable = 0;
+let vehicleAssets: VehicleAsset[] = [];
+let currentVehicleIndex = 0;
+let vehiclePreview: THREE.Object3D | null = null;
+let vehicleTurntable = 0;
 let lastPbrResult: TexturelessPbrBakeResult | null = null;
 let lastPbrBatchResult: TexturelessPbrBatchResult | null = null;
 let channelViewMode: ChannelViewMode = "rendered";
@@ -340,7 +396,9 @@ function disposeObject(root: THREE.Object3D | null): void {
 }
 
 function visibleAssetRoot(): THREE.Object3D | null {
-  return assetViewMode === "environment" ? environmentPreview : controller?.root || null;
+  if (assetViewMode === "environment") return environmentPreview;
+  if (assetViewMode === "vehicle") return vehiclePreview;
+  return controller?.root || null;
 }
 
 function channelAttributeValue(attribute: THREE.BufferAttribute | THREE.InterleavedBufferAttribute, index: number, component: number, fallback: number): number {
@@ -847,7 +905,9 @@ function updateModeUi(): void {
   if (characterRow) characterRow.style.display = assetViewMode === "character" ? "grid" : "none";
   if (characterSelect) characterSelect.style.display = assetViewMode === "character" ? "block" : "none";
   if (environmentSelect) environmentSelect.style.display = assetViewMode === "environment" ? "block" : "none";
+  if (vehicleSelect) vehicleSelect.style.display = assetViewMode === "vehicle" ? "block" : "none";
   if (environmentGallery) environmentGallery.style.display = assetViewMode === "environment" ? "grid" : "none";
+  if (vehicleGallery) vehicleGallery.style.display = assetViewMode === "vehicle" ? "grid" : "none";
   document.documentElement.dataset.assetViewMode = assetViewMode;
 }
 
@@ -894,6 +954,44 @@ function updateEnvironmentGalleryState(): void {
   });
 }
 
+function vehicleLabel(asset: VehicleAsset, index: number): string {
+  const triangles = asset.lods?.["10k"]?.triangles;
+  const polyLabel = triangles ? ` (${triangles.toLocaleString("en-US")} tris)` : "";
+  return `${index + 1}. ${asset.kind}${polyLabel}`;
+}
+
+function populateVehicleControls(): void {
+  if (vehicleSelect) {
+    vehicleSelect.textContent = "";
+    vehicleAssets.forEach((asset, index) => {
+      const option = document.createElement("option");
+      option.value = asset.guid;
+      option.textContent = vehicleLabel(asset, index);
+      vehicleSelect.append(option);
+    });
+  }
+  if (vehicleGallery) {
+    vehicleGallery.textContent = "";
+    vehicleAssets.forEach((asset, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.value = asset.guid;
+      button.textContent = vehicleLabel(asset, index);
+      button.setAttribute("aria-pressed", index === currentVehicleIndex ? "true" : "false");
+      button.addEventListener("click", () => void selectVehicle(asset.guid));
+      vehicleGallery.append(button);
+    });
+  }
+  document.documentElement.dataset.vehicleGalleryCount = String(vehicleAssets.length);
+}
+
+function updateVehicleGalleryState(): void {
+  if (!vehicleGallery) return;
+  Array.from(vehicleGallery.querySelectorAll<HTMLButtonElement>("button")).forEach((button, index) => {
+    button.setAttribute("aria-pressed", index === currentVehicleIndex ? "true" : "false");
+  });
+}
+
 function updateRosterUi(asset: Free3dCharacterAsset | null, loaded = false): void {
   const total = rosterAssets.length;
   setText(rosterPositionEl, total ? `${currentCharacterIndex + 1}/${total}` : "0/0");
@@ -923,6 +1021,28 @@ function updateEnvironmentUi(asset: EnvironmentAsset | null, loaded = false, tex
   document.documentElement.dataset.environmentAssetKind = asset?.kind || "";
   document.documentElement.dataset.environmentTextureCount = String(textureCount);
   document.documentElement.dataset.environmentAssetLoaded = loaded ? "true" : "false";
+}
+
+function updateVehicleUi(asset: VehicleAsset | null, loaded = false, textureCount = 0): void {
+  const total = vehicleAssets.length;
+  const vertices = asset?.lods?.["10k"]?.vertices || 0;
+  const triangles = asset?.lods?.["10k"]?.triangles || 0;
+  setText(rosterPositionEl, total ? `${currentVehicleIndex + 1}/${total}` : "0/0");
+  setText(characterTitleEl, asset?.title || "vehicle loading");
+  setText(clipCountEl, "0");
+  setText(textureCountEl, String(textureCount));
+  if (vehicleSelect && asset) vehicleSelect.value = asset.guid;
+  updateVehicleGalleryState();
+  document.documentElement.dataset.vehicleGalleryCount = String(total);
+  document.documentElement.dataset.vehicleAssetIndex = String(total ? currentVehicleIndex : -1);
+  document.documentElement.dataset.vehicleAssetGuid = asset?.guid || "";
+  document.documentElement.dataset.vehicleAssetKind = asset?.kind || "";
+  document.documentElement.dataset.vehicleAssetVehicleKind = asset?.vehicleKind || "";
+  document.documentElement.dataset.vehicleAssetLod = "10k";
+  document.documentElement.dataset.vehicleAssetVertices = String(vertices);
+  document.documentElement.dataset.vehicleAssetTriangles = String(triangles);
+  document.documentElement.dataset.vehicleTextureCount = String(textureCount);
+  document.documentElement.dataset.vehicleAssetLoaded = loaded ? "true" : "false";
 }
 
 function trigger(action: KickKind, sprintJump = false): void {
@@ -1107,6 +1227,16 @@ async function loadEnvironmentRoster(): Promise<void> {
   updateEnvironmentUi(environmentAssets[0] || null, false, 0);
 }
 
+async function loadVehicleRoster(): Promise<void> {
+  const response = await fetch(vehicleRosterSrc, { cache: "no-cache" });
+  if (!response.ok) throw new Error(`Free3D vehicle roster HTTP ${response.status}`);
+  const roster = await response.json() as VehicleRoster;
+  vehicleAssets = roster.assets;
+  populateVehicleControls();
+  updateVehicleUi(vehicleAssets[0] || null, false, 0);
+  document.documentElement.dataset.vehicleRosterMode = roster.mode;
+}
+
 function loadEnvironmentTemplate(asset: EnvironmentAsset): Promise<THREE.Object3D | null> {
   const cached = environmentCache.get(asset.src);
   if (cached) return cached;
@@ -1122,6 +1252,25 @@ function loadEnvironmentTemplate(asset: EnvironmentAsset): Promise<THREE.Object3
     );
   });
   environmentCache.set(asset.src, promise);
+  return promise;
+}
+
+function loadVehicleTemplate(asset: VehicleAsset): Promise<THREE.Object3D | null> {
+  const src = asset.src10k || asset.src1k;
+  const cached = vehicleCache.get(src);
+  if (cached) return cached;
+  const promise = new Promise<THREE.Object3D | null>((resolve) => {
+    vehicleLoader.load(
+      src,
+      (gltf) => resolve(gltf.scene),
+      undefined,
+      (error) => {
+        console.warn("Free3D vehicle preview failed", asset.guid, error);
+        resolve(null);
+      }
+    );
+  });
+  vehicleCache.set(src, promise);
   return promise;
 }
 
@@ -1159,12 +1308,69 @@ function normalizeEnvironmentPreview(source: THREE.Object3D, asset: EnvironmentA
   return root;
 }
 
+function normalizeVehiclePreview(source: THREE.Object3D, asset: VehicleAsset): THREE.Object3D {
+  const root = new THREE.Group();
+  root.name = `free3d-vehicle-preview-${asset.guid}`;
+  root.add(source);
+  source.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return;
+    child.castShadow = true;
+    child.receiveShadow = true;
+    child.frustumCulled = false;
+    child.geometry = child.geometry.clone();
+    child.geometry.computeVertexNormals();
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    const prepared = materials.map((material) => {
+      const clone = material instanceof THREE.MeshStandardMaterial
+        ? material.clone()
+        : new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.62, metalness: 0.08 });
+      clone.map = null;
+      clone.normalMap = null;
+      clone.roughnessMap = null;
+      clone.metalnessMap = null;
+      clone.aoMap = null;
+      clone.emissiveMap = null;
+      clone.alphaMap = null;
+      clone.vertexColors = true;
+      clone.needsUpdate = true;
+      return clone;
+    });
+    child.material = Array.isArray(child.material) ? prepared : prepared[0];
+  });
+  root.updateMatrixWorld(true);
+  bounds.setFromObject(root);
+  bounds.getSize(boundsSize);
+  bounds.getCenter(boundsCenter);
+  const maxAxis = Math.max(boundsSize.x, boundsSize.y, boundsSize.z, 0.001);
+  const scale = asset.scale > 0 ? asset.scale / maxAxis : 1;
+  const yawOffset = THREE.MathUtils.degToRad(asset.yawOffsetDeg || 0);
+  source.scale.setScalar(scale);
+  source.rotation.y = yawOffset;
+  const rotatedCenter = new THREE.Vector3(boundsCenter.x * scale, 0, boundsCenter.z * scale).applyAxisAngle(
+    new THREE.Vector3(0, 1, 0),
+    yawOffset
+  );
+  source.position.set(-rotatedCenter.x, -bounds.min.y * scale, -rotatedCenter.z);
+  root.userData.vehicleAsset = asset;
+  root.userData.vertexPbrOnly = true;
+  root.userData.vehicleLod = "10k";
+  return root;
+}
+
 function removeEnvironmentPreview(): void {
   if (!environmentPreview) return;
   restoreChannelMaterials(environmentPreview);
   scene.remove(environmentPreview);
   disposeObject(environmentPreview);
   environmentPreview = null;
+}
+
+function removeVehiclePreview(): void {
+  if (!vehiclePreview) return;
+  restoreChannelMaterials(vehiclePreview);
+  scene.remove(vehiclePreview);
+  disposeObject(vehiclePreview);
+  vehiclePreview = null;
 }
 
 function installWindowHarness(): void {
@@ -1183,6 +1389,8 @@ function installWindowHarness(): void {
     nextCharacter,
     selectEnvironment,
     nextEnvironment,
+    selectVehicle,
+    nextVehicle,
     assetMode,
     convertPbr: convertVisiblePbr,
     convertAllPbr,
@@ -1214,6 +1422,10 @@ function installWindowHarness(): void {
       environmentCount: environmentAssets.length,
       environmentIndex: currentEnvironmentIndex,
       environmentGuid: environmentAssets[currentEnvironmentIndex]?.guid || null,
+      vehicleCount: vehicleAssets.length,
+      vehicleIndex: currentVehicleIndex,
+      vehicleGuid: vehicleAssets[currentVehicleIndex]?.guid || null,
+      vehicleKind: vehicleAssets[currentVehicleIndex]?.kind || null,
       texturelessPbr: lastPbrResult,
       texturelessPbrBatch: lastPbrBatchResult,
       debug: controller?.debugSnapshot()
@@ -1231,6 +1443,16 @@ function installWindowHarness(): void {
       kind: asset.kind,
       title: asset.title,
       bytes: asset.bytes || 0
+    })),
+    vehicleRoster: () => vehicleAssets.map((asset, index) => ({
+      index,
+      guid: asset.guid,
+      kind: asset.kind,
+      vehicleKind: asset.vehicleKind,
+      title: asset.title,
+      vertices: asset.lods?.["10k"]?.vertices || 0,
+      triangles: asset.lods?.["10k"]?.triangles || 0,
+      src: asset.src10k
     })),
     converterState: () => ({
       current: lastPbrResult,
@@ -1250,10 +1472,15 @@ async function selectCharacter(indexOrGuid: number | string): Promise<void> {
   resetCharacterRuntimeState();
   updateModeUi();
   removeEnvironmentPreview();
+  removeVehiclePreview();
   document.documentElement.dataset.environmentAssetGuid = "";
   document.documentElement.dataset.environmentAssetKind = "";
   document.documentElement.dataset.environmentPreview = "inactive";
   document.documentElement.dataset.environmentTexturelessPbr = "false";
+  document.documentElement.dataset.vehicleAssetGuid = "";
+  document.documentElement.dataset.vehicleAssetKind = "";
+  document.documentElement.dataset.vehiclePreview = "inactive";
+  document.documentElement.dataset.vehicleTexturelessPbr = "false";
   const asset = rosterAssets[nextIndex];
   const sequence = ++loadSequence;
   currentCharacterIndex = nextIndex;
@@ -1304,6 +1531,7 @@ async function selectEnvironment(indexOrGuid: number | string): Promise<void> {
   if (nextIndex < 0) return;
   assetViewMode = "environment";
   updateModeUi();
+  removeVehiclePreview();
   const asset = environmentAssets[nextIndex];
   const sequence = ++loadSequence;
   currentEnvironmentIndex = nextIndex;
@@ -1322,6 +1550,10 @@ async function selectEnvironment(indexOrGuid: number | string): Promise<void> {
   document.documentElement.dataset.playerRigTexturelessPbr = "false";
   document.documentElement.dataset.playerRigTextures = "0";
   document.documentElement.dataset.playerRigTextureCount = "0";
+  document.documentElement.dataset.vehicleAssetGuid = "";
+  document.documentElement.dataset.vehicleAssetKind = "";
+  document.documentElement.dataset.vehiclePreview = "inactive";
+  document.documentElement.dataset.vehicleTexturelessPbr = "false";
   const template = await loadEnvironmentTemplate(asset);
   if (sequence !== loadSequence) return;
   removeEnvironmentPreview();
@@ -1349,18 +1581,78 @@ async function nextEnvironment(direction = 1): Promise<void> {
   await selectEnvironment(currentEnvironmentIndex + direction);
 }
 
+async function selectVehicle(indexOrGuid: number | string): Promise<void> {
+  if (vehicleAssets.length === 0) return;
+  const nextIndex = typeof indexOrGuid === "number"
+    ? wrapIndex(indexOrGuid, vehicleAssets.length)
+    : vehicleAssets.findIndex((entry) => entry.guid === indexOrGuid);
+  if (nextIndex < 0) return;
+  assetViewMode = "vehicle";
+  updateModeUi();
+  removeEnvironmentPreview();
+  const asset = vehicleAssets[nextIndex];
+  const sequence = ++loadSequence;
+  currentVehicleIndex = nextIndex;
+  updateVehicleGalleryState();
+  setText(assetEl, asset.guid);
+  setText(modeEl, "vehicle loading");
+  clearPbrStatus("textured");
+  updateVehicleUi(asset, false, 0);
+  if (controller) {
+    restoreChannelMaterials(controller.root);
+    scene.remove(controller.root);
+    controller.dispose();
+    controller = null;
+  }
+  document.documentElement.dataset.playerRigAsset = "";
+  document.documentElement.dataset.playerRigTexturelessPbr = "false";
+  document.documentElement.dataset.playerRigTextures = "0";
+  document.documentElement.dataset.playerRigTextureCount = "0";
+  document.documentElement.dataset.environmentAssetGuid = "";
+  document.documentElement.dataset.environmentAssetKind = "";
+  document.documentElement.dataset.environmentPreview = "inactive";
+  document.documentElement.dataset.environmentTexturelessPbr = "false";
+  const template = await loadVehicleTemplate(asset);
+  if (sequence !== loadSequence) return;
+  removeVehiclePreview();
+  if (!template) {
+    setText(modeEl, "load error");
+    document.documentElement.dataset.vehicleAssetLoaded = "load-error";
+    installWindowHarness();
+    return;
+  }
+  vehiclePreview = normalizeVehiclePreview(template.clone(true), asset);
+  scene.add(vehiclePreview);
+  vehicleTurntable = 0;
+  position.set(0, 0, 0);
+  velocity.set(0, 0, 0);
+  updateVehicleUi(asset, true, countObjectTextures(vehiclePreview));
+  setText(assetEl, asset.guid);
+  setText(modeEl, asset.kind);
+  document.documentElement.dataset.vehicleAssetLoaded = "true";
+  document.documentElement.dataset.vehiclePreview = "ready";
+  installWindowHarness();
+  setChannelView(channelViewMode);
+}
+
+async function nextVehicle(direction = 1): Promise<void> {
+  await selectVehicle(currentVehicleIndex + direction);
+}
+
 async function assetMode(mode: AssetViewMode): Promise<void> {
   if (mode === "environment") await selectEnvironment(currentEnvironmentIndex);
+  else if (mode === "vehicle") await selectVehicle(currentVehicleIndex);
   else await selectCharacter(currentCharacterIndex);
 }
 
 async function reloadCurrentAsset(): Promise<void> {
   if (assetViewMode === "environment") await selectEnvironment(currentEnvironmentIndex);
+  else if (assetViewMode === "vehicle") await selectVehicle(currentVehicleIndex);
   else await selectCharacter(currentCharacterIndex);
 }
 
 async function convertVisiblePbr(batchMode = false): Promise<TexturelessPbrBakeResult | null> {
-  const target = assetViewMode === "environment" ? environmentPreview : controller?.root || null;
+  const target = visibleAssetRoot();
   if (!target) {
     clearPbrStatus("no asset");
     return null;
@@ -1377,9 +1669,12 @@ async function convertVisiblePbr(batchMode = false): Promise<TexturelessPbrBakeR
     document.documentElement.dataset.playerRigTexturelessPbr = String(result.converted);
     document.documentElement.dataset.playerRigTextures = "0";
     document.documentElement.dataset.playerRigTextureCount = "0";
-  } else {
+  } else if (assetViewMode === "environment") {
     document.documentElement.dataset.environmentTexturelessPbr = String(result.converted);
     document.documentElement.dataset.environmentTextureCount = "0";
+  } else {
+    document.documentElement.dataset.vehicleTexturelessPbr = String(result.converted);
+    document.documentElement.dataset.vehicleTextureCount = "0";
   }
   document.documentElement.dataset.texturelessPbrConverting = "false";
   installWindowHarness();
@@ -1414,7 +1709,7 @@ function setBatchResult(result: TexturelessPbrBatchResult): void {
 
 async function convertAllPbr(): Promise<TexturelessPbrBatchResult | null> {
   if (pbrBatchInProgress) return lastPbrBatchResult;
-  const total = rosterAssets.length + environmentAssets.length;
+  const total = rosterAssets.length + environmentAssets.length + vehicleAssets.length;
   if (total <= 0) {
     setBatchStatus("no assets");
     return null;
@@ -1423,6 +1718,7 @@ async function convertAllPbr(): Promise<TexturelessPbrBatchResult | null> {
   const previousMode = assetViewMode;
   const previousCharacter = currentCharacterIndex;
   const previousEnvironment = currentEnvironmentIndex;
+  const previousVehicle = currentVehicleIndex;
   const previousChannelMode = channelViewMode;
   const items: TexturelessPbrBatchItem[] = [];
   let failures = 0;
@@ -1512,7 +1808,45 @@ async function convertAllPbr(): Promise<TexturelessPbrBatchResult | null> {
       await renderOneFrame();
     }
 
+    for (let index = 0; index < vehicleAssets.length; index += 1) {
+      const asset = vehicleAssets[index];
+      try {
+        await selectVehicle(index);
+        await renderOneFrame();
+        const result = await convertVisiblePbr(true);
+        if (!result) throw new Error("vehicle bake returned empty result");
+        items.push({
+          kind: "vehicle",
+          guid: asset.guid,
+          title: asset.title,
+          converted: result.converted,
+          vertexCount: result.vertexCount,
+          strippedTextureCount: result.strippedTextureCount,
+          averageAo: result.averageAo
+        });
+        vertexCount += result.vertexCount;
+        strippedTextureCount += result.strippedTextureCount;
+        aoSum += result.averageAo * result.vertexCount;
+        aoCount += result.vertexCount;
+      } catch (error) {
+        failures += 1;
+        items.push({
+          kind: "vehicle",
+          guid: asset.guid,
+          title: asset.title,
+          converted: false,
+          vertexCount: 0,
+          strippedTextureCount: 0,
+          averageAo: 1,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+      setBatchProgress(items.length, total, failures);
+      await renderOneFrame();
+    }
+
     if (previousMode === "environment") await selectEnvironment(previousEnvironment);
+    else if (previousMode === "vehicle") await selectVehicle(previousVehicle);
     else await selectCharacter(previousCharacter);
     await renderOneFrame();
     await convertVisiblePbr(true);
@@ -1679,11 +2013,27 @@ function animate(): void {
     document.documentElement.dataset.environmentPreviewCenter =
       `${boundsCenter.x.toFixed(2)},${boundsCenter.y.toFixed(2)},${boundsCenter.z.toFixed(2)}`;
   }
-  const focus = environmentPreview
+  if (vehiclePreview) {
+    vehicleTurntable += dt * 0.48;
+    vehiclePreview.rotation.y = vehicleTurntable;
+    bounds.setFromObject(vehiclePreview);
+    bounds.getSize(boundsSize);
+    bounds.getCenter(boundsCenter);
+    setText(actionEl, "preview");
+    setText(speedEl, "0.00");
+    setText(strikeEl, "none");
+    setText(staminaEl, "-");
+    document.documentElement.dataset.vehiclePreviewBounds =
+      `${boundsSize.x.toFixed(2)},${boundsSize.y.toFixed(2)},${boundsSize.z.toFixed(2)}`;
+    document.documentElement.dataset.vehiclePreviewCenter =
+      `${boundsCenter.x.toFixed(2)},${boundsCenter.y.toFixed(2)},${boundsCenter.z.toFixed(2)}`;
+  }
+  const previewRoot = environmentPreview || vehiclePreview;
+  const focus = previewRoot
     ? new THREE.Vector3(boundsCenter.x, Math.max(0.55, boundsCenter.y), boundsCenter.z)
     : new THREE.Vector3(position.x, 1.15 + position.y * 0.25, position.z);
-  const previewRadius = environmentPreview ? Math.max(boundsSize.x, boundsSize.y, boundsSize.z, 1.8) : 0;
-  const cameraTarget = environmentPreview
+  const previewRadius = previewRoot ? Math.max(boundsSize.x, boundsSize.y, boundsSize.z, 1.8) : 0;
+  const cameraTarget = previewRoot
     ? new THREE.Vector3(boundsCenter.x, Math.max(1.8, boundsCenter.y + previewRadius * 0.34), boundsCenter.z + Math.max(3.4, previewRadius * 2.25))
     : new THREE.Vector3(position.x + 0.82, 2, position.z + 5.25);
   camera.position.lerp(cameraTarget, 1 - Math.exp(-dt * 5.5));
@@ -1696,12 +2046,16 @@ window.addEventListener("resize", resize);
 window.addEventListener("keydown", (event) => {
   if (event.code === "ArrowLeft" || event.code === "ArrowUp") {
     event.preventDefault();
-    if (!event.repeat) void (assetViewMode === "environment" ? nextEnvironment(-1) : nextCharacter(-1));
+    if (!event.repeat) {
+      void (assetViewMode === "environment" ? nextEnvironment(-1) : assetViewMode === "vehicle" ? nextVehicle(-1) : nextCharacter(-1));
+    }
     return;
   }
   if (event.code === "ArrowRight" || event.code === "ArrowDown") {
     event.preventDefault();
-    if (!event.repeat) void (assetViewMode === "environment" ? nextEnvironment(1) : nextCharacter(1));
+    if (!event.repeat) {
+      void (assetViewMode === "environment" ? nextEnvironment(1) : assetViewMode === "vehicle" ? nextVehicle(1) : nextCharacter(1));
+    }
     return;
   }
   if (event.code === "KeyR" && ragdoll) {
@@ -1755,7 +2109,11 @@ document.querySelector("#btn-prev-character")?.addEventListener("click", () => v
 document.querySelector("#btn-next-character")?.addEventListener("click", () => void nextCharacter(1));
 characterSelect?.addEventListener("change", () => void selectCharacter(characterSelect.value));
 environmentSelect?.addEventListener("change", () => void selectEnvironment(environmentSelect.value));
-assetKindSelect?.addEventListener("change", () => void assetMode(assetKindSelect.value === "environment" ? "environment" : "character"));
+vehicleSelect?.addEventListener("change", () => void selectVehicle(vehicleSelect.value));
+assetKindSelect?.addEventListener("change", () => {
+  const value = assetKindSelect.value;
+  void assetMode(value === "environment" || value === "vehicle" ? value : "character");
+});
 channelViewSelect?.addEventListener("change", () => setChannelView(parseChannelViewMode(channelViewSelect.value)));
 aoContrastInput?.addEventListener("input", syncAoContrastFromInput);
 aoContrastInput?.addEventListener("change", syncAoContrastFromInput);
@@ -1771,7 +2129,7 @@ clearPbrStatus("textured");
 setChannelView("rendered");
 syncRagdollButton();
 installWindowHarness();
-void Promise.all([loadRoster(), loadEnvironmentRoster()])
+void Promise.all([loadRoster(), loadEnvironmentRoster(), loadVehicleRoster()])
   .then(() => selectCharacter(0))
   .then(async () => {
     if (shouldRunHandStrikeAutoTest()) await runHandStrikeAutoTest();

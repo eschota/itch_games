@@ -132,6 +132,11 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
   start the service and require local `/api/health.version` to match
   `package.json.games.unsoccer.version` before reloading nginx or restarting
   chat.
+- If the qwertystock worktree has already pulled committed dist for the new
+  version but local `/api/health.version` still reports the previous version,
+  the deploy script must restart UnSoccer immediately before later artifact or
+  nginx checks so public HTML and API cannot remain split-version after a
+  partial deploy.
 - The webhook child process must not synchronously restart
   `itch-games-ai-chat.service` before it exits. Schedule a delayed chat restart
   after local health checks so the parent process can append deploy

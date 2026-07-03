@@ -49,6 +49,24 @@ NODE
 )"
 echo "unsoccer expected version: ${expected_version}"
 echo "unsoccer expected weight: ${expected_weight}"
+
+restart_unsoccer() {
+  stage "$1"
+  sudo -n systemctl enable itch-games-unsoccer-server.service
+  sudo -n systemctl stop itch-games-unsoccer-server.service || true
+  sudo -n pkill -f '/home/generic/itch_games/unsoccer/server/dist/index.js' || true
+  sudo -n systemctl start itch-games-unsoccer-server.service
+  sleep 2
+  api_health="$(curl -fsS http://127.0.0.1:8787/api/health || true)"
+  if ! grep -q "\"version\":\"${expected_version}\"" <<< "$api_health"; then
+    sudo -n systemctl restart itch-games-unsoccer-server.service
+    sleep 3
+    api_health="$(curl -fsS http://127.0.0.1:8787/api/health)"
+  fi
+  printf '%s\n' "$api_health"
+  grep -q "\"version\":\"${expected_version}\"" <<< "$api_health"
+}
+
 dist_ready=0
 if [ -s "unsoccer/client/dist/index.html" ] && [ -s "unsoccer/server/dist/index.js" ] && [ -s "unsoccer/shared/dist/index.js" ]; then
   if grep -q "$expected_version" "unsoccer/client/dist/index.html" \
@@ -56,6 +74,13 @@ if [ -s "unsoccer/client/dist/index.html" ] && [ -s "unsoccer/server/dist/index.
     && grep -q "GAME_VERSION" "unsoccer/server/dist/index.js" \
     && grep -q "$expected_version" "unsoccer/shared/dist/index.js"; then
     dist_ready=1
+  fi
+fi
+if [ "$dist_ready" -eq 1 ]; then
+  current_api_health="$(curl -fsS http://127.0.0.1:8787/api/health || true)"
+  if ! grep -q "\"version\":\"${expected_version}\"" <<< "$current_api_health"; then
+    echo "UnSoccer local API is stale before artifact checks; restarting service for ${expected_version}"
+    restart_unsoccer "restart stale unsoccer api"
   fi
 fi
 if [ "$dist_ready" -eq 1 ] && [ "$source_changed_without_dist" -eq 0 ]; then
@@ -119,20 +144,7 @@ sudo -n ln -sfn /etc/nginx/sites-available/itch-games-io-games.conf /etc/nginx/s
 sudo -n rm -f /etc/nginx/sites-enabled/itch-games-orbital-courier.conf
 sudo -n nginx -t
 sudo -n systemctl daemon-reload
-stage "restart unsoccer"
-sudo -n systemctl enable itch-games-unsoccer-server.service
-sudo -n systemctl stop itch-games-unsoccer-server.service || true
-sudo -n pkill -f '/home/generic/itch_games/unsoccer/server/dist/index.js' || true
-sudo -n systemctl start itch-games-unsoccer-server.service
-sleep 2
-api_health="$(curl -fsS http://127.0.0.1:8787/api/health || true)"
-if ! grep -q "\"version\":\"${expected_version}\"" <<< "$api_health"; then
-  sudo -n systemctl restart itch-games-unsoccer-server.service
-  sleep 3
-  api_health="$(curl -fsS http://127.0.0.1:8787/api/health)"
-fi
-printf '%s\n' "$api_health"
-grep -q "\"version\":\"${expected_version}\"" <<< "$api_health"
+restart_unsoccer "restart unsoccer"
 stage "restart chat and reload nginx"
 sudo -n systemctl enable --now itch-games-ai-chat.service
 curl -fsS http://127.0.0.1:8765/api/health

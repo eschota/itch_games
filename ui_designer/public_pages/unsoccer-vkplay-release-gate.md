@@ -80,10 +80,13 @@ After the local and live gates pass:
    https://moscow-io-games.mecharulez.com/unsoccer/?source=vkplay&version={GAME_VERSION}
    ```
 
-3. Press `Increase iFrame Version` / `Increment` for an update build.
-4. Upload changed media only when the icon, cover, screenshots, or video changed.
-5. Save the locale/project page.
-6. Submit/publish only after a dashboard smoke confirms the iframe opens the
+3. If the normal browser fill/type path is blocked, click the field and enter
+   the URL by per-character keypress. Verify the field value before saving.
+4. Press `Increase iFrame Version` / `Increment` for an update build when the
+   button is enabled.
+5. Upload changed media only when the icon, cover, screenshots, or video changed.
+6. Save the locale/project page and reload it to prove the URL persisted.
+7. Submit/publish only after a dashboard smoke confirms the iframe opens the
    expected live version.
 
 ## Store Media Mapping
@@ -99,12 +102,12 @@ Use files from `dist/vkplay-upload-9572-{GAME_VERSION}/`:
 
 ## Current Known Blockers
 
-- Codex in-app Browser cannot currently type into this VK Play form in this
-  session because the browser runtime reports the virtual clipboard integration
-  is missing for fill/type and clipboard-paste operations.
+- Browser `fill`, DOM typing, and clipboard paste can fail when the runtime
+  virtual clipboard integration is missing. Per-character keypress after
+  coordinate focus is the proven fallback for text inputs.
 - Codex in-app Browser cannot select local files in VK Play file inputs.
-- If manual upload is unavailable, provide a VK Play API/session upload path or
-  a browser automation surface with working typing and file selection.
+- If manual media upload is unavailable, provide a VK Play API/session upload
+  path or a browser automation surface with working file selection.
 
 ## Evidence To Record
 

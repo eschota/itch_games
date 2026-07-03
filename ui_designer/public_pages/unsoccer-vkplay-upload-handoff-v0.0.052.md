@@ -31,8 +31,12 @@ Use this URL for the current release candidate after the Moscow deploy is live:
 `https://moscow-io-games.mecharulez.com/unsoccer/?source=vkplay&version=v0.0.052`
 
 Current live gate: primary and Moscow now both report `v0.0.052`, commit
-`e2c821a`, and Moscow public `/unsoccer/` contains `v0.0.052 / 40.05 MB`.
+`c6408d6`, and Moscow public `/unsoccer/` contains `v0.0.052 / 40.05 MB`.
 The iframe URL is no longer blocked by live-version drift.
+
+Dashboard save status: `IFrame link to the game` and `iFrame link to the test
+game` are saved as this URL. Post-save reload confirmed both fields still
+contain `v0.0.052`. Required `Marking` was saved as `cruelty`.
 
 ## Store Text To Apply
 
@@ -133,28 +137,28 @@ Use the numbered files from `dist/vkplay-upload-9572-v0.0.052/`.
 - `node ui_designer/public_pages/prepare-vkplay-upload-pack.mjs`: OK for
   `v0.0.052`, `40.05 MB`, `105` archive entries.
 - `node ai_chat/deploy/verify-moscow-relay.mjs --mode=report`: OK for primary
-  and Moscow `v0.0.052`, commit `e2c821a`, public version/weight, API health,
+  and Moscow `v0.0.052`, commit `c6408d6`, public version/weight, API health,
   and deploy-relay route.
 - Browser project audit found file inputs for horizontal/vertical/art/video/icon
   assets, but no callable file-upload API in the in-app browser.
 - Browser form update attempts on `iframe_landing_url` failed through
   `locator.fill`, DOM typing, and clipboard paste because this Browser runtime
   reports the virtual clipboard integration is missing.
+- Browser fallback via coordinate focus and per-character keypress succeeded for
+  the production iframe field and the test iframe field. Save returned
+  `Data saved`; post-save reload confirmed the persisted URL and
+  `main-marking=cruelty`.
 - Quick scan for common embedded ad SDK markers returned no matches in
   `unsoccer/client/dist`.
 
 ## Remaining Blockers
 
-- Current Codex browser automation cannot type into this VK Play form because
-  this runtime reports `Browser Use virtual clipboard is not installed` for
-  `fill`, `type`, and DOM typing.
 - Current Codex browser automation also cannot select local files in VK Play file
   inputs.
 - External/manual action still required unless a VK Play API/session upload path
   is supplied:
-  1. Save the iframe URL with `version=v0.0.052`.
-  2. Upload required images/video through the dashboard.
-  3. Use `Publication` to publish or submit the updated page.
-  4. For each later build, regenerate the pack, update only the iframe
+  1. Upload required images/video through the dashboard.
+  2. Use `Publication` to publish or submit the updated page.
+  3. For each later build, regenerate the pack, update only the iframe
      `version` parameter, press `Increment`, and upload media only when art
      changed.

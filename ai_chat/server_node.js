@@ -1414,8 +1414,12 @@ function runDeployFromWebhook(payload) {
   const script = process.env.AI_CHAT_DEPLOY_SCRIPT || path.join(ROOT, "ai_chat", "deploy", "itch-games-autodeploy-qwertystock.sh");
   childProcess.execFile(script, {
     cwd: ROOT,
+    env: {
+      ...process.env,
+      ITCH_GAMES_DEPLOY_DETACHED: "1",
+    },
     timeout: 900000,
-    maxBuffer: 1024 * 1024,
+    maxBuffer: 4 * 1024 * 1024,
     encoding: "utf8",
   }, (error, stdout, stderr) => {
     const output = [stdout, stderr].map((part) => String(part || "").trim()).filter(Boolean).join("\n").slice(-2500) || "no output";

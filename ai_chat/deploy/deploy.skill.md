@@ -127,10 +127,12 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
   after local health checks so the parent process can append deploy
   completion/failure to `/ai_chat`.
 - The qwertystock autodeploy entrypoint may detach the long-running deploy work
-  into a locked `nohup` child and return quickly to the webhook process. Keep
-  this path when asset-heavy builds risk exceeding the chat webhook child
-  timeout or being killed by parent service restarts.
-- The Moscow autodeploy follows the same detached webhook pattern, but its
+  into a locked `nohup` child for manual CLI invocations, but the Node webhook
+  runner must set `ITCH_GAMES_DEPLOY_DETACHED=1` and run the script in the
+  foreground. GitHub webhook completion must wait for artifact checks, UnSoccer
+  service restart, and public API version smoke; otherwise a pull can update
+  HTML/model files while the old server process keeps serving the previous API.
+- The Moscow autodeploy follows the same foreground webhook pattern, but its
   working copy is `/itch_games`, service user is `root`, public host is
   `moscow-io-games.mecharulez.com`, and it must install Node/npm/certbot on the
   mirror if the old Orbital-only host image lacks them. The active service

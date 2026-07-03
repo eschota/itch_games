@@ -20,6 +20,7 @@ const TODOS_FILE = path.join(DATA_DIR, "todos.json");
 const TODO_EVENTS_FILE = path.join(DATA_DIR, "todos.jsonl");
 const MEDIA_DIR = path.join(DATA_DIR, "media");
 const TELEGRAM_SEEN_FILE = path.join(DATA_DIR, "telegram_seen_updates.txt");
+const DEPLOY_STATUS_FILE = path.join(DATA_DIR, "deploy_status.json");
 const MAX_MESSAGE_CHARS = 4000;
 const MAX_ROLE_CHARS = 80;
 const MAX_TASK_TEXT_CHARS = 2000;
@@ -27,6 +28,7 @@ const MAX_MEDIA_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_MEDIA_UPLOAD_BYTES = 80 * 1024 * 1024;
 const MAX_MEDIA_ATTACHMENTS = 8;
 let deployRunning = false;
+let deployQueuedPayload = null;
 let unsoccerChild = null;
 let unsoccerLastStart = null;
 let unsoccerLastExit = null;
@@ -519,6 +521,41 @@ function appendMessage(role, text, source, mirrorTelegram, attachments) {
     mirrorRecordToTelegram(record);
   }
   return record;
+}
+
+function deployPayloadSummary(payload) {
+  const head = payload?.head_commit || {};
+  return {
+    ref: String(payload?.ref || "unknown"),
+    head_id: String(head.id || "").slice(0, 12) || "unknown",
+    head_message: cleanText(head.message || "", 240),
+    received_at: nowIso(),
+  };
+}
+
+function readDeployStatus() {
+  try {
+    return JSON.parse(fs.readFileSync(DEPLOY_STATUS_FILE, "utf8"));
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeDeployStatus(patch) {
+  const current = readDeployStatus() || {};
+  const next = Object.assign({}, current, patch, { updated_at: nowIso() });
+  ensureDataDir();
+  fs.writeFileSync(DEPLOY_STATUS_FILE, JSON.stringify(next, null, 2) + os.EOL, "utf8");
+  return next;
+}
+
+function deployOutputTail(stdout, stderr) {
+  const output = [stdout, stderr]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join("\n")
+    .slice(-6000);
+  return output || "no output";
 }
 
 function cleanText(value, maxChars) {
@@ -1403,15 +1440,38 @@ async function relayDeployWebhook(body, headers, payload) {
 
 function runDeployFromWebhook(payload) {
   if (deployRunning) {
-    appendMessage("Deploy Webhook", "Deploy webhook received, but another deploy is already running.");
+    deployQueuedPayload = payload;
+    const queued = deployPayloadSummary(payload);
+    writeDeployStatus({
+      running: true,
+      queued,
+      note: "deploy queued behind currently running deploy",
+    });
+    appendMessage("Deploy Webhook", `Deploy webhook received for \`${queued.ref}\` at \`${queued.head_id}\`, queued behind the running deploy.`);
     return;
   }
   deployRunning = true;
-  const ref = String(payload.ref || "unknown");
-  const head = payload.head_commit || {};
-  const headId = String(head.id || "").slice(0, 12) || "unknown";
+  const summary = deployPayloadSummary(payload);
+  const ref = summary.ref;
+  const headId = summary.head_id;
   appendMessage("Deploy Webhook", `GitHub push received for \`${ref}\` at \`${headId}\`. Starting autodeploy.`);
   const script = process.env.AI_CHAT_DEPLOY_SCRIPT || path.join(ROOT, "ai_chat", "deploy", "itch-games-autodeploy-qwertystock.sh");
+  const startedAt = nowIso();
+  writeDeployStatus({
+    running: true,
+    queued: null,
+    ok: null,
+    ref,
+    head_id: headId,
+    head_message: summary.head_message,
+    script,
+    started_at: startedAt,
+    finished_at: null,
+    exit_code: null,
+    signal: null,
+    output_tail: "",
+    error: null,
+  });
   childProcess.execFile(script, {
     cwd: ROOT,
     env: {
@@ -1422,14 +1482,33 @@ function runDeployFromWebhook(payload) {
     maxBuffer: 4 * 1024 * 1024,
     encoding: "utf8",
   }, (error, stdout, stderr) => {
-    const output = [stdout, stderr].map((part) => String(part || "").trim()).filter(Boolean).join("\n").slice(-2500) || "no output";
+    const output = deployOutputTail(stdout, stderr);
+    const exitCode = error ? (error.code === undefined ? "unknown" : error.code) : 0;
+    writeDeployStatus({
+      running: false,
+      queued: deployQueuedPayload ? deployPayloadSummary(deployQueuedPayload) : null,
+      ok: !error,
+      ref,
+      head_id: headId,
+      script,
+      started_at: startedAt,
+      finished_at: nowIso(),
+      exit_code: exitCode,
+      signal: error?.signal || null,
+      output_tail: output,
+      error: error ? String(error.message || error).slice(0, 1000) : null,
+    });
     if (!error) {
       appendMessage("Deploy Webhook", `Autodeploy completed for \`${ref}\`.\n${output}`);
     } else {
-      const code = error.code === undefined ? "unknown" : error.code;
-      appendMessage("Deploy Webhook", `Autodeploy failed for \`${ref}\` with exit ${code}.\n${output}`);
+      appendMessage("Deploy Webhook", `Autodeploy failed for \`${ref}\` with exit ${exitCode}.\n${output}`);
     }
     deployRunning = false;
+    const nextPayload = deployQueuedPayload;
+    deployQueuedPayload = null;
+    if (nextPayload) {
+      setImmediate(() => runDeployFromWebhook(nextPayload));
+    }
   });
 }
 
@@ -1681,6 +1760,8 @@ async function deployHealthSnapshot() {
     expected_weight_label: expectedWeightLabel,
     git: gitContext(),
     deploy_running: deployRunning,
+    deploy_queued: deployQueuedPayload ? deployPayloadSummary(deployQueuedPayload) : null,
+    last_deploy: readDeployStatus(),
     deploy_relay: deployRelayHealth(),
     urls: {
       public_game: `${publicBaseUrl}/unsoccer/`,

@@ -345,6 +345,10 @@ ensure_certificate() {
 }
 
 cd "$ROOT"
+DEPLOY_LOCK="${ITCH_GAMES_DEPLOY_LOCK:-/tmp/itch-games-moscow-autodeploy.lock}"
+DEPLOY_PID="${ITCH_GAMES_DEPLOY_PID:-/tmp/itch-games-moscow-autodeploy.pid}"
+DEPLOY_MAX_SECONDS="${ITCH_GAMES_DEPLOY_MAX_SECONDS:-900}"
+
 if [ "${ITCH_GAMES_DEPLOY_DETACHED:-0}" != "1" ]; then
   log="/tmp/itch-games-moscow-autodeploy-$(date -u +%Y%m%dT%H%M%SZ).log"
   nohup env ITCH_GAMES_DEPLOY_DETACHED=1 "$0" >"$log" 2>&1 &
@@ -352,11 +356,39 @@ if [ "${ITCH_GAMES_DEPLOY_DETACHED:-0}" != "1" ]; then
   exit 0
 fi
 
-exec 9>/tmp/itch-games-moscow-autodeploy.lock
+exec 9>"$DEPLOY_LOCK"
 if ! flock -n 9; then
-  echo "another detached moscow autodeploy is already running"
-  exit 0
+  echo "another detached moscow autodeploy is already running; checking for stale deploy processes older than ${DEPLOY_MAX_SECONDS}s"
+  stale_pids="$(ps -eo pid=,etimes=,args= | awk -v self="$$" -v max="$DEPLOY_MAX_SECONDS" '$1 != self && $2 > max && $0 ~ /[i]tch-games-autodeploy-moscow\.sh/ {print $1}' || true)"
+  if [ -z "$stale_pids" ] && [ -s "$DEPLOY_PID" ]; then
+    lock_pid="$(cat "$DEPLOY_PID" 2>/dev/null || true)"
+    if [[ "$lock_pid" =~ ^[0-9]+$ ]] && [ "$lock_pid" != "$$" ] && kill -0 "$lock_pid" 2>/dev/null; then
+      lock_age="$(ps -p "$lock_pid" -o etimes= 2>/dev/null | tr -d ' ' || true)"
+      if [ "${lock_age:-0}" -gt "$DEPLOY_MAX_SECONDS" ]; then
+        stale_pids="$lock_pid"
+      fi
+    fi
+  fi
+  if [ -n "$stale_pids" ]; then
+    echo "terminating stale moscow deploy process(es): $stale_pids"
+    for pid in $stale_pids; do
+      kill -TERM "$pid" 2>/dev/null || true
+    done
+    sleep 2
+    for pid in $stale_pids; do
+      kill -KILL "$pid" 2>/dev/null || true
+    done
+  fi
+  if ! flock -w 10 9; then
+    echo "unable to acquire moscow autodeploy lock after stale-process recovery" >&2
+    exit 75
+  fi
 fi
+printf '%s\n' "$$" >"$DEPLOY_PID"
+cleanup_deploy_pid() {
+  rm -f "$DEPLOY_PID"
+}
+trap cleanup_deploy_pid EXIT
 
 ensure_packages
 ensure_webhook_secret
@@ -468,20 +500,55 @@ as_root nginx -t
 as_root systemctl daemon-reload
 as_root systemctl enable --now nginx
 
+find_unsoccer_pids() {
+  ps -eo pid=,args= | awk -v target="${ROOT}/unsoccer/server/dist/index.js" 'index($0, target) && $0 ~ /[n]ode/ {print $1}' || true
+}
+
+terminate_unsoccer_processes() {
+  pids="$(find_unsoccer_pids)"
+  if [ -z "$pids" ]; then
+    return 0
+  fi
+  echo "terminating Moscow UnSoccer process(es): $pids"
+  for pid in $pids; do
+    kill -TERM "$pid" 2>/dev/null || true
+  done
+  sleep 2
+  for pid in $pids; do
+    kill -KILL "$pid" 2>/dev/null || true
+  done
+}
+
+wait_for_unsoccer_version() {
+  attempts="${1:-20}"
+  api_health=""
+  for _ in $(seq 1 "$attempts"); do
+    api_health="$(curl -fsS "http://127.0.0.1:${UNSOCCER_PORT}/api/health" || true)"
+    if grep -q "\"version\":\"${expected_version}\"" <<< "$api_health"; then
+      printf '%s\n' "$api_health"
+      return 0
+    fi
+    sleep 1
+  done
+  printf '%s\n' "$api_health"
+  return 1
+}
+
 stage "restart unsoccer"
 as_root systemctl enable itch-games-unsoccer-server.service
 as_root systemctl stop itch-games-unsoccer-server.service || true
+as_root systemctl kill --kill-who=all itch-games-unsoccer-server.service || true
 as_root pkill -f "${ROOT}/unsoccer/server/dist/index.js" || true
-as_root systemctl start itch-games-unsoccer-server.service
-sleep 2
-api_health="$(curl -fsS "http://127.0.0.1:${UNSOCCER_PORT}/api/health" || true)"
-if ! grep -q "\"version\":\"${expected_version}\"" <<< "$api_health"; then
-  as_root systemctl restart itch-games-unsoccer-server.service
-  sleep 3
-  api_health="$(curl -fsS "http://127.0.0.1:${UNSOCCER_PORT}/api/health")"
+terminate_unsoccer_processes
+if as_root systemctl start itch-games-unsoccer-server.service; then
+  if ! wait_for_unsoccer_version 20; then
+    as_root systemctl restart itch-games-unsoccer-server.service || true
+    wait_for_unsoccer_version 20
+  fi
+else
+  echo "Moscow systemd start failed for UnSoccer" >&2
+  exit 1
 fi
-printf '%s\n' "$api_health"
-grep -q "\"version\":\"${expected_version}\"" <<< "$api_health"
 
 stage "restart chat and reload nginx"
 as_root systemctl enable --now itch-games-ai-chat.service

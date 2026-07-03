@@ -7,17 +7,50 @@ stage() {
 }
 
 cd /home/generic/itch_games
+DEPLOY_LOCK="${ITCH_GAMES_DEPLOY_LOCK:-/tmp/itch-games-autodeploy.lock}"
+DEPLOY_PID="${ITCH_GAMES_DEPLOY_PID:-/tmp/itch-games-autodeploy.pid}"
+DEPLOY_MAX_SECONDS="${ITCH_GAMES_DEPLOY_MAX_SECONDS:-900}"
+
 if [ "${ITCH_GAMES_DEPLOY_DETACHED:-0}" != "1" ]; then
   log="/tmp/itch-games-autodeploy-$(date -u +%Y%m%dT%H%M%SZ).log"
   nohup env ITCH_GAMES_DEPLOY_DETACHED=1 "$0" >"$log" 2>&1 &
   echo "detached autodeploy started; log=${log}"
   exit 0
 fi
-exec 9>/tmp/itch-games-autodeploy.lock
+
+exec 9>"$DEPLOY_LOCK"
 if ! flock -n 9; then
-  echo "another detached autodeploy is already running"
-  exit 0
+  echo "another detached autodeploy is already running; checking for stale deploy processes older than ${DEPLOY_MAX_SECONDS}s"
+  stale_pids="$(ps -eo pid=,etimes=,args= | awk -v self="$$" -v max="$DEPLOY_MAX_SECONDS" '$1 != self && $2 > max && $0 ~ /[i]tch-games-autodeploy-qwertystock\.sh/ {print $1}' || true)"
+  if [ -z "$stale_pids" ] && [ -s "$DEPLOY_PID" ]; then
+    lock_pid="$(cat "$DEPLOY_PID" 2>/dev/null || true)"
+    if [[ "$lock_pid" =~ ^[0-9]+$ ]] && [ "$lock_pid" != "$$" ] && kill -0 "$lock_pid" 2>/dev/null; then
+      lock_age="$(ps -p "$lock_pid" -o etimes= 2>/dev/null | tr -d ' ' || true)"
+      if [ "${lock_age:-0}" -gt "$DEPLOY_MAX_SECONDS" ]; then
+        stale_pids="$lock_pid"
+      fi
+    fi
+  fi
+  if [ -n "$stale_pids" ]; then
+    echo "terminating stale deploy process(es): $stale_pids"
+    for pid in $stale_pids; do
+      kill -TERM "$pid" 2>/dev/null || true
+    done
+    sleep 2
+    for pid in $stale_pids; do
+      kill -KILL "$pid" 2>/dev/null || true
+    done
+  fi
+  if ! flock -w 10 9; then
+    echo "unable to acquire autodeploy lock after stale-process recovery" >&2
+    exit 75
+  fi
 fi
+printf '%s\n' "$$" >"$DEPLOY_PID"
+cleanup_deploy_pid() {
+  rm -f "$DEPLOY_PID"
+}
+trap cleanup_deploy_pid EXIT
 stage "git update"
 git fetch origin main
 git checkout main
@@ -50,42 +83,73 @@ NODE
 echo "unsoccer expected version: ${expected_version}"
 echo "unsoccer expected weight: ${expected_weight}"
 
+find_unsoccer_pids() {
+  ps -eo pid=,args= | awk '/[n]ode .*\/home\/generic\/itch_games\/unsoccer\/server\/dist\/index\.js/ {print $1}' || true
+}
+
+terminate_unsoccer_processes() {
+  pids="$(find_unsoccer_pids)"
+  if [ -z "$pids" ]; then
+    return 0
+  fi
+  echo "terminating UnSoccer process(es): $pids"
+  for pid in $pids; do
+    kill -TERM "$pid" 2>/dev/null || true
+  done
+  sleep 2
+  for pid in $pids; do
+    kill -KILL "$pid" 2>/dev/null || true
+  done
+}
+
+wait_for_unsoccer_version() {
+  attempts="${1:-20}"
+  api_health=""
+  for _ in $(seq 1 "$attempts"); do
+    api_health="$(curl -fsS http://127.0.0.1:8787/api/health || true)"
+    if grep -q "\"version\":\"${expected_version}\"" <<< "$api_health"; then
+      printf '%s\n' "$api_health"
+      return 0
+    fi
+    sleep 1
+  done
+  printf '%s\n' "$api_health"
+  return 1
+}
+
 restart_unsoccer() {
   stage "$1"
+  service_available=0
   if sudo -n systemctl enable itch-games-unsoccer-server.service; then
+    service_available=1
     sudo -n systemctl stop itch-games-unsoccer-server.service || true
+    sudo -n systemctl kill --kill-who=all itch-games-unsoccer-server.service || true
     sudo -n pkill -f '/home/generic/itch_games/unsoccer/server/dist/index.js' || true
-    sudo -n systemctl start itch-games-unsoccer-server.service || true
-  else
-    echo "sudo systemctl is unavailable; falling back to direct UnSoccer process restart"
-  fi
-  sleep 2
-  api_health="$(curl -fsS http://127.0.0.1:8787/api/health || true)"
-  if ! grep -q "\"version\":\"${expected_version}\"" <<< "$api_health"; then
+    terminate_unsoccer_processes
+    if sudo -n systemctl start itch-games-unsoccer-server.service; then
+      if wait_for_unsoccer_version 20; then
+        return 0
+      fi
+    else
+      echo "systemd start failed; using fallback path"
+    fi
+    echo "systemd start did not expose ${expected_version}; retrying restart"
     sudo -n systemctl restart itch-games-unsoccer-server.service || true
-    sleep 3
-    api_health="$(curl -fsS http://127.0.0.1:8787/api/health || true)"
-  fi
-  if ! grep -q "\"version\":\"${expected_version}\"" <<< "$api_health"; then
+    if wait_for_unsoccer_version 20; then
+      return 0
+    fi
+    sudo -n systemctl status --no-pager itch-games-unsoccer-server.service || true
     echo "systemd restart did not expose ${expected_version}; using direct process fallback"
-    pids="$(ps -eo pid=,args= | awk '/[n]ode .*\/home\/generic\/itch_games\/unsoccer\/server\/dist\/index\.js/ {print $1}' || true)"
-    if [ -n "$pids" ]; then
-      for pid in $pids; do
-        kill -TERM "$pid" 2>/dev/null || true
-      done
-      sleep 2
-      for pid in $pids; do
-        kill -KILL "$pid" 2>/dev/null || true
-      done
-    fi
-    if ! curl -fsS http://127.0.0.1:8787/api/health >/tmp/itch-games-unsoccer-health.json 2>/dev/null || ! grep -q "\"version\":\"${expected_version}\"" /tmp/itch-games-unsoccer-health.json; then
-      nohup env NODE_ENV=production UNSOCCER_PORT=8787 /usr/bin/node /home/generic/itch_games/unsoccer/server/dist/index.js >/tmp/itch-games-unsoccer-fallback.log 2>&1 &
-      sleep 3
-    fi
-    api_health="$(curl -fsS http://127.0.0.1:8787/api/health)"
+    sudo -n systemctl stop itch-games-unsoccer-server.service || true
+    sudo -n systemctl kill --kill-who=all itch-games-unsoccer-server.service || true
+  else
+    echo "sudo systemctl is unavailable; using direct UnSoccer process restart"
   fi
-  printf '%s\n' "$api_health"
-  grep -q "\"version\":\"${expected_version}\"" <<< "$api_health"
+
+  sudo -n pkill -f '/home/generic/itch_games/unsoccer/server/dist/index.js' || true
+  terminate_unsoccer_processes
+  nohup env NODE_ENV=production UNSOCCER_PORT=8787 /usr/bin/node /home/generic/itch_games/unsoccer/server/dist/index.js >/tmp/itch-games-unsoccer-fallback.log 2>&1 &
+  wait_for_unsoccer_version 20
 }
 
 dist_ready=0

@@ -38,7 +38,7 @@ Use this root skill when changing, packaging, validating, or publishing the
     `ui_designer/public_pages/unsoccer-itch-assets/`
   - UnSoccer Yandex Games assets and upload handoff:
     `ui_designer/public_pages/unsoccer-yandex-games-assets/`,
-    `ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md`,
+    `ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.056.md`,
     `ui_designer/public_pages/verify-yandex-upload-pack.mjs`
   - UnSoccer VK Play handoff:
     `ui_designer/public_pages/unsoccer-vkplay-release-gate.md`,
@@ -133,6 +133,10 @@ Use this root skill when changing, packaging, validating, or publishing the
   `gh`/GitHub connector access is blocked. Record browser-driven changes in
   `/ai_chat` and verify with webhook deliveries or production health endpoints.
 - Version bumps must be committed, pushed to GitHub, and autodeployed.
+- GitHub webhook deploys must be observable in
+  `/ai_chat/api/deploy-health.last_deploy`; if a deploy is already running,
+  queue the newest main push and report lock contention as a visible failure
+  instead of silently dropping it.
 - This local clone uses `git config core.hooksPath tools/hooks`, where
   `tools/hooks/post-commit` runs
   `tools/hooks/unsoccer_post_commit_autodeploy.ps1`. Commits to `main` push to

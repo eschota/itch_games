@@ -2298,6 +2298,10 @@ async function assertBallPossessionAndContextShots(api) {
     `low possession shot should drive the ball forward, got vz=${state.ball.velocity.z}`
   );
   assert.ok(
+    state.ball.velocity.z < BALL_POSSESSION_LOW_SHOT_SPEED * 1.5,
+    `tap LMB possession shot should stay pass-like, got vz=${state.ball.velocity.z}`
+  );
+  assert.ok(
     state.ball.velocity.y < 1.2,
     `low possession shot should stay low, got vy=${state.ball.velocity.y}`
   );

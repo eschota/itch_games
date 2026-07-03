@@ -318,7 +318,7 @@
   "ballPossessionLowShotLift": 0.22,
   "ballPossessionUpperShotLift": 4.2,
   "ballPossessionStrongMultiplier": 1.85,
-  "ballPossessionBasePowerMultiplier": 4,
+  "ballPossessionBasePowerMultiplier": 1.2,
   "ballPossessionFullPowerMultiplier": 8,
   "friendlyFireEnabled": true,
   "playerHitFullKnockoutEnabled": true,

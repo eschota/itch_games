@@ -1,7 +1,8 @@
 # Ragdoll Soccer II Itch.io Page Copy
 
-Use this as the source-of-truth copy for the public Ragdoll Soccer II itch.io
-project page.
+Use `../../unsoccer/meta.json` as the reusable RU/EN source of truth for public
+Ragdoll Soccer II copy. This file stays as paste-ready itch.io field context
+for the next public page refresh and must not diverge from the JSON.
 
 ## Project Fields
 
@@ -12,7 +13,7 @@ Project URL:
 `https://eschotagmailcom.itch.io/ragdoll-soccer-ii`
 
 Short description:
-`Browser ragdoll soccer with bots, charged shots, stamina, knockdowns, and messy courtyard physics.`
+`Browser ragdoll soccer with bots, charged shots, stamina, knockdowns, RU/EN UI, and messy courtyard physics.`
 
 Classification:
 `Game`
@@ -24,16 +25,16 @@ Release status:
 `Prototype`
 
 Version:
-`v0.0.053`
+`v0.0.054`
 
 Suggested tags:
-`football`, `physics`, `browser`, `fighting`, `sports`, `soccer`, `ragdoll`,
-`html5`, `multiplayer`, `prototype`
+`football`, `physics`, `browser`, `sports`, `soccer`, `ragdoll`, `html5`,
+`multiplayer`, `prototype`, `bots`
 
 ## Short Positioning
 
-`Street-football chaos in a browser: sprint, kick, jump, shove, ragdoll, and
-fight bots for the ball on a live server-backed 3D pitch.`
+`Full-contact arcade football in a browser: sprint, charge shots, jump into
+tackles, ragdoll, and fight bots for the ball on a live server-backed 3D pitch.`
 
 ## Long Description
 
@@ -45,10 +46,10 @@ bites back, jump into tackles, and knock players into ragdoll chaos.`
 fallback. The itch.io build is the static browser client; for real multiplayer
 it connects to the deployed game server.`
 
-`Current build: v0.0.053. This release keeps the ten-player bot fill visible,
-fixes point-blank overlap strikes, supports possession shots with LMB + Shift,
-keeps stamina drain tied to sprinting and incoming damage, and adds the
-itch-hosted production server fallback.`
+`Current source target: v0.0.054. This version adds automatic RU/EN player-facing
+localization based on device/browser language, keeps generated English players
+named Player instead of Russian text, and preserves the v0.0.053 itch-hosted
+production server fallback.`
 
 ## Controls
 
@@ -68,7 +69,7 @@ Hand strike:
 `RMB`
 
 Head hit:
-Mouse wheel / middle mouse input path in the in-game HUD.
+Middle mouse button.
 
 Players:
 The first connected players join the pitch; extra clients can spectate.
@@ -83,9 +84,17 @@ The first connected players join the pitch; extra clients can spectate.
   `https://io-games.mecharulez.com/unsoccer/` when running from
   `html-classic.itch.zone`.
 - Courtyard football setting with dense environment dressing, weather,
-  floodlights, audio ambience, bots, player emotions, and HUD settings.
+  floodlights, audio ambience, bots, player emotions, chat, and HUD settings.
 - Nonstandard contact rules: foot/hand/head hits, player stamina damage,
   exhaustion, jump hits, ragdoll knockdowns, and bouncy physics goals.
+
+## Media Refresh Pack
+
+- Itch cover: `ui_designer/public_pages/unsoccer-itch-assets/cover-630x500.png`.
+- Embed background: `ui_designer/public_pages/unsoccer-itch-assets/embed-background-1280x720.png`.
+- First gallery visual: `ui_designer/public_pages/unsoccer-itch-assets/screenshot-01-vk-art-1280x720.png`.
+- Motion preview source: `unsoccer/store-assets/gameplay-preview-342x190.webm`.
+- Public runtime page art: `unsoccer/store-assets/`.
 
 ## Credits And Licenses
 
@@ -113,13 +122,14 @@ Project chat:
 
 - Public itch.io project id: `4740079`.
 - Butler target: `eschotagmailcom/ragdoll-soccer-ii:html5`.
-- Current uploaded build: upload `#18187910`, build `#1768259`, version
-  `v0.0.053`.
+- Current live uploaded build before this visual refresh: upload `#18187910`,
+  build `#1768259`, version `v0.0.053`.
+- Next upload target: `v0.0.054` after the orchestrator rebuilds/packages and
+  publishes through butler.
 - Current embed setting: 960 x 540, fullscreen enabled, mobile-friendly enabled,
   autostart disabled.
-- Live full description currently needs manual restoration from this file. The
-  in-app Browser could not persist itch Redactor `game[description]` through
-  automation, and the blocked `javascript:` path was not worked around.
-- Cover/screenshots still need manual media upload or an itch media API path;
-  the current browser automation can edit text/settings but cannot choose local
-  files in itch.io upload dialogs.
+- Live full description previously needed manual restoration from this file.
+  Recheck after the next dashboard save because the itch Redactor field did not
+  persist reliably through the earlier Browser automation.
+- Cover/background/gallery media from the refresh pack still need external
+  itch.io upload and verification.

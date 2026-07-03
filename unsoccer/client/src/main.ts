@@ -65,6 +65,22 @@ import {
   type SettingsTab,
   type UnSoccerSettings
 } from "./settings";
+import {
+  actionLabel,
+  applyStaticLocalization,
+  controllerBadge as localizedControllerBadge,
+  currentLocale,
+  emotionLabel,
+  generatedPlayerName,
+  localizeGeneratedPlayerName,
+  staminaLabel,
+  t,
+  teamLabel,
+  teamShortLabel,
+  weatherEmoji,
+  weatherKindLabel,
+  weatherMessageEmoji
+} from "./i18n";
 import { WeatherVisualLayer } from "./weather";
 import {
   applyLookdevMaterial,
@@ -74,6 +90,7 @@ import {
   type VisualRig
 } from "./visual-pipeline";
 import "./styles.css";
+import "./hud-overrides.css";
 
 interface NetworkChannel {
   emit(eventName: string, data: unknown, options?: unknown): void;
@@ -260,6 +277,8 @@ const settingsButton = requireElement<HTMLButtonElement>("#settings-button");
 const muteButton = requireElement<HTMLButtonElement>("#mute-button");
 const fullscreenButton = requireElement<HTMLButtonElement>("#fullscreen-button");
 const cameraResetButton = requireElement<HTMLButtonElement>("#camera-reset-button");
+const AUDIO_ON_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Zm13.3-1.7-1.4 1.4a4.6 4.6 0 0 1 0 6.6l1.4 1.4a6.6 6.6 0 0 0 0-9.4Zm2.8-2.8-1.4 1.4a8.6 8.6 0 0 1 0 12.2l1.4 1.4a10.6 10.6 0 0 0 0-15Z"/></svg>';
+const AUDIO_OFF_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Zm12.4 3 2.8-2.8-1.4-1.4-2.8 2.8-2.8-2.8-1.4 1.4 2.8 2.8-2.8 2.8 1.4 1.4 2.8-2.8 2.8 2.8 1.4-1.4-2.8-2.8Z"/></svg>';
 const settingsPanel = requireElement<HTMLElement>("#settings-panel");
 const settingsForm = requireElement<HTMLFormElement>("#settings-form");
 const settingsSaveStateEl = requireElement<HTMLElement>("#settings-save-state");
@@ -282,9 +301,11 @@ const NIGHT_START_SECONDS = 23 * 60 * 60;
 const DARK_HOURS_LABEL = "23:00-03:00";
 const TWILIGHT_HOURS_LABEL = "03:00-05:00/21:00-23:00";
 
+applyStaticLocalization(GAME_VERSION, BUILD_WEIGHT_LABEL);
 versionBadge.textContent = `${GAME_VERSION} / ${BUILD_WEIGHT_LABEL}`;
 document.documentElement.dataset.gameVersion = GAME_VERSION;
 document.documentElement.dataset.gameWeightLabel = BUILD_WEIGHT_LABEL;
+document.documentElement.dataset.gameLocale = currentLocale;
 document.documentElement.dataset.artPass = ART_PASS_VERSION;
 document.documentElement.dataset.ballRadius = BALL_RADIUS.toFixed(2);
 document.documentElement.dataset.environment = "residential-courtyard-v028-free3d-dense";
@@ -723,6 +744,8 @@ let emotionWheelSelectedIndex = 0;
 let emotionWheelCloseTimer = 0;
 const pressedCodes = new Set<string>();
 const eventFeedMessages: string[] = [];
+type ControlHintId = "move" | "leftKick" | "rightKick" | "headHit" | "jump" | "sprint" | "menu";
+const usedControlHints = new Set<ControlHintId>();
 type MobileDirection = "up" | "down" | "left" | "right";
 type MobileAction = "sprint" | "jump" | "leftKick" | "rightKick" | "headHit";
 const mobileDirectionPointers = new Map<number, MobileDirection>();
@@ -758,7 +781,7 @@ function defaultUserPic(): string {
 
 function sanitizeLocalName(value: string): string {
   const clean = value.replace(/[^\p{L}\p{N}_ .-]/gu, "").trim().slice(0, 18);
-  return clean || `\u0418\u0433\u0440\u043e\u043a ${Math.floor(Math.random() * 90 + 10)}`;
+  return clean ? localizeGeneratedPlayerName(clean) : generatedPlayerName();
 }
 
 function sanitizeLocalUserPic(value: string): string {
@@ -850,10 +873,11 @@ function saveLocalProfile(): void {
 }
 
 function skinLabel(id: string, index: number): string {
-  return `Skin ${index + 1} · ${id.slice(0, 8)}`;
+  return t("profile.skinLabel", { index: index + 1, id: id.slice(0, 8) });
 }
 
 function syncProfileUi(): void {
+  localProfile.nickname = localizeGeneratedPlayerName(localProfile.nickname);
   profileNameInput.value = localProfile.nickname;
   profileSkinSelect.value = localProfile.skinId;
   profilePicInput.value = localProfile.userPic;
@@ -879,14 +903,15 @@ function readProfileUi(): boolean {
 }
 
 function profilePayload(): LocalPlayerProfile {
-  return { ...localProfile };
+  return { ...localProfile, nickname: localizeGeneratedPlayerName(localProfile.nickname) };
 }
 
 function joinRequestPayload(name = localProfile.nickname) {
+  const localizedName = localizeGeneratedPlayerName(name);
   return {
-    name,
+    name: localizedName,
     clientFingerprint: localBrowserFingerprint,
-    profile: profilePayload()
+    profile: { ...profilePayload(), nickname: localizedName }
   };
 }
 
@@ -925,9 +950,10 @@ function renderEmotionWheel(): void {
   emotionWheelEl.innerHTML = EMOTION_CHOICES.map((choice, index) => {
     const selected = index === emotionWheelSelectedIndex ? " selected" : "";
     const angle = (index / EMOTION_CHOICES.length) * 360 - 90;
+    const label = emotionLabel(choice.id);
     return (
       `<button type="button" class="emotion-choice${selected}" data-emotion="${escapeHtml(choice.id)}" ` +
-      `style="--emotion-angle:${angle}deg" title="${escapeHtml(choice.label)}" aria-label="${escapeHtml(choice.label)}">` +
+      `style="--emotion-angle:${angle}deg" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">` +
       `${escapeHtml(choice.emoji)}</button>`
     );
   }).join("");
@@ -1023,7 +1049,7 @@ function updateChatUi(state: ServerState | null): void {
   chatLogEl.innerHTML = messages.slice(-6).map((message) => (
     `<div class="chat-line" data-player-id="${escapeHtml(message.playerId)}">` +
     `${renderUserPicMarkup(message.userPic)}` +
-    `<span><strong>${escapeHtml(message.name)}</strong>${escapeHtml(message.text)}</span>` +
+    `<span><strong>${escapeHtml(displayPlayerName(message.name))}</strong>${escapeHtml(message.text)}</span>` +
     `</div>`
   )).join("");
   chatPanelEl.dataset.messages = String(messages.length);
@@ -1147,20 +1173,9 @@ function audioUserActivationLabel(): string {
   return `${activation.isActive ? "active" : "inactive"}:${activation.hasBeenActive ? "used" : "fresh"}`;
 }
 
-const ACTION_LABELS: Record<InputAction, string> = {
-  moveForward: "\u0412\u043f\u0435\u0440\u0435\u0434",
-  moveBack: "\u041d\u0430\u0437\u0430\u0434",
-  moveLeft: "\u0412\u043b\u0435\u0432\u043e",
-  moveRight: "\u0412\u043f\u0440\u0430\u0432\u043e",
-  leftKick: "\u041b\u0435\u0432\u0430\u044f \u043d\u043e\u0433\u0430",
-  rightKick: "\u0420\u0443\u043a\u0430",
-  headHit: "\u0413\u043e\u043b\u043e\u0432\u0430",
-  jump: "\u041f\u0440\u044b\u0436\u043e\u043a",
-  sprint: "\u0421\u043f\u0440\u0438\u043d\u0442",
-  settings: "\u041c\u0435\u043d\u044e",
-  cameraReset: "\u041a\u0430\u043c\u0435\u0440\u0430",
-  muteAudio: "\u0417\u0432\u0443\u043a"
-};
+function inputActionLabel(action: InputAction): string {
+  return actionLabel(action);
+}
 
 function syncSettingsUi(): void {
   selectEl("#setting-movement-mode").value = settings.controls.movementMode;
@@ -1193,7 +1208,7 @@ function syncSettingsUi(): void {
   inputEl("#setting-reduce-weather-opacity").checked = settings.accessibility.reduceWeatherOpacity;
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-rebind-action]")) {
     const action = button.dataset.rebindAction as InputAction;
-    button.innerHTML = `<span>${escapeHtml(ACTION_LABELS[action])}</span><strong>${escapeHtml(formatBinding(codeForAction(settings.controls, action)))}</strong>`;
+    button.innerHTML = `<span>${escapeHtml(inputActionLabel(action))}</span><strong>${escapeHtml(formatBinding(codeForAction(settings.controls, action)))}</strong>`;
   }
   setActiveSettingsTab(activeSettingsTab);
   syncInputTestPad();
@@ -1248,7 +1263,7 @@ function readSettingsFromForm(): void {
 }
 
 function persistAndApplySettings(): void {
-  settingsSaveStateEl.textContent = saveSettings(settings) ? "\u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e" : "\u043d\u0435 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e";
+  settingsSaveStateEl.textContent = saveSettings(settings) ? t("settings.saved") : t("settings.notSaved");
   applySettingsToRuntime();
   syncSettingsUi();
 }
@@ -1283,10 +1298,16 @@ function applySettingsToRuntime(): void {
   document.documentElement.dataset.weatherOpacity = settings.accessibility.reduceWeatherOpacity ? "reduced" : "normal";
   document.documentElement.dataset.ibl = "procedural-sky";
   document.documentElement.dataset.visibleSun = String(sunMesh.visible);
-  muteButton.textContent = settings.audio.muted ? "MUT" : "AUD";
+  updateMuteButtonIcon();
   updateControlHints();
   updatePlayerChip();
   resize();
+}
+
+function updateMuteButtonIcon(): void {
+  muteButton.innerHTML = settings.audio.muted ? AUDIO_OFF_ICON : AUDIO_ON_ICON;
+  muteButton.title = settings.audio.muted ? "Включить звук" : "Выключить звук";
+  muteButton.setAttribute("aria-label", muteButton.title);
 }
 
 function setSettingsOpen(open: boolean): void {
@@ -1324,8 +1345,8 @@ function bindAction(action: InputAction, code: string): void {
 function syncSettingsNotes(): void {
   const conflicts = bindingConflicts(settings.controls.bindings);
   bindingConflictsEl.textContent = pendingRebindAction
-    ? `${ACTION_LABELS[pendingRebindAction]}: \u043d\u0430\u0436\u043c\u0438\u0442\u0435 \u043a\u043b\u0430\u0432\u0438\u0448\u0443`
-    : conflicts.length ? `Conflicts: ${conflicts.map((item) => item.code).join(", ")}` : "\u0414\u0443\u0431\u043b\u0438 \u0437\u0430\u043c\u0435\u043d\u044f\u044e\u0442\u0441\u044f.";
+    ? t("settings.rebindPending", { action: inputActionLabel(pendingRebindAction) })
+    : conflicts.length ? t("settings.conflicts", { codes: conflicts.map((item) => item.code).join(", ") }) : t("settings.rebindDuplicate");
   const audioState = audio.snapshot();
   audioStateEl.textContent = `Audio: ${audioState.contextState}, unlocked=${audioState.unlocked}`;
   graphicsStateEl.textContent = `IBL=${document.documentElement.dataset.ibl || "procedural-sky"} / sun=${document.documentElement.dataset.visibleSun || "true"} / day=${document.documentElement.dataset.dayCycleSeconds || "0"}s`;
@@ -1334,20 +1355,55 @@ function syncSettingsNotes(): void {
 
 function updateControlHints(): void {
   const move = `${formatBinding(codeForAction(settings.controls, "moveForward"))}/${formatBinding(codeForAction(settings.controls, "moveLeft"))}/${formatBinding(codeForAction(settings.controls, "moveBack"))}/${formatBinding(codeForAction(settings.controls, "moveRight"))}`;
-  controlHintsEl.innerHTML = [
-    `<span>\u0425\u043e\u0434 ${escapeHtml(move)}</span>`,
-    `<span>\u0423\u0434\u0430\u0440/\u0440\u0443\u043a\u0430 ${escapeHtml(formatBinding(codeForAction(settings.controls, "leftKick")))}/${escapeHtml(formatBinding(codeForAction(settings.controls, "rightKick")))}</span>`,
-    `<span>\u0413\u043e\u043b\u043e\u0432\u0430 ${escapeHtml(formatBinding(codeForAction(settings.controls, "headHit")))}</span>`,
-    `<span>\u041f\u0440\u044b\u0436\u043e\u043a/\u0441\u043f\u0440\u0438\u043d\u0442 ${escapeHtml(formatBinding(codeForAction(settings.controls, "jump")))}/${escapeHtml(formatBinding(codeForAction(settings.controls, "sprint")))}</span>`,
-    `<span>\u041c\u0435\u043d\u044e ${escapeHtml(formatBinding(codeForAction(settings.controls, "settings")))}</span>`
-  ].join("");
+  const hints: Array<[ControlHintId, string]> = [
+    ["move", t("control.move", { binding: move })],
+    ["leftKick", `${actionLabel("leftKick")} ${formatBinding(codeForAction(settings.controls, "leftKick"))}`],
+    ["rightKick", `${actionLabel("rightKick")} ${formatBinding(codeForAction(settings.controls, "rightKick"))}`],
+    ["headHit", t("control.head", { binding: formatBinding(codeForAction(settings.controls, "headHit")) })],
+    ["jump", `${actionLabel("jump")} ${formatBinding(codeForAction(settings.controls, "jump"))}`],
+    ["sprint", `${actionLabel("sprint")} ${formatBinding(codeForAction(settings.controls, "sprint"))}`],
+    ["menu", t("control.menu", { binding: formatBinding(codeForAction(settings.controls, "settings")) })]
+  ];
+  const visibleHints = hints.filter(([id]) => !usedControlHints.has(id));
+  controlHintsEl.hidden = visibleHints.length === 0;
+  controlHintsEl.innerHTML = visibleHints
+    .map(([id, label]) => `<span data-control-hint="${id}">${escapeHtml(label)}</span>`)
+    .join("");
+  document.documentElement.dataset.controlHintsUsed = [...usedControlHints].sort().join(",");
+  document.documentElement.dataset.controlHintsRemaining = visibleHints.map(([id]) => id).join(",");
+}
+
+function markControlHintsUsed(...ids: ControlHintId[]): void {
+  let changed = false;
+  for (const id of ids) {
+    if (usedControlHints.has(id)) continue;
+    usedControlHints.add(id);
+    changed = true;
+  }
+  if (changed) updateControlHints();
+}
+
+function markInputActionHintUsed(action: InputAction): void {
+  if (action === "moveForward" || action === "moveBack" || action === "moveLeft" || action === "moveRight") markControlHintsUsed("move");
+  else if (action === "leftKick") markControlHintsUsed("leftKick");
+  else if (action === "rightKick") markControlHintsUsed("rightKick");
+  else if (action === "headHit") markControlHintsUsed("headHit");
+  else if (action === "jump") markControlHintsUsed("jump");
+  else if (action === "sprint") markControlHintsUsed("sprint");
+  else if (action === "settings") markControlHintsUsed("menu");
+}
+
+function markHintsForPressedCodes(codes: Set<string>): void {
+  for (const action of ["moveForward", "moveBack", "moveLeft", "moveRight", "leftKick", "rightKick", "headHit", "jump", "sprint", "settings"] as InputAction[]) {
+    if (actionPressed(settings.controls, action, codes)) markInputActionHintUsed(action);
+  }
 }
 
 type StaminaUiState = "hidden" | "ready" | "recovering" | "low" | "sprint" | "exhausted";
 
 function updatePlayerChip(state: ServerState | null = renderedState ?? latestState): void {
-  playerRoleEl.textContent = connected ? (localJoin?.role === "player" ? "\u0418\u0433\u0440\u043e\u043a" : "\u0417\u0440\u0438\u0442\u0435\u043b\u044c") : "\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u0435";
-  playerTeamEl.textContent = localJoin ? teamNameLabel(localJoin.team) : "\u0417\u0440\u0438\u0442\u0435\u043b\u044c";
+  playerRoleEl.textContent = connected ? (localJoin?.role === "player" ? t("player.role.player") : t("player.role.spectator")) : t("player.role.connecting");
+  playerTeamEl.textContent = localJoin ? teamNameLabel(localJoin.team) : teamLabel(null, true);
   playerInputModeEl.textContent = settings.controls.movementMode === "team-goal" ? "Team-goal" : settings.controls.movementMode === "camera" ? "Camera" : "Screen";
   updateStaminaHud(findLocalPlayer(state));
 }
@@ -1362,9 +1418,10 @@ function updateStaminaHud(player: PlayerSnapshot | null): void {
   if (!player) {
     staminaMeterEl.dataset.state = "hidden";
     staminaMeterEl.setAttribute("aria-valuenow", "0");
+    staminaMeterEl.style.setProperty("--stamina-pct", "0%");
     staminaFillEl.style.setProperty("--stamina-pct", "0%");
     staminaValueEl.textContent = "--";
-    staminaStateEl.textContent = "\u043e\u0436\u0438\u0434\u0430\u043d\u0438\u0435";
+    staminaStateEl.textContent = t("stamina.waiting");
     document.documentElement.dataset.localStamina = "";
     document.documentElement.dataset.localStaminaState = "hidden";
     document.documentElement.dataset.localStaminaSprinting = "false";
@@ -1379,6 +1436,7 @@ function updateStaminaHud(player: PlayerSnapshot | null): void {
   const uiState = staminaUiState(player, staminaPercent);
   staminaMeterEl.dataset.state = uiState;
   staminaMeterEl.setAttribute("aria-valuenow", String(staminaPercent));
+  staminaMeterEl.style.setProperty("--stamina-pct", `${staminaPercent}%`);
   staminaFillEl.style.setProperty("--stamina-pct", `${staminaPercent}%`);
   staminaValueEl.textContent = `${staminaPercent}%`;
   staminaStateEl.textContent = staminaUiLabel(uiState);
@@ -1397,19 +1455,14 @@ function staminaUiState(player: PlayerSnapshot, staminaPercent: number): Stamina
 }
 
 function staminaUiLabel(state: StaminaUiState): string {
-  if (state === "exhausted") return "\u0438\u0441\u0442\u043e\u0449\u0435\u043d\u0438\u0435";
-  if (state === "sprint") return "\u0441\u043f\u0440\u0438\u043d\u0442";
-  if (state === "low") return "\u043c\u0430\u043b\u043e \u0441\u0438\u043b";
-  if (state === "recovering") return "\u0432\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435";
-  if (state === "ready") return "\u0433\u043e\u0442\u043e\u0432";
-  return "\u043e\u0436\u0438\u0434\u0430\u043d\u0438\u0435";
+  return staminaLabel(state);
 }
 
 function updateNetworkHud(now = performance.now()): void {
   transportStatusEl.textContent = transportMode === "none" ? "offline" : transportMode;
   const serverLag = latestState ? Math.max(0, Date.now() - latestState.serverTime) : null;
   pingStatusEl.textContent = serverLag === null ? "-- ms" : `${Math.min(serverLag, 9999)} ms`;
-  snapshotAgeEl.textContent = latestSnapshotReceivedAt ? `${Math.round(now - latestSnapshotReceivedAt)} ms` : "snapshot --";
+  snapshotAgeEl.textContent = latestSnapshotReceivedAt ? `${Math.round(now - latestSnapshotReceivedAt)} ms` : t("network.snapshot");
   if (settingsOpen) syncSettingsNotes();
 }
 
@@ -1537,6 +1590,7 @@ function syncMobileControlsUi(): void {
   document.documentElement.dataset.mobileMoveY = mobileMoveVector.y.toFixed(3);
   document.documentElement.dataset.mobileMoveStrength = mobileMoveVector.strength.toFixed(3);
   if (activeDirections.length > 0) {
+    markControlHintsUsed("move");
     document.documentElement.dataset.mobileLastDirections = [...new Set(activeDirections)].sort().join(",");
     document.documentElement.dataset.mobileLastMoveStrength = mobileMoveVector.strength.toFixed(3);
   }
@@ -3247,7 +3301,7 @@ function teamColor(team: number | null) {
 
 function playerLabelText(snapshot: PlayerSnapshot): string {
   const prefix = snapshot.userPic && !isImageUserPic(snapshot.userPic) ? `${snapshot.userPic} ` : "";
-  return `${prefix}${snapshot.name}`;
+  return `${prefix}${displayPlayerName(snapshot.name)}`;
 }
 
 function makeLabelTexture(name: string): THREE.CanvasTexture {
@@ -3385,7 +3439,7 @@ function acceptJoin(join: JoinAccepted) {
   localJoin = join;
   if (join.profile) {
     localProfile = {
-      nickname: join.profile.nickname,
+      nickname: localizeGeneratedPlayerName(join.profile.nickname),
       skinId: sanitizeLocalSkin(join.profile.skinId),
       userPic: sanitizeLocalUserPic(join.profile.userPic)
     };
@@ -3395,12 +3449,12 @@ function acceptJoin(join: JoinAccepted) {
   if (!previous || previous.role !== join.role || previous.team !== join.team || previous.index !== join.index) {
     audio.playJoin(localJoin.role);
     pushEventFeed(localJoin.role === "player"
-      ? `\u0412\u044b: ${teamNameLabel(localJoin.team)} #${localJoin.index + 1}`
-      : "\u0412\u044b: \u0437\u0440\u0438\u0442\u0435\u043b\u044c");
+      ? t("player.youTeam", { team: teamNameLabel(localJoin.team), index: localJoin.index + 1 })
+      : t("player.youSpectator"));
   }
   statusEl.textContent = localJoin.role === "player"
-    ? `\u0412\u044b \u0432 \u043a\u043e\u043c\u0430\u043d\u0434\u0435 ${teamNameLabel(localJoin.team)} #${localJoin.index + 1}.`
-    : "\u0420\u0435\u0436\u0438\u043c \u0437\u0440\u0438\u0442\u0435\u043b\u044f/\u0442\u0435\u0441\u0442\u0435\u0440\u0430.";
+    ? t("player.joinedTeam", { team: teamNameLabel(localJoin.team), index: localJoin.index + 1 })
+    : t("player.spectatorMode");
   updatePlayerChip();
   updateResolvedInput();
 }
@@ -3454,8 +3508,8 @@ function connectWebSocket(name: string) {
     }, 900);
   });
   wsChannel.on("server-full", () => {
-    statusEl.textContent = "\u0421\u0435\u0440\u0432\u0435\u0440 \u0437\u0430\u043f\u043e\u043b\u043d\u0435\u043d.";
-    pushEventFeed("\u0421\u0435\u0440\u0432\u0435\u0440 \u0437\u0430\u043f\u043e\u043b\u043d\u0435\u043d");
+    statusEl.textContent = t("status.serverFull");
+    pushEventFeed(t("status.serverFull"));
   });
   wsChannel.on("state", (data) => {
     clearStateWatchdog();
@@ -3480,8 +3534,8 @@ function connectWebSocket(name: string) {
     connected = true;
     document.documentElement.dataset.transport = "websocket";
     audio.playConnection(true);
-    statusEl.textContent = "\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u043e.";
-    pushEventFeed("WebSocket online");
+    statusEl.textContent = t("status.connected");
+    pushEventFeed(t("status.websocketOnline"));
     updateNetworkHud();
     wsChannel.emit("join", joinRequestPayload(name));
   });
@@ -3495,8 +3549,8 @@ function connectWebSocket(name: string) {
     audio.playConnection(false);
     resetServerAudioCursor();
     resetStateInterpolation();
-    statusEl.textContent = "\u041e\u0442\u043a\u043b\u044e\u0447\u0435\u043d\u043e. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0438\u0433\u0440\u043e\u0432\u043e\u0439 \u0441\u0435\u0440\u0432\u0435\u0440.";
-    pushEventFeed("\u041e\u0442\u043a\u043b\u044e\u0447\u0435\u043d\u043e");
+    statusEl.textContent = t("status.disconnected");
+    pushEventFeed(t("status.disconnected"));
     updatePlayerChip();
     updateNetworkHud();
     document.documentElement.dataset.autoReconnect = String(settings.network.autoReconnect);
@@ -3516,8 +3570,8 @@ async function connectHttp(name: string, reason: string) {
   transportMode = "http";
   httpPollGeneration += 1;
   const generation = httpPollGeneration;
-  statusEl.textContent = "\u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u0435 HTTP fallback...";
-  pushEventFeed("HTTP fallback");
+  statusEl.textContent = t("status.httpFallbackConnecting");
+  pushEventFeed(t("status.httpFallback"));
   try {
     const payload = await postJson<{ ok: boolean; joined: JoinAccepted; state: ServerState }>("join", joinRequestPayload(name));
     httpClientId = payload.joined.id;
@@ -3531,8 +3585,8 @@ async function connectHttp(name: string, reason: string) {
   } catch (error) {
     connected = false;
     transportMode = "none";
-    statusEl.textContent = "\u041e\u0448\u0438\u0431\u043a\u0430 \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u044f. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0438\u0433\u0440\u043e\u0432\u043e\u0439 \u0441\u0435\u0440\u0432\u0435\u0440.";
-    pushEventFeed("\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u0435\u0442\u0438");
+    statusEl.textContent = t("status.connectionError");
+    pushEventFeed(t("status.networkError"));
     updateNetworkHud();
     console.warn("unsoccer http fallback failed", error);
   }
@@ -3550,8 +3604,8 @@ async function pollHttpState(generation: number) {
     } catch (error) {
       connected = false;
       audio.playConnection(false);
-      statusEl.textContent = "\u041e\u0442\u043a\u043b\u044e\u0447\u0435\u043d\u043e. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0438\u0433\u0440\u043e\u0432\u043e\u0439 \u0441\u0435\u0440\u0432\u0435\u0440.";
-      pushEventFeed("\u041f\u043e\u0442\u0435\u0440\u044f\u043d HTTP snapshot");
+      statusEl.textContent = t("status.disconnected");
+      pushEventFeed(t("status.httpSnapshotLost"));
       updateNetworkHud();
       console.warn("unsoccer http poll failed", error);
       await wait(1000);
@@ -3894,11 +3948,11 @@ function updateHud(state: ServerState) {
   document.documentElement.dataset.goalResetPhase = state.goalReset.phase;
   document.documentElement.dataset.goalResetRemainingMs = String(Math.round(state.goalReset.remainingMs));
   document.documentElement.dataset.goalResetReturnProgress = state.goalReset.returnProgress.toFixed(3);
-  const countdown = state.countdown > 0 ? ` \u0420\u043e\u0437\u044b\u0433\u0440\u044b\u0448 \u0447\u0435\u0440\u0435\u0437 ${(state.countdown / 1000).toFixed(1)}\u0441.` : "";
+  const countdown = state.countdown > 0 ? t("status.countdown", { seconds: (state.countdown / 1000).toFixed(1) }) : "";
   const goalResetText = state.goalReset.phase === "celebration"
-    ? ` \u041f\u0440\u0430\u0437\u0434\u043d\u043e\u0432\u0430\u043d\u0438\u0435 ${(state.goalReset.remainingMs / 1000).toFixed(1)}\u0441.`
+    ? t("status.celebration", { seconds: (state.goalReset.remainingMs / 1000).toFixed(1) })
     : state.goalReset.phase === "returning"
-      ? ` \u041c\u044f\u0447 \u043b\u0435\u0442\u0438\u0442 \u0432 \u0446\u0435\u043d\u0442\u0440 ${Math.round(state.goalReset.returnProgress * 100)}%.`
+      ? t("status.ballReturning", { progress: Math.round(state.goalReset.returnProgress * 100) })
       : "";
   const rawMessage = state.message;
   const message = translateServerMessage(rawMessage);
@@ -3909,31 +3963,30 @@ function updateHud(state: ServerState) {
     statusEl.title = rawMessage;
   } else if (!localJoin || localJoin.role === "spectator") {
     statusEl.title = "";
-    statusEl.textContent = `${statusMessage || "\u041d\u0430\u0431\u043b\u044e\u0434\u0435\u043d\u0438\u0435"}.${goalResetText || countdown || ""}`;
+    statusEl.textContent = `${statusMessage || t("status.observing")}.${goalResetText || countdown || ""}`;
   } else if (statusMessage) {
     statusEl.title = "";
     statusEl.textContent = `${statusMessage}.${goalResetText || countdown}`;
   } else {
     statusEl.title = "";
-    statusEl.textContent = `\u0412\u044b: ${teamNameLabel(localJoin.team)} #${localJoin.index + 1}.${goalResetText || countdown}`;
+    statusEl.textContent = `${t("player.youTeam", { team: teamNameLabel(localJoin.team), index: localJoin.index + 1 })}.${goalResetText || countdown}`;
   }
   rosterEl.innerHTML = state.players.map((player) => {
     const dot = player.team === 0 ? "blue" : player.team === 1 ? "orange" : "spectator";
-    const role = player.role === "player" ? teamNameLabel(player.team) : "\u0417\u0440\u0438\u0442\u0435\u043b\u044c";
-    const shortRole = player.role === "player" ? (player.team === 0 ? "\u0421" : "\u041e") : "\u0417";
-    const controllerBadge = player.controller === "bot" ? "\u0418\u0418" : player.controller === "test" ? "\u0422\u0415\u0421\u0422" : "";
-    const self = player.id === localJoin?.id ? "\u0432\u044b" : controllerBadge || shortRole;
+    const role = player.role === "player" ? teamNameLabel(player.team) : teamLabel(null, true);
+    const controllerBadge = localizedControllerBadge(player.controller);
     const goals = Math.max(0, Math.floor(player.goals || 0));
-    const title = controllerBadge ? `${role} • ${controllerBadge}` : role;
-    return `<div class="roster-row" title="${escapeHtml(title)}" data-player-goals="${goals}" data-controller="${escapeHtml(player.controller)}">${renderUserPicMarkup(player.userPic, "roster-avatar")}<i class="dot ${dot}"></i><span>${escapeHtml(player.name)}</span><b class="roster-goals" title="\u0413\u043e\u043b\u044b">${goals}</b><small>${self}</small></div>`;
+    const title = controllerBadge ? `${role} - ${controllerBadge}` : role;
+    return `<div class="roster-row" title="${escapeHtml(title)}" data-player-goals="${goals}" data-controller="${escapeHtml(player.controller)}"><i class="dot ${dot}"></i><span>${escapeHtml(displayPlayerName(player.name))}</span><b class="roster-goals" title="${escapeHtml(t("score.goals"))}">${goals}</b></div>`;
   }).join("");
   updateChatUi(state);
 }
 
 function updateWeatherHud(weather: WeatherSnapshot | undefined, dayTimeSeconds: number) {
   if (!weather) {
-    weatherEl.innerHTML = `<div class="weather-hud" role="img" aria-label="\u041f\u043e\u0433\u043e\u0434\u0430 \u043e\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044f"><span class="weather-icon">⌛</span>${weatherClockMarkup(dayTimeSeconds)}<span class="weather-pill">🌬️ --</span><span class="weather-pill">💧--</span><span class="weather-pill">🧊--</span><span class="weather-pill">⛄--</span><span class="weather-pill">🔄--</span></div>`;
-    weatherEl.title = "\u041f\u043e\u0433\u043e\u0434\u0430 \u043e\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044f";
+    const pending = t("weather.pendingLabel");
+    weatherEl.innerHTML = `<div class="weather-hud" role="img" aria-label="${escapeHtml(pending)}"><span class="weather-icon">⌛</span>${weatherClockMarkup(dayTimeSeconds)}<span class="weather-pill">🌬️ --</span><span class="weather-pill">💧--</span><span class="weather-pill">🧊--</span><span class="weather-pill">⛄--</span><span class="weather-pill">🔄--</span></div>`;
+    weatherEl.title = pending;
     document.documentElement.dataset.weatherLabel = "";
     document.documentElement.dataset.weatherHazards = "0";
     return;
@@ -3946,7 +3999,8 @@ function updateWeatherHud(weather: WeatherSnapshot | undefined, dayTimeSeconds: 
     { puddle: 0, slush: 0, snowbank: 0 }
   );
   const wind = Math.hypot(weather.wind.x, weather.wind.z);
-  document.documentElement.dataset.weatherLabel = weather.label;
+  const label = weatherKindLabel(weather.kind);
+  document.documentElement.dataset.weatherLabel = label;
   document.documentElement.dataset.weatherHazards = String(weather.hazards.length);
   document.documentElement.dataset.weatherPuddles = String(counts.puddle);
   document.documentElement.dataset.weatherSlush = String(counts.slush);
@@ -3956,20 +4010,25 @@ function updateWeatherHud(weather: WeatherSnapshot | undefined, dayTimeSeconds: 
   document.documentElement.dataset.weatherNextChangeMs = String(Math.round(weather.nextChangeInMs));
   const intensity = Math.round(weather.intensity * 100);
   const nextChangeSeconds = Math.ceil(weather.nextChangeInMs / 1000);
-  const summary =
-    `${weather.label}, ${intensity}%, \u0432\u0435\u0442\u0435\u0440 ${wind.toFixed(1)}, ` +
-    `\u0441\u043c\u0435\u043d\u0430 ${nextChangeSeconds}\u0441, \u043b\u0443\u0436\u0438 ${counts.puddle}, ` +
-    `\u0441\u043b\u044f\u043a\u043e\u0442\u044c ${counts.slush}, \u0441\u0443\u0433\u0440\u043e\u0431\u044b ${counts.snowbank}`;
+  const summary = t("weather.summary", {
+    label,
+    intensity,
+    wind: wind.toFixed(1),
+    change: nextChangeSeconds,
+    puddles: counts.puddle,
+    slush: counts.slush,
+    snowbanks: counts.snowbank
+  });
   weatherEl.title = summary;
   weatherEl.innerHTML =
     `<div class="weather-hud" role="img" aria-label="${escapeHtml(summary)}">` +
     `<span class="weather-icon">${weatherEmoji(weather.kind)}</span>` +
     weatherClockMarkup(dayTimeSeconds) +
-    `<span class="weather-pill" title="\u0421\u0438\u043b\u0430 \u043f\u043e\u0433\u043e\u0434\u044b">${intensity}%</span>` +
-    `<span class="weather-pill" title="\u0412\u0435\u0442\u0435\u0440">🌬️ ${wind.toFixed(1)}</span>` +
-    `<span class="weather-pill" title="\u041b\u0443\u0436\u0438">💧${counts.puddle}</span>` +
-    `<span class="weather-pill" title="\u0421\u043b\u044f\u043a\u043e\u0442\u044c">🧊${counts.slush}</span>` +
-    `<span class="weather-pill" title="\u0421\u0443\u0433\u0440\u043e\u0431\u044b">⛄${counts.snowbank}</span>` +
+    `<span class="weather-pill" title="${escapeHtml(t("weather.intensity"))}">${intensity}%</span>` +
+    `<span class="weather-pill" title="${escapeHtml(t("weather.wind"))}">🌬️ ${wind.toFixed(1)}</span>` +
+    `<span class="weather-pill" title="${escapeHtml(t("weather.puddles"))}">💧${counts.puddle}</span>` +
+    `<span class="weather-pill" title="${escapeHtml(t("weather.slush"))}">🧊${counts.slush}</span>` +
+    `<span class="weather-pill" title="${escapeHtml(t("weather.snowbanks"))}">⛄${counts.snowbank}</span>` +
     `</div>`;
 }
 
@@ -3978,30 +4037,24 @@ function isWeatherServerMessage(message: string): boolean {
 }
 
 function isTransientEventMessage(message: string): boolean {
-  return message.includes("\u0443\u0434\u0430\u0440\u0438\u043b")
-    || message.includes("\u0441\u044b\u0433\u0440\u0430\u043b \u0433\u043e\u043b\u043e\u0432\u043e\u0439")
-    || message.includes("\u043f\u0440\u043e\u0434\u0430\u0432\u0438\u043b")
-    || message.includes("\u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0438\u043b\u0441\u044f")
-    || message.includes("left-kicked")
-    || message.includes("right-kicked")
-    || message.includes("headed")
-    || message.includes("body-checked");
-}
-
-function weatherEmoji(kind: WeatherSnapshot["kind"]): string {
-  if (kind === "dawn") return "🌅";
-  if (kind === "rain") return "🌧️";
-  if (kind === "snow") return "🌨️";
-  return "☀️";
-}
-
-function weatherMessageEmoji(message: string): string {
   const normalized = message.toLowerCase();
-  if (normalized.includes("\u0440\u0430\u0441\u0441\u0432\u0435\u0442") || normalized.includes("dawn")) return "🌅";
-  if (normalized.includes("\u0434\u043e\u0436\u0434") || normalized.includes("rain")) return "🌧️";
-  if (normalized.includes("\u0441\u043d\u0435\u0433") || normalized.includes("snow")) return "🌨️";
-  if (normalized.includes("\u044f\u0441\u043d") || normalized.includes("clear")) return "☀️";
-  return "🌤️";
+  return normalized.includes("\u0443\u0434\u0430\u0440\u0438\u043b")
+    || normalized.includes("\u0441\u044b\u0433\u0440\u0430\u043b \u0433\u043e\u043b\u043e\u0432\u043e\u0439")
+    || normalized.includes("\u043f\u0440\u043e\u0434\u0430\u0432\u0438\u043b")
+    || normalized.includes("\u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0438\u043b\u0441\u044f")
+    || normalized.includes("\u043e\u0431\u043d\u043e\u0432\u0438\u043b \u043f\u0440\u043e\u0444\u0438\u043b\u044c")
+    || normalized.includes("\u0432\u044b\u0448\u0435\u043b")
+    || normalized.includes("joined")
+    || normalized.includes("updated profile")
+    || normalized.includes("left")
+    || normalized.includes("kicked")
+    || normalized.includes("hit with")
+    || normalized.includes("headed")
+    || normalized.includes("body-checked")
+    || normalized.includes("chipped")
+    || normalized.includes("drove the ball")
+    || normalized.includes("raises hands")
+    || normalized.includes("fist-pumps");
 }
 
 function weatherClockMarkup(dayTimeSeconds: number): string {
@@ -4019,32 +4072,83 @@ function weatherClockMarkup(dayTimeSeconds: number): string {
 }
 
 function teamNameLabel(team: TeamId | null): string {
-  if (team === 0) return "\u0421\u0438\u043d\u0438\u0435";
-  if (team === 1) return "\u041e\u0440\u0430\u043d\u0436\u0435\u0432\u044b\u0435";
-  return "\u0417\u0440\u0438\u0442\u0435\u043b\u0438";
+  return teamLabel(team);
+}
+
+function displayPlayerName(name: string): string {
+  return localizeGeneratedPlayerName(name);
+}
+
+function localizeGeneratedNamesInText(text: string): string {
+  return text.replace(/(?:Игрок|Player)\s+\d{1,4}/gi, (name) => localizeGeneratedPlayerName(name));
 }
 
 function translateServerMessage(message: string): string {
   if (!message) return "";
   if (isWeatherServerMessage(message)) return weatherMessageEmoji(message);
-  if (message === "Waiting for players") return "\u0416\u0434\u0451\u043c \u0438\u0433\u0440\u043e\u043a\u043e\u0432";
-  if (message === "Orange scores") return "\u041e\u0440\u0430\u043d\u0436\u0435\u0432\u044b\u0435 \u0437\u0430\u0431\u0438\u0432\u0430\u044e\u0442";
-  if (message === "Blue scores") return "\u0421\u0438\u043d\u0438\u0435 \u0437\u0430\u0431\u0438\u0432\u0430\u044e\u0442";
+  if (message === "Waiting for players" || message === "\u0416\u0434\u0451\u043c \u0438\u0433\u0440\u043e\u043a\u043e\u0432") return t("status.waitingPlayers");
+  if (message === "\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438 \u0438\u0433\u0440\u044b \u043f\u0440\u0438\u043c\u0435\u043d\u0435\u043d\u044b") return t("status.settingsApplied");
+  if (message === "\u041c\u044f\u0447 \u0432\u043e\u0437\u0432\u0440\u0430\u0449\u0430\u0435\u0442\u0441\u044f \u0432 \u0446\u0435\u043d\u0442\u0440") return t("status.ballReturningPlain");
+  if (message === "\u0420\u043e\u0437\u044b\u0433\u0440\u044b\u0448 \u0441 \u0446\u0435\u043d\u0442\u0440\u0430") return t("status.centerKickoff");
+  if (message === "Orange scores" || message === "\u041e\u0440\u0430\u043d\u0436\u0435\u0432\u044b\u0435 \u0437\u0430\u0431\u0438\u0432\u0430\u044e\u0442") return t("score.orange");
+  if (message === "Blue scores" || message === "\u0421\u0438\u043d\u0438\u0435 \u0437\u0430\u0431\u0438\u0432\u0430\u044e\u0442") return t("score.blue");
+  const orangeScore = message.match(/^(?:Orange scores|\u041e\u0440\u0430\u043d\u0436\u0435\u0432\u044b\u0435 \u0437\u0430\u0431\u0438\u0432\u0430\u044e\u0442):\s*(.+)$/);
+  if (orangeScore) return t("score.orangeWithScorer", { name: displayPlayerName(orangeScore[1]) });
+  const blueScore = message.match(/^(?:Blue scores|\u0421\u0438\u043d\u0438\u0435 \u0437\u0430\u0431\u0438\u0432\u0430\u044e\u0442):\s*(.+)$/);
+  if (blueScore) return t("score.blueWithScorer", { name: displayPlayerName(blueScore[1]) });
   const joined = message.match(/^(.+) joined (the pitch|as spectator)$/);
-  if (joined) return `${joined[1]} ${joined[2] === "the pitch" ? "\u0432\u044b\u0448\u0435\u043b \u043d\u0430 \u043f\u043e\u043b\u0435" : "\u0441\u0442\u0430\u043b \u0437\u0440\u0438\u0442\u0435\u043b\u0435\u043c"}`;
+  if (joined) return t(joined[2] === "the pitch" ? "server.joinedPitch" : "server.joinedSpectator", { name: displayPlayerName(joined[1]) });
+  const joinedPitch = message.match(/^(.+) \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0438\u043b\u0441\u044f \u043a \u043f\u043e\u043b\u044e$/);
+  if (joinedPitch) return t("server.joinedPitch", { name: displayPlayerName(joinedPitch[1]) });
+  const joinedSpectator = message.match(/^(.+) \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0438\u043b\u0441\u044f \u043a\u0430\u043a \u043d\u0430\u0431\u043b\u044e\u0434\u0430\u0442\u0435\u043b\u044c$/);
+  if (joinedSpectator) return t("server.joinedSpectator", { name: displayPlayerName(joinedSpectator[1]) });
   const left = message.match(/^(.+) left$/);
-  if (left) return `${left[1]} \u0432\u044b\u0448\u0435\u043b`;
+  if (left) return t("server.left", { name: displayPlayerName(left[1]) });
+  if (message === "\u0418\u0433\u0440\u043e\u043a \u0432\u044b\u0448\u0435\u043b") return t("server.playerLeft");
+  const ruLeft = message.match(/^(.+) \u0432\u044b\u0448\u0435\u043b$/);
+  if (ruLeft) return t("server.left", { name: displayPlayerName(ruLeft[1]) });
+  const profileUpdated = message.match(/^(.+) \u043e\u0431\u043d\u043e\u0432\u0438\u043b \u043f\u0440\u043e\u0444\u0438\u043b\u044c$/) || message.match(/^(.+) updated profile$/);
+  if (profileUpdated) return t("server.profileUpdated", { name: displayPlayerName(profileUpdated[1]) });
+  const ruBody = message.match(/^(.+) \u043f\u0440\u043e\u0434\u0430\u0432\u0438\u043b \u043c\u044f\u0447 \u043a\u043e\u0440\u043f\u0443\u0441\u043e\u043c$/);
+  if (ruBody) return t("server.bodyChecked", { name: displayPlayerName(ruBody[1]) });
+  const ruShot = message.match(/^(.+) (\u043f\u043e\u0434\u0431\u0440\u043e\u0441\u0438\u043b \u043c\u044f\u0447 \u0432\u0435\u0440\u0445\u043e\u043c|\u043f\u0440\u043e\u0431\u0438\u043b \u043c\u044f\u0447 \u043d\u0438\u0437\u043e\u043c)( \u0441 \u0443\u0441\u0438\u043b\u0435\u043d\u0438\u0435\u043c)?$/);
+  if (ruShot) {
+    const base = t(ruShot[2].includes("\u0432\u0435\u0440\u0445\u043e\u043c") ? "server.shotUpper" : "server.shotLow", { name: displayPlayerName(ruShot[1]) });
+    return `${base}${ruShot[3] ? t("server.withPower") : ""}`;
+  }
+  const ruAction = message.match(/^(.+) (\u0443\u0434\u0430\u0440\u0438\u043b \u043b\u0435\u0432\u043e\u0439 \u043d\u043e\u0433\u043e\u0439|\u0443\u0434\u0430\u0440\u0438\u043b \u043f\u0440\u0430\u0432\u043e\u0439 \u043d\u043e\u0433\u043e\u0439|\u0443\u0434\u0430\u0440\u0438\u043b \u043b\u0435\u0432\u043e\u0439 \u0440\u0443\u043a\u043e\u0439|\u0443\u0434\u0430\u0440\u0438\u043b \u043f\u0440\u0430\u0432\u043e\u0439 \u0440\u0443\u043a\u043e\u0439|\u0441\u044b\u0433\u0440\u0430\u043b \u0433\u043e\u043b\u043e\u0432\u043e\u0439|\u043f\u0440\u044b\u0433\u043d\u0443\u043b|\u0441\u044b\u0433\u0440\u0430\u043b \u043a\u043e\u0440\u043f\u0443\u0441\u043e\u043c)$/);
+  if (ruAction) {
+    const keys: Record<string, string> = {
+      "\u0443\u0434\u0430\u0440\u0438\u043b \u043b\u0435\u0432\u043e\u0439 \u043d\u043e\u0433\u043e\u0439": "server.leftFoot",
+      "\u0443\u0434\u0430\u0440\u0438\u043b \u043f\u0440\u0430\u0432\u043e\u0439 \u043d\u043e\u0433\u043e\u0439": "server.rightFoot",
+      "\u0443\u0434\u0430\u0440\u0438\u043b \u043b\u0435\u0432\u043e\u0439 \u0440\u0443\u043a\u043e\u0439": "server.leftHand",
+      "\u0443\u0434\u0430\u0440\u0438\u043b \u043f\u0440\u0430\u0432\u043e\u0439 \u0440\u0443\u043a\u043e\u0439": "server.rightHand",
+      "\u0441\u044b\u0433\u0440\u0430\u043b \u0433\u043e\u043b\u043e\u0432\u043e\u0439": "server.headed",
+      "\u043f\u0440\u044b\u0433\u043d\u0443\u043b": "server.jumped",
+      "\u0441\u044b\u0433\u0440\u0430\u043b \u043a\u043e\u0440\u043f\u0443\u0441\u043e\u043c": "server.bodyPlayed"
+    };
+    return t(keys[ruAction[2]], { name: displayPlayerName(ruAction[1]) });
+  }
+  const ruCelebration = message.match(/^(.+) (\u043f\u043e\u0434\u043d\u0438\u043c\u0430\u0435\u0442 \u0440\u0443\u043a\u0438 \u043f\u043e\u0441\u043b\u0435 \u0433\u043e\u043b\u0430|\u043f\u0440\u044b\u0433\u0430\u0435\u0442 \u0438 \u043a\u0430\u0447\u0430\u0435\u0442 \u0442\u0440\u0438\u0431\u0443\u043d\u044b|\u043a\u0438\u0432\u0430\u0435\u0442 \u0438 \u0434\u0435\u043b\u0430\u0435\u0442 \u0444\u0438\u0441\u0442-\u043f\u0430\u043c\u043f)$/);
+  if (ruCelebration) {
+    const keys: Record<string, string> = {
+      "\u043f\u043e\u0434\u043d\u0438\u043c\u0430\u0435\u0442 \u0440\u0443\u043a\u0438 \u043f\u043e\u0441\u043b\u0435 \u0433\u043e\u043b\u0430": "server.celebrate1",
+      "\u043f\u0440\u044b\u0433\u0430\u0435\u0442 \u0438 \u043a\u0430\u0447\u0430\u0435\u0442 \u0442\u0440\u0438\u0431\u0443\u043d\u044b": "server.celebrate2",
+      "\u043a\u0438\u0432\u0430\u0435\u0442 \u0438 \u0434\u0435\u043b\u0430\u0435\u0442 \u0444\u0438\u0441\u0442-\u043f\u0430\u043c\u043f": "server.celebrate3"
+    };
+    return t(keys[ruCelebration[2]], { name: displayPlayerName(ruCelebration[1]) });
+  }
   const action = message.match(/^(.+) (left-kicked|right-kicked|headed|body-checked) the ball$/);
   if (action) {
-    const verbs: Record<string, string> = {
-      "left-kicked": "\u0443\u0434\u0430\u0440\u0438\u043b \u043b\u0435\u0432\u043e\u0439 \u043d\u043e\u0433\u043e\u0439",
-      "right-kicked": "\u0443\u0434\u0430\u0440\u0438\u043b \u043f\u0440\u0430\u0432\u043e\u0439 \u043d\u043e\u0433\u043e\u0439",
-      headed: "\u0441\u044b\u0433\u0440\u0430\u043b \u0433\u043e\u043b\u043e\u0432\u043e\u0439",
-      "body-checked": "\u043f\u0440\u043e\u0434\u0430\u0432\u0438\u043b \u043c\u044f\u0447 \u043a\u043e\u0440\u043f\u0443\u0441\u043e\u043c"
+    const keys: Record<string, string> = {
+      "left-kicked": "server.leftFoot",
+      "right-kicked": "server.rightFoot",
+      headed: "server.headed",
+      "body-checked": "server.bodyChecked"
     };
-    return `${action[1]} ${verbs[action[2]] || "\u0441\u044b\u0433\u0440\u0430\u043b \u043c\u044f\u0447\u043e\u043c"}`;
+    return t(keys[action[2]], { name: displayPlayerName(action[1]) });
   }
-  return message;
+  return localizeGeneratedNamesInText(message);
 }
 
 function escapeHtml(value: string) {
@@ -4442,7 +4546,7 @@ function getPlayerOffscreenIndicator(player: PlayerSnapshot): HTMLElement {
   }
   indicator.classList.toggle("team-blue", player.team === 0);
   indicator.classList.toggle("team-orange", player.team === 1);
-  indicator.title = player.name;
+  indicator.title = displayPlayerName(player.name);
   return indicator;
 }
 
@@ -4544,6 +4648,7 @@ function onMobilePointerDown(event: PointerEvent): void {
   if (movePad) {
     mobileMovePointerId = event.pointerId;
     updateMobileMoveVector(event);
+    markControlHintsUsed("move");
     try {
       mobileMovePadEl.setPointerCapture(event.pointerId);
     } catch {
@@ -4563,6 +4668,7 @@ function onMobilePointerDown(event: PointerEvent): void {
 
   if (button.dataset.mobileDir) {
     mobileDirectionPointers.set(event.pointerId, button.dataset.mobileDir as MobileDirection);
+    markControlHintsUsed("move");
     updateResolvedInput();
     sendInput(true);
     return;
@@ -4571,6 +4677,7 @@ function onMobilePointerDown(event: PointerEvent): void {
   const action = button.dataset.mobileAction as MobileAction | undefined;
   if (!action) return;
   mobileActionPointers.set(event.pointerId, action);
+  markInputActionHintUsed(action);
   document.documentElement.dataset.mobileLastAction = action;
   document.documentElement.dataset.mobileLastActionAt = String(Math.round(performance.now()));
   if (action === "sprint") {
@@ -4658,12 +4765,14 @@ addEventListener("keydown", (event) => {
   if (isChatFocused()) return;
   if (actionPressed(settings.controls, "settings", new Set([event.code]))) {
     event.preventDefault();
+    markControlHintsUsed("menu");
     setSettingsOpen(!settingsOpen);
     return;
   }
   if (settingsOpen) return;
   pressedCodes.add(event.code);
   if (!event.repeat) {
+    markHintsForPressedCodes(new Set([event.code]));
     if (actionPressed(settings.controls, "leftKick", new Set([event.code]))) {
       input.kickLeftCharge = 0;
       input.kickLeftHeld = false;
@@ -4690,7 +4799,10 @@ addEventListener("keyup", (event) => {
   sendInput(true);
 });
 
-settingsButton.addEventListener("click", () => setSettingsOpen(true));
+settingsButton.addEventListener("click", () => {
+  markControlHintsUsed("menu");
+  setSettingsOpen(true);
+});
 settingsCloseButton.addEventListener("click", () => setSettingsOpen(false));
 muteButton.addEventListener("click", toggleMute);
 cameraResetButton.addEventListener("click", resetCamera);
@@ -4792,6 +4904,7 @@ canvas.addEventListener("pointerdown", (event) => {
   const mouseCodes = new Set([`Mouse${event.button}`]);
   let handled = false;
   if (actionPressed(settings.controls, "leftKick", mouseCodes)) {
+    markControlHintsUsed("leftKick");
     beginLeftKickCharge(event.pointerId);
     try {
       canvas.setPointerCapture(event.pointerId);
@@ -4801,11 +4914,13 @@ canvas.addEventListener("pointerdown", (event) => {
     handled = true;
   }
   if (actionPressed(settings.controls, "rightKick", mouseCodes)) {
+    markControlHintsUsed("rightKick");
     input.kickRight += 1;
     triggerLocalHandStrikePreview();
     handled = true;
   }
   if (actionPressed(settings.controls, "headHit", mouseCodes)) {
+    markControlHintsUsed("headHit");
     input.head += 1;
     handled = true;
   }

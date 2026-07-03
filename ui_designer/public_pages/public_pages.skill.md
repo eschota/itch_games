@@ -29,12 +29,19 @@ Use this file for UI Designer work inside
   background, screenshots, and asset manifest for Orbital Courier.
 - `unsoccer-public-pages.md`: Ragdoll Soccer II local route, catalog card,
   multiplayer status, and itch.io page brief.
-- `unsoccer-itch-page-copy.md`: live itch.io copy source for Ragdoll Soccer II.
+- `../../unsoccer/meta.json`: promoted RU/EN public marketing-copy source for
+  Ragdoll Soccer II catalog, `/unsoccer/`, and external store listings.
+- `unsoccer-itch-page-copy.md`: next itch.io copy source for Ragdoll Soccer II.
 - `unsoccer-itch-publishing-checklist.md`: operational publish checklist for
   the Ragdoll Soccer II itch.io page.
 - `unsoccer-itch-publication-v0.0.053.md`: live itch.io publication evidence
   for Ragdoll Soccer II v0.0.053, including butler upload/build IDs, browser
   smoke, and remaining description/media upload blockers.
+- `unsoccer-itch-visual-refresh-v0.0.054.md`: repo-side itch visual refresh
+  handoff using VK-derived public-page/store assets; external dashboard upload
+  remains an orchestrator/manual step.
+- `unsoccer-itch-assets/`: itch-specific cover, embed background, gallery
+  visual candidates, and historical draft screenshots for Ragdoll Soccer II.
 - `unsoccer-ui-settings-redesign-v0.0.008.md`: original UnSoccer UI/settings
   redesign brief; current status records the runtime implementation in
   `v0.0.009`.
@@ -64,8 +71,8 @@ Use this file for UI Designer work inside
   project 48793. Use it before every VK Play publish or iframe version
   increment.
 - `unsoccer-vkplay-assets/`: VK Play-specific store art derivatives for the
-  image/video fields, generated at VK-required dimensions from the current
-  UnSoccer media pack.
+  image/video fields, generated at VK-required dimensions and reused as the
+  source art for the v0.0.054 itch/local public-page refresh.
 - `prepare-vkplay-store-assets.py`: repeatable generator for the VK Play image
   and WEBM preview assets.
 - `prepare-vkplay-upload-pack.mjs`: repeatable VK Play staging-pack generator.
@@ -92,6 +99,9 @@ Use this file for UI Designer work inside
   source assets for a public-page brief.
 - When a brief changes source-controlled public pages, update `../../skill.md`,
   `../../skill.xml`, and the relevant folder skill.
+- Keep Ragdoll Soccer II player-facing public copy aligned with
+  `../../unsoccer/meta.json`; do not let local page, catalog, and store docs
+  diverge into separate marketing texts.
 - External itch.io edits must be recorded here with date, copy, screenshots, and
   publication notes.
 - VK Play updates must pass `unsoccer-vkplay-release-gate.md` before the

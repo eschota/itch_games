@@ -1,23 +1,32 @@
 # Ragdoll Soccer II Itch Storefront Assets
 
-Generated on 2026-07-01 from the production public pages on
-`https://io-games.mecharulez.com/`.
+Refreshed on 2026-07-03 from the VK Play visual pack in
+`ui_designer/public_pages/unsoccer-vkplay-assets/`.
 
-## Files
+## Current Upload Candidates
 
-- `cover-630x500.png`: itch.io cover image, 315:250 ratio.
-- `embed-background-1280x720.png`: optional itch.io embed/play background.
-- `screenshot-01-public-page-1280x720.png`: desktop production `/unsoccer/`
-  public-page screenshot.
-- `screenshot-02-public-page-mobile-390x844.png`: mobile production
+- `cover-630x500.png`: itch.io cover image, 315:250 ratio. Generated from the
+  VK album art with a readable title plate.
+- `embed-background-1280x720.png`: 16:9 itch.io embed/play background from the
+  VK album cover.
+- `screenshot-01-vk-art-1280x720.png`: wide VK background-art crop for the
+  first gallery slot or visual reference.
+
+## Historical Draft Captures
+
+- `screenshot-01-public-page-1280x720.png`: older desktop production
   `/unsoccer/` public-page screenshot.
-- `screenshot-03-catalog-1280x720.png`: production root catalog screenshot
-  showing the Ragdoll Soccer II card in context.
+- `screenshot-02-public-page-mobile-390x844.png`: older mobile production
+  `/unsoccer/` public-page screenshot.
+- `screenshot-03-catalog-1280x720.png`: older production root catalog
+  screenshot.
 
-## Notes
+## Source Notes
 
-- These are draft storefront/public-page assets from an earlier production
-  public route snapshot. They are not final `v0.0.009` runtime screenshots.
-- Do not treat them as final gameplay screenshots for an external itch.io
-  release. Final screenshots must come from the frozen uploaded build after the
-  multiplayer server URL strategy is confirmed.
+- VK source files remain in `unsoccer-vkplay-assets/` for platform-specific
+  upload slots.
+- Public runtime page copies live under `unsoccer/store-assets/` so local static
+  pages can use the art without exposing UI Designer working folders.
+- The current external itch.io page has not been verified with these media files
+  uploaded yet. Record the live upload evidence before marking the itch page
+  complete.

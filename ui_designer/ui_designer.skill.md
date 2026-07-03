@@ -43,6 +43,11 @@ Use this file for work inside `/itch_games/ui_designer`.
 - `flows/`: player journeys, state diagrams, menu and overlay flows.
 - `public_pages/`: local catalog, game entry page, itch.io listing, capsule,
   screenshot, metadata, and public copy briefs.
+- `public_pages/unsoccer-itch-visual-refresh-v0.0.054.md`: current Ragdoll
+  Soccer II repo-side itch visual refresh handoff using VK-derived assets.
+- `checks/unsoccer-itch-visual-refresh-v0.0.054/`: desktop/mobile/minimum
+  browser smoke screenshots and JSON for the v0.0.054 public/itch visual
+  refresh.
 - `wireframes/`: layout drafts and responsive sketches.
 - `copy/`: button labels, prompts, short UI text variants.
 - `references/`: UI references and source/license notes.

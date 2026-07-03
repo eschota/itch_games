@@ -1,0 +1,208 @@
+{
+  "schemaVersion": 1,
+  "projectKey": "unsoccer",
+  "slug": "ragdoll-soccer-ii",
+  "title": "Ragdoll Soccer II",
+  "version": "v0.0.054",
+  "status": "prototype",
+  "updatedAt": "2026-07-03",
+  "defaultLocale": "en",
+  "supportedLocales": [
+    "en",
+    "ru"
+  ],
+  "game": {
+    "title": "Ragdoll Soccer II",
+    "projectKey": "unsoccer",
+    "slug": "ragdoll-soccer-ii",
+    "version": "v0.0.054",
+    "catalogUrl": "/",
+    "publicUrl": "/unsoccer/",
+    "productionCatalogUrl": "https://io-games.mecharulez.com/",
+    "productionPublicUrl": "https://io-games.mecharulez.com/unsoccer/",
+    "itchUrl": "https://eschotagmailcom.itch.io/ragdoll-soccer-ii"
+  },
+  "assets": {
+    "icon": "store-assets/icon-256x256.png",
+    "heroBackground": "store-assets/hero-background-1544x380.png",
+    "heroAlbumCover": "store-assets/hero-album-cover-626x352.png",
+    "cover": "store-assets/itch-cover-630x500.png",
+    "embedBackground": "store-assets/embed-background-1280x720.png",
+    "portraitCover": "store-assets/portrait-cover-398x530.png",
+    "previewVideo": "store-assets/gameplay-preview-342x190.webm"
+  },
+  "locales": {
+    "en": {
+      "seo": {
+        "title": "Ragdoll Soccer II | Browser physics football",
+        "description": "Play browser ragdoll football with charged shots, tackles, bots, and messy physics goals."
+      },
+      "catalogShell": {
+        "seoTitle": "IO Games - Browser Arcade",
+        "kicker": "Browser arcade",
+        "intro": "Play fast browser games with instant launch, clear controls, and no install."
+      },
+      "catalog": {
+        "pill": "New match",
+        "kicker": "Browser physics football",
+        "title": "Full-contact ragdoll soccer",
+        "description": "Sprint, charge shots, collide, ragdoll, and battle bots for goals in a chaotic 3D courtyard match.",
+        "primaryCta": "Play",
+        "secondaryCta": "Itch.io"
+      },
+      "publicPage": {
+        "nav": {
+          "catalog": "Catalog",
+          "itch": "Itch.io",
+          "live": "Play"
+        },
+        "eyebrow": "Browser physics football",
+        "heroTitle": "Full-contact ragdoll soccer",
+        "heroSummary": "Sprint, charge shots, collide, ragdoll, and battle bots for goals in a chaotic 3D courtyard match.",
+        "primaryCta": "Play now",
+        "secondaryCta": "Open on itch.io",
+        "facts": [
+          {
+            "label": "No install",
+            "value": "Play in browser"
+          },
+          {
+            "label": "Online match",
+            "value": "Humans and bots share the pitch"
+          },
+          {
+            "label": "Full-contact",
+            "value": "Kicks, tackles, hand hits, head hits"
+          },
+          {
+            "label": "Controls",
+            "value": "WASD, mouse, Shift, Space"
+          }
+        ],
+        "sectionEyebrow": "Why it feels different",
+        "sectionTitle": "Every touch can turn into a collision, a tackle, or a flying ragdoll save.",
+        "sectionBody": "Ragdoll Soccer II turns a small courtyard pitch into a messy contact match: chase loose balls, use stamina for bursts, pick your angle, and survive the bodies around you.",
+        "bullets": [
+          "Jump into a match from the browser with no install.",
+          "Bots keep the pitch active while players connect.",
+          "Move with WASD, sprint with Shift, jump with Space, kick and strike with the mouse."
+        ],
+        "mediaLabel": "See it in motion",
+        "mediaText": "Watch the contact-heavy play loop: wild shots, knockdowns, bot pressure, and quick resets after every goal."
+      },
+      "storeListing": {
+        "title": "Ragdoll Soccer II",
+        "shortDescription": "Browser ragdoll soccer with bots, charged shots, stamina, knockdowns, RU/EN UI, and messy courtyard physics.",
+        "longDescription": [
+          "Ragdoll Soccer II is a browser HTML5 physics soccer prototype about messy street-football control: chase the ball, charge shots, sprint until stamina bites back, jump into tackles, and knock players into ragdoll chaos.",
+          "The match runs on a live authoritative server with WebSocket plus HTTP polling fallback. The browser build starts instantly and connects to the deployed game server for multiplayer.",
+          "Use WASD to move, Shift to sprint and power up, Space to jump, LMB to kick, RMB to strike with hands, and middle mouse for head hits."
+        ],
+        "tags": [
+          "football",
+          "physics",
+          "browser",
+          "sports",
+          "soccer",
+          "ragdoll",
+          "html5",
+          "multiplayer",
+          "prototype",
+          "bots"
+        ],
+        "features": [
+          "Fast browser launch with no install.",
+          "Bots keep matches active while players connect.",
+          "Charged shots, stamina bursts, kicks, hand hits, head hits, and ragdoll knockdowns.",
+          "RU/EN player-facing UI selected from device or browser language."
+        ]
+      }
+    },
+    "ru": {
+      "seo": {
+        "title": "Ragdoll Soccer II | Браузерный физический футбол",
+        "description": "Играйте в браузерный регдолл-футбол с заряженными ударами, столкновениями, ботами и хаотичными физическими голами."
+      },
+      "catalogShell": {
+        "seoTitle": "IO Games - Браузерная аркада",
+        "kicker": "Браузерная аркада",
+        "intro": "Играйте в быстрые браузерные игры с мгновенным запуском, понятным управлением и без установки."
+      },
+      "catalog": {
+        "pill": "Новый матч",
+        "kicker": "Браузерный физический футбол",
+        "title": "Регдолл-футбол с полным контактом",
+        "description": "Разгоняйтесь, заряжайте удары, врезайтесь, падайте в регдолл и сражайтесь с ботами за голы на хаотичном 3D-дворе.",
+        "primaryCta": "Играть",
+        "secondaryCta": "Itch.io"
+      },
+      "publicPage": {
+        "nav": {
+          "catalog": "Каталог",
+          "itch": "Itch.io",
+          "live": "Играть"
+        },
+        "eyebrow": "Браузерный физический футбол",
+        "heroTitle": "Регдолл-футбол с полным контактом",
+        "heroSummary": "Разгоняйтесь, заряжайте удары, врезайтесь, падайте в регдолл и сражайтесь с ботами за голы на хаотичном 3D-дворе.",
+        "primaryCta": "Играть сейчас",
+        "secondaryCta": "Открыть на itch.io",
+        "facts": [
+          {
+            "label": "Без установки",
+            "value": "Запуск в браузере"
+          },
+          {
+            "label": "Онлайн-матч",
+            "value": "Игроки и боты на одном поле"
+          },
+          {
+            "label": "Полный контакт",
+            "value": "Удары ногой, руками, головой и подкаты"
+          },
+          {
+            "label": "Управление",
+            "value": "WASD, мышь, Shift, Space"
+          }
+        ],
+        "sectionEyebrow": "Почему матч ощущается иначе",
+        "sectionTitle": "Каждое касание может стать столкновением, подкатом или спасением в полете.",
+        "sectionBody": "Ragdoll Soccer II превращает маленький дворовый стадион в контактный матч: догоняйте свободный мяч, тратьте выносливость на рывки, выбирайте угол удара и выдерживайте толпу вокруг.",
+        "bullets": [
+          "Заходите в матч прямо из браузера, без установки.",
+          "Боты поддерживают темп, пока подключаются игроки.",
+          "Двигайтесь на WASD, бегите с Shift, прыгайте на Space, бейте и толкайтесь мышью."
+        ],
+        "mediaLabel": "Игра в движении",
+        "mediaText": "Посмотрите основной цикл: дикие удары, нокдауны, давление ботов и быстрые розыгрыши после каждого гола."
+      },
+      "storeListing": {
+        "title": "Ragdoll Soccer II",
+        "shortDescription": "Браузерный регдолл-футбол с ботами, заряженными ударами, выносливостью, нокдаунами, RU/EN интерфейсом и хаотичной физикой двора.",
+        "longDescription": [
+          "Ragdoll Soccer II - HTML5-прототип физического футбола в браузере: догоняйте мяч, заряжайте удары, разгоняйтесь до потери выносливости, прыгайте в столкновения и отправляйте игроков в регдолл.",
+          "Матч работает через авторитетный сервер с WebSocket и HTTP polling fallback. Браузерная сборка запускается сразу и подключается к игровому серверу для мультиплеера.",
+          "WASD - движение, Shift - спринт и усиление, Space - прыжок, LMB - удар ногой, RMB - удар руками, средняя кнопка мыши - удар головой."
+        ],
+        "tags": [
+          "football",
+          "physics",
+          "browser",
+          "sports",
+          "soccer",
+          "ragdoll",
+          "html5",
+          "multiplayer",
+          "prototype",
+          "bots"
+        ],
+        "features": [
+          "Быстрый запуск в браузере без установки.",
+          "Боты поддерживают матч активным, пока подключаются игроки.",
+          "Заряженные удары, рывки на выносливости, удары ногой, руками, головой и регдолл-нокдауны.",
+          "Игровой RU/EN интерфейс выбирается по языку устройства или браузера."
+        ]
+      }
+    }
+  }
+}

@@ -9,6 +9,8 @@ Use this before changing the external Ragdoll Soccer II itch.io page.
 - Butler target: `eschotagmailcom/ragdoll-soccer-ii:html5`.
 - Current upload/build: upload `#18187910`, build `#1768259`, user version
   `v0.0.053`.
+- Next source target: `v0.0.054`; do not call it live on itch.io until the
+  butler upload, copy save, and media upload are verified.
 - Current page status: `Published`.
 - Current project type: `HTML`.
 - Current release status: `Prototype`.
@@ -53,13 +55,15 @@ $env:BUTLER_PATH="$env:LOCALAPPDATA\itch-games\butler\butler.exe"
 
 ## Assets
 
-- Target cover: `unsoccer-yandex-games-assets/cover-800x470.png` or a future
-  itch-specific 315:250 cover export.
-- Target screenshots: current gameplay screenshots from
-  `unsoccer-yandex-games-assets/`.
+- Target cover: `unsoccer-itch-assets/cover-630x500.png`.
+- Target embed background: `unsoccer-itch-assets/embed-background-1280x720.png`.
+- Target first gallery visual: `unsoccer-itch-assets/screenshot-01-vk-art-1280x720.png`.
+- Motion preview source: `../../unsoccer/store-assets/gameplay-preview-342x190.webm`.
 - Current blocker: Codex in-app browser can edit itch text/settings, but cannot
   select local files in itch.io file dialogs. Upload media manually or provide
   an itch media API/session upload path.
+- If itch rejects WEBM media, convert the preview to an accepted GIF/MP4 before
+  upload; keep the static cover/background PNGs as the mandatory visual refresh.
 
 ## Verification
 
@@ -68,7 +72,8 @@ $env:BUTLER_PATH="$env:LOCALAPPDATA\itch-games\butler\butler.exe"
 - Open the public page on desktop.
 - Press `Run match`.
 - Confirm the iframe URL uses the latest build id.
-- Confirm the iframe has one canvas and visible `v0.0.053 / 40.05 MB`.
+- Confirm the iframe has one canvas and the expected visible version/weight
+  for the published build.
 - Confirm the transport is `websocket` or HTTP fallback against the production
   server, not a 403 from `html-classic.itch.zone`.
 - Check console warnings. FBXLoader skinning/unsupported-map warnings are known

@@ -17,6 +17,7 @@ this browser game.
 - [orbital-courier/index.html](orbital-courier/index.html)
 - [ui_designer/public_pages/orbital-courier-public-pages.md](ui_designer/public_pages/orbital-courier-public-pages.md)
 - [unsoccer/index.html](unsoccer/index.html)
+- [unsoccer/meta.json](unsoccer/meta.json)
 - [unsoccer/client/index.html](unsoccer/client/index.html)
 - [unsoccer/client/src/styles.css](unsoccer/client/src/styles.css)
 - [ui_designer/public_pages/unsoccer-public-pages.md](ui_designer/public_pages/unsoccer-public-pages.md)
@@ -29,7 +30,8 @@ this browser game.
 - [ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md](ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md)
 - [ui_designer/public_pages/unsoccer-vkplay-release-gate.md](ui_designer/public_pages/unsoccer-vkplay-release-gate.md)
 - [ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md](ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md)
-- [ui_designer/public_pages/unsoccer-itch-publication-v0.0.052.md](ui_designer/public_pages/unsoccer-itch-publication-v0.0.052.md)
+- [ui_designer/public_pages/unsoccer-itch-publication-v0.0.053.md](ui_designer/public_pages/unsoccer-itch-publication-v0.0.053.md)
+- [ui_designer/public_pages/unsoccer-itch-visual-refresh-v0.0.054.md](ui_designer/public_pages/unsoccer-itch-visual-refresh-v0.0.054.md)
 - [ui_designer/public_pages/unsoccer-crazygames-upload-handoff-v0.0.053.md](ui_designer/public_pages/unsoccer-crazygames-upload-handoff-v0.0.053.md)
 - [ui_designer/public_pages/prepare-crazygames-upload-pack.mjs](ui_designer/public_pages/prepare-crazygames-upload-pack.mjs)
 

@@ -11,9 +11,10 @@ Checked from the working copy and public itch.io page on 2026-07-03.
 
 | Surface | Evidence | Status |
 | --- | --- | --- |
-| UnSoccer source/build target | `package.json` and `package.json.games.unsoccer.version` record `v0.0.053` | Public itch.io upload now matches `v0.0.053` |
+| UnSoccer source/build target | `package.json` and `package.json.games.unsoccer.version` record `v0.0.054` | Source target is ahead of the current itch.io upload |
 | UnSoccer upload package | `dist/unsoccer-itch.zip` was rebuilt with the itch-host default-server patch | Uploaded through butler to `eschotagmailcom/ragdoll-soccer-ii:html5` |
 | UnSoccer itch build | Butler status reports channel `html5`, upload `#18187910`, build `#1768259 (from #1768248)`, version `v0.0.053` | Public build active |
+| UnSoccer visual refresh assets | `unsoccer-itch-assets/cover-630x500.png`, `embed-background-1280x720.png`, and `screenshot-01-vk-art-1280x720.png` generated from VK art | Repo-side ready; external media upload still pending |
 | Static HTML5 contract | Itch upload is a static browser client and defaults to the live authoritative multiplayer server when hosted from `html-classic.itch.zone` | Embed smoke joined over WebSocket |
 | External itch.io | `https://eschotagmailcom.itch.io/ragdoll-soccer-ii` returned HTTP 200 and showed `PUBLISHED` | Public page live; full description copy still needs manual restoration |
 
@@ -61,13 +62,14 @@ Required final evidence:
 ### Ragdoll Soccer II
 
 - Local production URL: `https://io-games.mecharulez.com/unsoccer/`.
-- Current repo-local publication target: `v0.0.053`.
+- Current repo-local publication target: `v0.0.054`.
 - Current external itch.io publication status: published and smoke-checked on
   2026-07-03 as `v0.0.053`.
 - Upload package: `dist/unsoccer-itch.zip`.
 - Page copy: `unsoccer-itch-page-copy.md`.
 - Publish checklist: `unsoccer-itch-publishing-checklist.md`.
 - Publication evidence: `unsoccer-itch-publication-v0.0.053.md`.
+- Visual refresh handoff: `unsoccer-itch-visual-refresh-v0.0.054.md`.
 - Storefront assets: `unsoccer-itch-assets/`.
 - UI/settings redesign brief: `unsoccer-ui-settings-redesign-v0.0.008.md`.
 - UI/settings runtime evidence:
@@ -78,9 +80,10 @@ Required final evidence:
   roster, and `websocket` transport.
 - External itch.io project URL:
   `https://eschotagmailcom.itch.io/ragdoll-soccer-ii`.
-- Publication status: public itch.io page is live. Full description copy and
+- Publication status: public itch.io page is live at `v0.0.053`. The `v0.0.054`
+  visual/copy refresh is prepared repo-side, but full description copy and
   cover/screenshot media still need manual upload or an itch media API/session
-  upload path.
+  upload path before the external page can be called refreshed.
 
 Required final evidence:
 
@@ -95,7 +98,8 @@ Required final evidence:
   loads.
 - Exact live page copy does not yet match `unsoccer-itch-page-copy.md`; full
   description restoration is a manual blocker.
-- Screenshots/cover media: still pending manual upload.
+- Screenshots/cover media: refreshed files are prepared; external itch upload is
+  still pending.
 - Desktop embed smoke: recorded in `unsoccer-itch-publication-v0.0.053.md`.
 
 ## Rules

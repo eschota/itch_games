@@ -1,0 +1,152 @@
+{
+  "baseUrl": "http://127.0.0.1:5224",
+  "checkedAt": "2026-07-03T09:21:37.030Z",
+  "smokeResults": [
+    {
+      "viewport": {
+        "name": "desktop",
+        "width": 1440,
+        "height": 900
+      },
+      "root": {
+        "title": "IO Games - Browser Arcade",
+        "h1": "IO Games",
+        "noOverflow": true,
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "imagesOk": true,
+        "imageCount": 1,
+        "hasVersion": false
+      },
+      "unsoccer": {
+        "title": "Ragdoll Soccer II | IO Games",
+        "h1": "Physics soccer with full-contact chaos",
+        "noOverflow": true,
+        "scrollWidth": 1425,
+        "clientWidth": 1425,
+        "mediaOk": true,
+        "mediaCount": 3,
+        "internalText": false,
+        "hasVersion": true,
+        "buttonTexts": [
+          "IO Games",
+          "Catalog",
+          "Itch.io",
+          "Live build",
+          "Play live build",
+          "Open itch.io"
+        ]
+      }
+    },
+    {
+      "viewport": {
+        "name": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      "root": {
+        "title": "IO Games - Browser Arcade",
+        "h1": "IO Games",
+        "noOverflow": true,
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "imagesOk": true,
+        "imageCount": 1,
+        "hasVersion": false
+      },
+      "unsoccer": {
+        "title": "Ragdoll Soccer II | IO Games",
+        "h1": "Physics soccer with full-contact chaos",
+        "noOverflow": true,
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "mediaOk": true,
+        "mediaCount": 3,
+        "internalText": false,
+        "hasVersion": true,
+        "buttonTexts": [
+          "IO Games",
+          "Catalog",
+          "Itch.io",
+          "Live build",
+          "Play live build",
+          "Open itch.io"
+        ]
+      }
+    },
+    {
+      "viewport": {
+        "name": "minimum",
+        "width": 320,
+        "height": 640
+      },
+      "root": {
+        "title": "IO Games - Browser Arcade",
+        "h1": "IO Games",
+        "noOverflow": true,
+        "scrollWidth": 320,
+        "clientWidth": 320,
+        "imagesOk": true,
+        "imageCount": 1,
+        "hasVersion": false
+      },
+      "unsoccer": {
+        "title": "Ragdoll Soccer II | IO Games",
+        "h1": "Physics soccer with full-contact chaos",
+        "noOverflow": true,
+        "scrollWidth": 320,
+        "clientWidth": 320,
+        "mediaOk": true,
+        "mediaCount": 3,
+        "internalText": false,
+        "hasVersion": true,
+        "buttonTexts": [
+          "IO Games",
+          "Catalog",
+          "Itch.io",
+          "Live build",
+          "Play live build",
+          "Open itch.io"
+        ]
+      }
+    }
+  ],
+  "assetChecks": [
+    {
+      "url": "/unsoccer/store-assets/hero-album-cover-626x352.png",
+      "status": 200,
+      "contentType": "image/png",
+      "length": 412547
+    },
+    {
+      "url": "/unsoccer/store-assets/hero-background-1544x380.png",
+      "status": 200,
+      "contentType": "image/png",
+      "length": 904182
+    },
+    {
+      "url": "/unsoccer/store-assets/gameplay-preview-342x190.webm",
+      "status": 200,
+      "contentType": "video/webm",
+      "length": 188570
+    },
+    {
+      "url": "/ui_designer/public_pages/unsoccer-itch-assets/cover-630x500.png",
+      "status": 200,
+      "contentType": "image/png",
+      "length": 447190
+    },
+    {
+      "url": "/ui_designer/public_pages/unsoccer-itch-assets/embed-background-1280x720.png",
+      "status": 200,
+      "contentType": "image/png",
+      "length": 1304050
+    },
+    {
+      "url": "/ui_designer/public_pages/unsoccer-itch-assets/screenshot-01-vk-art-1280x720.png",
+      "status": 200,
+      "contentType": "image/png",
+      "length": 1095730
+    }
+  ]
+}

@@ -200,6 +200,7 @@
       <rule>When GitHub CLI or connector access is unavailable, repository settings and webhooks may be managed through the logged-in Codex in-app Browser session; browser-driven GitHub changes must be reported in /ai_chat and verified through webhook delivery evidence or production health.</rule>
       <rule>Primary autodeploy is triggered by a signed GitHub push webhook. Moscow may also be triggered by the primary-to-Moscow deploy relay or by the Moscow fallback timer while GitHub-side hook creation is blocked.</rule>
       <rule>Webhook deploys must expose the latest result in /ai_chat/api/deploy-health.last_deploy, queue the newest main push while another deploy is running, and fail visibly if an autodeploy lock cannot be acquired.</rule>
+      <rule>Duplicate webhook deliveries for the same running or queued commit must be ignored instead of starting another deploy against the same lock.</rule>
       <rule>Primary webhook execution must fall back to the repo qwertystock deploy script when a stale service environment points AI_CHAT_DEPLOY_SCRIPT at the legacy /usr/local/bin/itch-games-autodeploy.sh path.</rule>
       <deployRelay source="https://io-games.mecharulez.com/ai_chat/api/deploy-webhook" target="https://moscow-io-games.mecharulez.com/ai_chat/api/deploy-relay" allowSourceIp="145.239.0.57" />
       <rule>Telegram bridge uses /ai_chat/api/telegram-webhook, accepts only the configured group, and relays real-user messages as Producer messages.</rule>

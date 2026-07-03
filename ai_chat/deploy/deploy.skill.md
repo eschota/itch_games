@@ -152,7 +152,9 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
   completion/failure to `/ai_chat`.
 - `/ai_chat/api/deploy-health` must expose `last_deploy` and `deploy_queued`
   so webhook deploys are observable after GitHub receives the initial 202. A
-  running deploy must queue the newest main push instead of dropping it.
+  running deploy must queue the newest main push instead of dropping it, but a
+  duplicate webhook for the already running or queued commit must be ignored
+  instead of launching a second same-head deploy.
 - The qwertystock autodeploy entrypoint may detach the long-running deploy work
   into a locked `nohup` child for manual CLI invocations, but the Node webhook
   runner must set `ITCH_GAMES_DEPLOY_DETACHED=1` and run the script in the

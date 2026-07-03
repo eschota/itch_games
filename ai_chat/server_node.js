@@ -29,6 +29,7 @@ const MAX_MEDIA_UPLOAD_BYTES = 80 * 1024 * 1024;
 const MAX_MEDIA_ATTACHMENTS = 8;
 let deployRunning = false;
 let deployQueuedPayload = null;
+let activeDeployHeadId = "";
 let unsoccerChild = null;
 let unsoccerLastStart = null;
 let unsoccerLastExit = null;
@@ -1448,9 +1449,20 @@ async function relayDeployWebhook(body, headers, payload) {
 }
 
 function runDeployFromWebhook(payload) {
+  const summary = deployPayloadSummary(payload);
   if (deployRunning) {
+    const queuedSummary = deployQueuedPayload ? deployPayloadSummary(deployQueuedPayload) : null;
+    if (summary.head_id === activeDeployHeadId || summary.head_id === queuedSummary?.head_id) {
+      writeDeployStatus({
+        running: true,
+        queued: queuedSummary,
+        note: `duplicate deploy ignored for ${summary.head_id}`,
+      });
+      appendMessage("Deploy Webhook", `Duplicate deploy webhook for \`${summary.ref}\` at \`${summary.head_id}\` ignored; that commit is already running or queued.`);
+      return;
+    }
     deployQueuedPayload = payload;
-    const queued = deployPayloadSummary(payload);
+    const queued = summary;
     writeDeployStatus({
       running: true,
       queued,
@@ -1460,9 +1472,9 @@ function runDeployFromWebhook(payload) {
     return;
   }
   deployRunning = true;
-  const summary = deployPayloadSummary(payload);
   const ref = summary.ref;
   const headId = summary.head_id;
+  activeDeployHeadId = headId;
   appendMessage("Deploy Webhook", `GitHub push received for \`${ref}\` at \`${headId}\`. Starting autodeploy.`);
   const script = deployScriptPath();
   const startedAt = nowIso();
@@ -1513,6 +1525,7 @@ function runDeployFromWebhook(payload) {
       appendMessage("Deploy Webhook", `Autodeploy failed for \`${ref}\` with exit ${exitCode}.\n${output}`);
     }
     deployRunning = false;
+    activeDeployHeadId = "";
     const nextPayload = deployQueuedPayload;
     deployQueuedPayload = null;
     if (nextPayload) {

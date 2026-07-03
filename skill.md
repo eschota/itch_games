@@ -136,7 +136,8 @@ Use this root skill when changing, packaging, validating, or publishing the
 - GitHub webhook deploys must be observable in
   `/ai_chat/api/deploy-health.last_deploy`; if a deploy is already running,
   queue the newest main push and report lock contention as a visible failure
-  instead of silently dropping it.
+  instead of silently dropping it. Duplicate webhooks for the same running or
+  queued commit must be ignored rather than starting a second deploy.
 - Primary webhooks must run the repo qwertystock deploy script even if a stale
   service environment still points `AI_CHAT_DEPLOY_SCRIPT` at the old
   `/usr/local/bin/itch-games-autodeploy.sh`.

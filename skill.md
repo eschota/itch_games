@@ -137,6 +137,9 @@ Use this root skill when changing, packaging, validating, or publishing the
   `/ai_chat/api/deploy-health.last_deploy`; if a deploy is already running,
   queue the newest main push and report lock contention as a visible failure
   instead of silently dropping it.
+- Primary webhooks must run the repo qwertystock deploy script even if a stale
+  service environment still points `AI_CHAT_DEPLOY_SCRIPT` at the old
+  `/usr/local/bin/itch-games-autodeploy.sh`.
 - This local clone uses `git config core.hooksPath tools/hooks`, where
   `tools/hooks/post-commit` runs
   `tools/hooks/unsoccer_post_commit_autodeploy.ps1`. Commits to `main` push to

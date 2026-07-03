@@ -558,6 +558,15 @@ function deployOutputTail(stdout, stderr) {
   return output || "no output";
 }
 
+function deployScriptPath() {
+  const fallback = path.join(ROOT, "ai_chat", "deploy", "itch-games-autodeploy-qwertystock.sh");
+  const configured = String(process.env.AI_CHAT_DEPLOY_SCRIPT || "").trim();
+  if (!configured) return fallback;
+  if (configured === "/usr/local/bin/itch-games-autodeploy.sh") return fallback;
+  if (!fs.existsSync(configured)) return fallback;
+  return configured;
+}
+
 function cleanText(value, maxChars) {
   return String(value || "").trim().slice(0, maxChars || MAX_TASK_TEXT_CHARS);
 }
@@ -1455,7 +1464,7 @@ function runDeployFromWebhook(payload) {
   const ref = summary.ref;
   const headId = summary.head_id;
   appendMessage("Deploy Webhook", `GitHub push received for \`${ref}\` at \`${headId}\`. Starting autodeploy.`);
-  const script = process.env.AI_CHAT_DEPLOY_SCRIPT || path.join(ROOT, "ai_chat", "deploy", "itch-games-autodeploy-qwertystock.sh");
+  const script = deployScriptPath();
   const startedAt = nowIso();
   writeDeployStatus({
     running: true,
@@ -1762,6 +1771,7 @@ async function deployHealthSnapshot() {
     deploy_running: deployRunning,
     deploy_queued: deployQueuedPayload ? deployPayloadSummary(deployQueuedPayload) : null,
     last_deploy: readDeployStatus(),
+    deploy_script: deployScriptPath(),
     deploy_relay: deployRelayHealth(),
     urls: {
       public_game: `${publicBaseUrl}/unsoccer/`,

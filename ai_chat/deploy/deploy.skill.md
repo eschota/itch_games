@@ -85,6 +85,10 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
   `AI_CHAT_DEPLOY_SCRIPT=/home/generic/itch_games/ai_chat/deploy/itch-games-autodeploy-qwertystock.sh`
   after loading `/etc/itch-games-ai-chat.env` so stale server env values cannot
   redirect webhooks to an old deploy script.
+- `ai_chat/server_node.js` must also ignore the legacy primary
+  `/usr/local/bin/itch-games-autodeploy.sh` path and fall back to the repo
+  qwertystock script, because a previously installed unit can keep the stale env
+  until a successful deploy rewrites and restarts the service.
 - The qwertystock chat unit must force `UNSOCCER_AUTOSTART=1` after loading
   `/etc/itch-games-ai-chat.env`; otherwise an old server env can keep the
   fallback child disabled while `/unsoccer/api/health` stays 502.

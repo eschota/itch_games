@@ -708,6 +708,30 @@ function toggleRagdoll(): void {
   else activateRagdoll(7.4, true);
 }
 
+function resetCharacterRuntimeState(): void {
+  keys.clear();
+  velocity.set(0, 0, 0);
+  position.set(0, 0, 0);
+  desired.set(0, 0, 0);
+  lastAction = null;
+  lastActionSide = null;
+  lastActionAt = 0;
+  nextFootStrikeSide = "left";
+  celebration = null;
+  celebrationAt = 0;
+  celebrationAvailableUntil = 0;
+  stamina = 100;
+  verticalVelocity = 0;
+  airborne = false;
+  ragdoll = false;
+  ragdollAt = 0;
+  ragdollManual = false;
+  sprinting = false;
+  sprintJumpUntil = 0;
+  yaw = Math.PI;
+  syncRagdollButton();
+}
+
 function celebrate(action: CelebrationKind): void {
   if (ragdoll) return;
   celebration = action;
@@ -884,6 +908,7 @@ async function selectCharacter(indexOrGuid: number | string): Promise<void> {
     : rosterAssets.findIndex((entry) => entry.guid === indexOrGuid);
   if (nextIndex < 0) return;
   assetViewMode = "character";
+  resetCharacterRuntimeState();
   updateModeUi();
   removeEnvironmentPreview();
   document.documentElement.dataset.environmentAssetGuid = "";

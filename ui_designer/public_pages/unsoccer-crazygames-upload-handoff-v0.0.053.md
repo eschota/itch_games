@@ -15,24 +15,34 @@ Generated on 2026-07-03 for CrazyGames Developer Portal.
 The open browser form is filled up to the required file upload step:
 
 - Game name: `Ragdoll Soccer II`
-- Game engine: `HTML5`
+- Game engine: `Externally hosted (iframe)`
+- IFrame link:
+  `https://moscow-io-games.mecharulez.com/unsoccer/?source=crazygames&version=v0.0.053`
 - Save progress: `No, the game does not need progress save`
 - Mobile support: unchecked
-- Online multiplayer: checked
-- Multiplayer lobby size: min `1`, max `4`
+- Online multiplayer: unchecked for the Basic Launch form
 - CrazyGames SDK audio mute support: unchecked
 
-Mobile and SDK audio support are intentionally unchecked until a dedicated
-CrazyGames mobile QA pass and CrazyGames SDK integration exist.
+Mobile, online multiplayer, and SDK audio support are intentionally unchecked
+until dedicated CrazyGames mobile QA and CrazyGames SDK integration exist. The
+portal warns that multiplayer submissions need invite-link functionality and
+`IsInstantMultiplayer`; the current game does not implement those CrazyGames SDK
+features yet.
 
-## Current Upload Archive
+Preview was clicked after filling the iframe form, then retried after blurring
+the URL field with a force-click. The page stayed on step 1 without a visible
+validation message, invalid form field, new tab, or console error; do not mark
+the CrazyGames submission as complete until the portal advances past Preview and
+the final Submit succeeds.
+
+## Fallback HTML5 Upload Archive
 
 - Archive source: `dist/unsoccer-itch.zip`
 - Manual-upload staging folder: `dist/crazygames-upload-v0.0.053/`
 - Archive: `dist/crazygames-upload-v0.0.053/01-unsoccer-crazygames-v0.0.053.zip`
 - Archive size: `22,976,522` bytes
 - Archive SHA-256:
-  `af037e1587fd9f7c6264a73a50308ec0282909f76afde256f8f0d066f7f0834e`
+  `bbf7b22b4699c0b9604fc4bec1a7ff9933f4659e451a96f2f2db4ac25a9ecdd7`
 - Root `index.html`: present
 - Detected version in archive: `v0.0.053`
 - Visible weight label in archive: `40.05 MB`
@@ -52,9 +62,16 @@ custom CrazyGames SDK integration, but technical limits still apply.
 - Paths in `index.html` are relative asset refs.
 - SDK/ads are not claimed in the form.
 
+Important runtime note: the hosted ZIP is a fallback pack only. The current
+client defaults to same-origin `/unsoccer/api` and `/unsoccer/socket/ws` outside
+localhost/itch, so a CrazyGames-hosted ZIP would try to connect to the
+CrazyGames domain unless the client is patched or the submission uses the iframe
+URL above.
+
 ## Upload Order
 
-Use files from `dist/crazygames-upload-v0.0.053/`.
+Use files from `dist/crazygames-upload-v0.0.053/` only if CrazyGames requires a
+hosted HTML5 ZIP instead of the iframe URL.
 
 1. Upload `01-unsoccer-crazygames-v0.0.053.zip` to `Upload files *`.
 2. Click `Preview`.
@@ -72,10 +89,13 @@ Use files from `dist/crazygames-upload-v0.0.053/`.
 
 - Codex in-app Browser can fill text, radio, checkbox, and combobox controls in
   the CrazyGames form.
-- Codex in-app Browser cannot select the local ZIP in the `Upload files *`
-  file input.
-- Actual submission still requires manual file selection, a browser automation
+- In iframe mode, Codex filled the live Moscow URL and clicked `Preview`, but the
+  portal remained on step 1 without a visible error.
+- In HTML5 upload mode, Codex in-app Browser cannot select the local ZIP in the
+  `Upload files *` file input.
+- Actual submission still requires the portal to advance past Preview, manual
+  file selection if CrazyGames requires HTML5 upload, a browser automation
   surface with file-upload support, or a CrazyGames API/session upload path.
 
-Do not mark CrazyGames as submitted until the uploaded ZIP is selected, preview
-passes, and the final submit action succeeds.
+Do not mark CrazyGames as submitted until Preview/QA passes and the final submit
+action succeeds.

@@ -120,7 +120,19 @@ Current generated folder: `dist/vkplay-upload-9572-v0.0.052/`
 
 ## Upload Files
 
-Use the numbered files from `dist/vkplay-upload-9572-v0.0.052/`.
+Use the VK Play-specific files from
+`ui_designer/public_pages/unsoccer-vkplay-assets/` for the current dashboard
+`Images` tab:
+
+1. `vkplay-album-cover-626x352.png` - `Album Cover`.
+2. `vkplay-portrait-cover-398x530.png` - `Portrait Cover`.
+3. `vkplay-background-art-1544x380.png` - `Background Art`.
+4. `vkplay-video-preview-342x190.webm` - `Video Preview`.
+5. `vkplay-desktop-icon-256x256.png` - `Desktop Icon Shortcut`.
+6. `vkplay-game-loading-image-1000x1000.png` - `Game Loading Image`.
+
+The numbered files from `dist/vkplay-upload-9572-v0.0.052/` remain the general
+staging pack:
 
 1. `01-browser-build-v0.0.052.zip` - browser build archive, only if VK Play asks
    for a hosted build instead of the iframe URL.

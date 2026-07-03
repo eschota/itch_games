@@ -1,0 +1,40 @@
+[
+  {
+    "file": "ui_designer\\public_pages\\unsoccer-vkplay-assets\\vkplay-album-cover-626x352.png",
+    "size": 412547,
+    "width": 626,
+    "height": 352
+  },
+  {
+    "file": "ui_designer\\public_pages\\unsoccer-vkplay-assets\\vkplay-portrait-cover-398x530.png",
+    "size": 353120,
+    "width": 398,
+    "height": 530
+  },
+  {
+    "file": "ui_designer\\public_pages\\unsoccer-vkplay-assets\\vkplay-background-art-1544x380.png",
+    "size": 904182,
+    "width": 1544,
+    "height": 380
+  },
+  {
+    "file": "ui_designer\\public_pages\\unsoccer-vkplay-assets\\vkplay-desktop-icon-256x256.png",
+    "size": 148614,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "file": "ui_designer\\public_pages\\unsoccer-vkplay-assets\\vkplay-game-loading-image-1000x1000.png",
+    "size": 1092092,
+    "width": 1000,
+    "height": 1000
+  },
+  {
+    "file": "ui_designer\\public_pages\\unsoccer-vkplay-assets\\vkplay-video-preview-342x190.webm",
+    "size": 188570,
+    "width": 342,
+    "height": 190,
+    "frames": 64,
+    "fps": 12
+  }
+]

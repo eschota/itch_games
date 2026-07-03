@@ -63,6 +63,11 @@ Use this file for UI Designer work inside
 - `unsoccer-vkplay-release-gate.md`: permanent VK Play release/update gate for
   project 48793. Use it before every VK Play publish or iframe version
   increment.
+- `unsoccer-vkplay-assets/`: VK Play-specific store art derivatives for the
+  image/video fields, generated at VK-required dimensions from the current
+  UnSoccer media pack.
+- `prepare-vkplay-store-assets.py`: repeatable generator for the VK Play image
+  and WEBM preview assets.
 - `prepare-vkplay-upload-pack.mjs`: repeatable VK Play staging-pack generator.
   Run after `python tools/package_itch.py unsoccer` for each new UnSoccer
   release; it verifies the archive version/weight/assets and writes

@@ -42,6 +42,8 @@ Use this root skill when changing, packaging, validating, or publishing the
     `ui_designer/public_pages/verify-yandex-upload-pack.mjs`
   - UnSoccer VK Play handoff:
     `ui_designer/public_pages/unsoccer-vkplay-release-gate.md`,
+    `ui_designer/public_pages/unsoccer-vkplay-assets/`,
+    `ui_designer/public_pages/prepare-vkplay-store-assets.py`,
     `ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md`,
     `ui_designer/public_pages/prepare-vkplay-upload-pack.mjs`
   - UnSoccer CrazyGames handoff:

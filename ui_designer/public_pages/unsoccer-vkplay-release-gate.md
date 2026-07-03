@@ -91,7 +91,23 @@ After the local and live gates pass:
 
 ## Store Media Mapping
 
-Use files from `dist/vkplay-upload-9572-{GAME_VERSION}/`:
+Use VK-specific files from `ui_designer/public_pages/unsoccer-vkplay-assets/`:
+
+- `vkplay-album-cover-626x352.png`: `Album Cover`.
+- `vkplay-portrait-cover-398x530.png`: `Portrait Cover`.
+- `vkplay-background-art-1544x380.png`: `Background Art`.
+- `vkplay-video-preview-342x190.webm`: `Video Preview`.
+- `vkplay-desktop-icon-256x256.png`: `Desktop Icon Shortcut`.
+- `vkplay-game-loading-image-1000x1000.png`: `Game Loading Image`.
+
+Regenerate them after changing source art:
+
+```powershell
+C:\Users\escho\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe ui_designer/public_pages/prepare-vkplay-store-assets.py
+```
+
+The `dist/vkplay-upload-9572-{GAME_VERSION}/` files are the general staging
+pack and source media fallback:
 
 - `02-icon-512x512.png`: desktop/icon upload.
 - `03-cover-800x470.png`: horizontal/catalog cover when accepted.

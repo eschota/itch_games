@@ -123,8 +123,7 @@ Developer Portal:
 - Game name: Ragdoll Soccer II
 - Engine: HTML5
 - Save progress: No, the game does not need progress save
-- Multiplayer: Yes
-- Multiplayer lobby size: 1 min / 4 max
+- Multiplayer: No for Basic Launch until CrazyGames SDK invite/instant flow exists
 - Mobile support: No, leave unchecked until CrazyGames mobile QA is complete
 - CrazyGames SDK audio mute support: No, leave unchecked until SDK integration exists
 

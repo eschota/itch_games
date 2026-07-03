@@ -24,6 +24,8 @@
     <child path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md" role="unsoccer-yandex-games-upload-handoff-v0.0.033-archive" />
     <child path="ui_designer/public_pages/verify-yandex-upload-pack.mjs" role="unsoccer-yandex-games-upload-pack-verifier" />
     <child path="ui_designer/public_pages/unsoccer-vkplay-release-gate.md" role="unsoccer-vkplay-release-gate" />
+    <child path="ui_designer/public_pages/unsoccer-vkplay-assets" role="unsoccer-vkplay-store-assets" />
+    <child path="ui_designer/public_pages/prepare-vkplay-store-assets.py" role="unsoccer-vkplay-store-assets-generator" />
     <child path="ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md" role="unsoccer-vkplay-upload-handoff-current" />
     <child path="ui_designer/public_pages/prepare-vkplay-upload-pack.mjs" role="unsoccer-vkplay-upload-pack-generator" />
     <child path="ui_designer/public_pages/unsoccer-crazygames-upload-handoff-v0.0.053.md" role="unsoccer-crazygames-upload-handoff-current" />
@@ -138,6 +140,8 @@
           <node path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="yandex-games-upload-handoff-current" owner="UI Designer" />
           <node path="ui_designer/public_pages/verify-yandex-upload-pack.mjs" role="yandex-games-upload-pack-verifier" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-vkplay-release-gate.md" role="vkplay-release-gate" owner="UI Designer" />
+          <node path="ui_designer/public_pages/unsoccer-vkplay-assets" role="vkplay-store-assets" owner="UI Designer" />
+          <node path="ui_designer/public_pages/prepare-vkplay-store-assets.py" role="vkplay-store-assets-generator" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md" role="vkplay-upload-handoff-current" owner="UI Designer" />
           <node path="ui_designer/public_pages/prepare-vkplay-upload-pack.mjs" role="vkplay-upload-pack-generator" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-crazygames-upload-handoff-v0.0.053.md" role="crazygames-upload-handoff-current" owner="UI Designer" />
@@ -251,6 +255,8 @@
       <artifact path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="unsoccer-yandex-games-upload-handoff-current" />
       <artifact path="ui_designer/public_pages/verify-yandex-upload-pack.mjs" role="unsoccer-yandex-games-upload-pack-verifier" />
       <artifact path="ui_designer/public_pages/unsoccer-vkplay-release-gate.md" role="unsoccer-vkplay-release-gate" />
+      <artifact path="ui_designer/public_pages/unsoccer-vkplay-assets" role="unsoccer-vkplay-store-assets" />
+      <artifact path="ui_designer/public_pages/prepare-vkplay-store-assets.py" role="unsoccer-vkplay-store-assets-generator" />
       <artifact path="ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md" role="unsoccer-vkplay-upload-handoff-current" />
       <artifact path="ui_designer/public_pages/prepare-vkplay-upload-pack.mjs" role="unsoccer-vkplay-upload-pack-generator" />
       <artifact path="ui_designer/public_pages/unsoccer-crazygames-upload-handoff-v0.0.053.md" role="unsoccer-crazygames-upload-handoff-current" />
@@ -394,6 +400,8 @@
     <surface path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="unsoccer-yandex-games-upload-handoff-current" />
     <surface path="ui_designer/public_pages/verify-yandex-upload-pack.mjs" role="unsoccer-yandex-games-upload-pack-verifier" />
     <surface path="ui_designer/public_pages/unsoccer-vkplay-release-gate.md" role="unsoccer-vkplay-release-gate" />
+    <surface path="ui_designer/public_pages/unsoccer-vkplay-assets" role="unsoccer-vkplay-store-assets" />
+    <surface path="ui_designer/public_pages/prepare-vkplay-store-assets.py" role="unsoccer-vkplay-store-assets-generator" />
     <surface path="ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md" role="unsoccer-vkplay-upload-handoff-current" />
     <surface path="ui_designer/public_pages/prepare-vkplay-upload-pack.mjs" role="unsoccer-vkplay-upload-pack-generator" />
     <surface path="ui_designer/public_pages/unsoccer-crazygames-upload-handoff-v0.0.053.md" role="unsoccer-crazygames-upload-handoff-current" />

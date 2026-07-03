@@ -126,6 +126,8 @@ export interface InputState {
   kickLeftHeld: boolean;
   kickLeftCharge: number;
   kickRight: number;
+  kickRightHeld: boolean;
+  kickRightCharge: number;
   head: number;
   jump: number;
   sprint: boolean;
@@ -353,6 +355,8 @@ export const DEFAULT_INPUT: InputState = {
   kickLeftHeld: false,
   kickLeftCharge: 0,
   kickRight: 0,
+  kickRightHeld: false,
+  kickRightCharge: 0,
   head: 0,
   jump: 0,
   sprint: false,

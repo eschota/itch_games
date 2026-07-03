@@ -24,8 +24,10 @@ const PLAYER_BALL_SAFE_RADIUS = PLAYER_RADIUS + BALL_RADIUS + DEFAULT_GAME_SETTI
 const PLAYER_STAMINA_MAX = DEFAULT_GAME_SETTINGS.playerStaminaMax;
 const BALL_POSSESSION_CARRY_DISTANCE = DEFAULT_GAME_SETTINGS.ballPossessionCarryDistance;
 const BALL_POSSESSION_LOW_SHOT_SPEED = DEFAULT_GAME_SETTINGS.ballPossessionLowShotSpeed;
+const BALL_POSSESSION_UPPER_SHOT_SPEED = DEFAULT_GAME_SETTINGS.ballPossessionUpperShotSpeed;
 const BALL_POSSESSION_UPPER_SHOT_LIFT = DEFAULT_GAME_SETTINGS.ballPossessionUpperShotLift;
 const BALL_POSSESSION_STRONG_MULTIPLIER = DEFAULT_GAME_SETTINGS.ballPossessionStrongMultiplier;
+const BALL_POSSESSION_BASE_POWER_MULTIPLIER = DEFAULT_GAME_SETTINGS.ballPossessionBasePowerMultiplier;
 const KICK_COOLDOWN_MS = DEFAULT_GAME_SETTINGS.kickCooldownMs;
 const DAY_CYCLE_SECONDS = DEFAULT_GAME_SETTINGS.dayCycleSeconds;
 const DAY_START_SECONDS = DEFAULT_GAME_SETTINGS.dayStartSeconds;
@@ -193,6 +195,8 @@ function inputState(patch = {}) {
     kickLeftHeld: false,
     kickLeftCharge: 0,
     kickRight: 0,
+    kickRightHeld: false,
+    kickRightCharge: 0,
     head: 0,
     jump: 0,
     sprint: false,
@@ -651,7 +655,7 @@ async function assertCommunicationProfileAndCombatSides(api, baseUrl) {
     input: inputState()
   });
   let state = (await api("POST", "/api/test/ball", {
-    position: { x: 0.34, y: BALL_RADIUS + 0.04, z: 1.0 },
+    position: { x: 0.34, y: BALL_RADIUS + 0.04, z: 0.58 },
     velocity: { x: 0, y: 0, z: 0 }
   })).state;
   await api("POST", "/api/test/player/0", { input: inputState({ kickLeft: 1 }) });
@@ -817,6 +821,7 @@ async function assertGameSettingsApi(api, baseUrl, settingsFile) {
 
 function roundtripSettingValue(item, current) {
   if (item.input === "checkbox" || typeof current === "boolean") return !Boolean(current);
+  if (item.input === "json" || (current && typeof current === "object")) return JSON.parse(JSON.stringify(current));
   const step = Number(item.step ?? 1);
   const min = item.min === undefined ? Number.NEGATIVE_INFINITY : Number(item.min);
   const max = item.max === undefined ? Number.POSITIVE_INFINITY : Number(item.max);
@@ -838,6 +843,8 @@ function roundedForStep(value, step) {
 function assertSettingValue(actual, expected, message) {
   if (typeof expected === "number") {
     assert.ok(Math.abs(Number(actual) - expected) < 1e-9, `${message}: expected ${expected}, got ${actual}`);
+  } else if (expected && typeof expected === "object") {
+    assert.deepEqual(actual, expected, message);
   } else {
     assert.equal(actual, expected, message);
   }
@@ -1622,7 +1629,7 @@ async function main() {
     await assertFullKnockoutFriendlyFireAndJumpDash(api);
     await assertPlayerHitVerticalReach(api);
 
-    await assertKick(api, "left", { x: -0.34, y: BALL_RADIUS + 0.04, z: 1.0 }, { kickLeft: 1 });
+    await assertKick(api, "left", { x: -0.34, y: BALL_RADIUS + 0.04, z: 0.58 }, { kickLeft: 1 });
     await assertKick(api, "hand", { x: 0.34, y: BALL_RADIUS + 0.04, z: 1.0 }, { kickRight: 1 });
     await assertKick(api, "head", { x: 0, y: PLAYER_HEIGHT - BALL_RADIUS * 0.1, z: 0.95 }, { head: 1 });
     await assertFriendlyKickPriority(api);
@@ -2119,7 +2126,7 @@ async function assertEmptySpaceStrikeVisuals(api) {
   for (const strike of [
     { kind: "hand", input: { kickRight: 1 }, visible: true },
     { kind: "left", input: { kickLeft: 1 }, visible: true },
-    { kind: "head", input: { head: 1 }, visible: false }
+    { kind: "head", input: { head: 1 }, visible: true }
   ]) {
     await api("POST", "/api/test/players", { count: 1 });
     let state = (await api("POST", "/api/test/reset", {})).state;
@@ -2364,6 +2371,35 @@ async function assertBallPossessionAndContextShots(api) {
   assert.ok(
     state.ball.velocity.y > BALL_POSSESSION_UPPER_SHOT_LIFT * BALL_POSSESSION_STRONG_MULTIPLIER * 0.5,
     `RMB upper shot should lift the ball, got vy=${state.ball.velocity.y}`
+  );
+
+  await api("POST", "/api/test/reset", {});
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: 70,
+    yaw: 0,
+    input: inputState({ up: true })
+  });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 0.72 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 6 })).state;
+  assert.equal(state.ball.ownerPlayerId, ownerId, "player should be able to regain possession for a charged upper shot");
+  await api("POST", "/api/test/player/0", { input: inputState({ kickRightHeld: true }) });
+  state = (await api("POST", "/api/test/tick", { frames: 66 })).state;
+  assert.equal(state.ball.ownerPlayerId, ownerId, "holding RMB should charge the upper shot without releasing the ball");
+  await api("POST", "/api/test/player/0", { input: inputState({ kickRight: 1, kickRightHeld: false, kickRightCharge: 1 }) });
+  state = (await api("POST", "/api/test/tick", { frames: 2 })).state;
+  assert.equal(state.ball.ownerPlayerId, null, "releasing charged RMB should release possession");
+  assert.equal(playerAt(state, 0).lastAction, "hand", "charged RMB possession shot should keep the existing right-button action channel");
+  assert.ok(
+    state.ball.velocity.z > BALL_POSSESSION_UPPER_SHOT_SPEED * BALL_POSSESSION_BASE_POWER_MULTIPLIER * 0.9,
+    `charged RMB upper shot should travel farther than a tap, got vz=${state.ball.velocity.z}`
+  );
+  assert.ok(
+    state.ball.velocity.y > BALL_POSSESSION_UPPER_SHOT_LIFT * 1.45,
+    `charged RMB upper shot should arc higher than a tap, got vy=${state.ball.velocity.y}`
   );
 }
 
@@ -2658,7 +2694,7 @@ async function assertFriendlyKickAssist(api) {
     input: inputState()
   });
   await api("POST", "/api/test/ball", {
-    position: { x: 0, y: BALL_RADIUS + 0.04, z: 1.25 },
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 0.58 },
     velocity: { x: 0, y: 0, z: 0 }
   });
   await api("POST", "/api/test/player/0", {
@@ -2677,7 +2713,7 @@ async function assertLeftKickInputBuffer(api) {
     input: inputState()
   });
   await api("POST", "/api/test/ball", {
-    position: { x: 0, y: BALL_RADIUS + 0.04, z: 2.25 },
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 1.3 },
     velocity: { x: 0, y: 0, z: 0 }
   });
   await api("POST", "/api/test/player/0", {
@@ -2688,7 +2724,7 @@ async function assertLeftKickInputBuffer(api) {
 
   await api("POST", "/api/test/player/0", { input: inputState() });
   await api("POST", "/api/test/ball", {
-    position: { x: 0, y: BALL_RADIUS + 0.04, z: 1.25 },
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 0.58 },
     velocity: { x: 0, y: 0, z: 0 }
   });
   state = (await api("POST", "/api/test/tick", { frames: 3 })).state;
@@ -2698,7 +2734,7 @@ async function assertLeftKickInputBuffer(api) {
 
 async function measureLeftKickSpeed(api, setupInput, releaseInput, holdFrames = 0) {
   let state = await prepareSinglePlayer(api);
-  const kickBallPosition = { x: -0.34, y: BALL_RADIUS + 0.04, z: 1.0 };
+  const kickBallPosition = { x: -0.34, y: BALL_RADIUS + 0.04, z: 0.58 };
   await api("POST", "/api/test/player/0", {
     position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
     yaw: 0,
@@ -2725,6 +2761,7 @@ async function measureLeftKickSpeed(api, setupInput, releaseInput, holdFrames = 
 }
 
 async function assertLeftKickCharge(api) {
+  await api("POST", "/api/game-settings", { settings: { ballPossessionEnabled: false } });
   const tapSpeed = await measureLeftKickSpeed(api, null, { kickLeft: 1 });
   assert.ok(tapSpeed > 5.2, `tap left kick should use the stronger v0.0.028 impulse, got ${tapSpeed}`);
   const chargedSpeed = await measureLeftKickSpeed(
@@ -2756,6 +2793,7 @@ async function assertLeftKickCharge(api) {
     `held charged left kick should fire on ball contact before release; tap=${tapSpeed}, heldContact=${heldContactSpeed}`
   );
   assert.ok(heldContactSpeed < KICK_SPEED_MAX, `held charged left kick should stay under runaway threshold, got ${heldContactSpeed}`);
+  await api("POST", "/api/game-settings", { settings: DEFAULT_GAME_SETTINGS });
 }
 
 async function measureHeldContactLeftKickSpeed(api) {
@@ -2773,7 +2811,7 @@ async function measureHeldContactLeftKickSpeed(api) {
   state = (await api("POST", "/api/test/tick", { frames: 66 })).state;
   assert.notEqual(playerAt(state, 0).lastAction, "left", "held left kick should wait for ball contact while charging");
   await api("POST", "/api/test/ball", {
-    position: { x: -0.34, y: BALL_RADIUS + 0.04, z: 1.0 },
+    position: { x: -0.34, y: BALL_RADIUS + 0.04, z: 0.58 },
     velocity: { x: 0, y: 0, z: 0 }
   });
   state = (await api("POST", "/api/test/tick", { frames: 3 })).state;

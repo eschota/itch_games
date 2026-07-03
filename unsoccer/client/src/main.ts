@@ -700,6 +700,9 @@ let nextLocalHandStrikeSide: "left" | "right" = "right";
 let leftKickChargeStartedAt = 0;
 let leftKickChargingPointerId: number | null = null;
 let leftKickChargingByPointer = false;
+let rightKickChargeStartedAt = 0;
+let rightKickChargingPointerId: number | null = null;
+let rightKickChargingByPointer = false;
 let lastFrameSeconds = 0;
 let lastRenderFrameAt = 0;
 let interpolationAlpha = 1;
@@ -1529,6 +1532,11 @@ function leftKickChargeFraction(now = performance.now()): number {
   return THREE.MathUtils.clamp((now - leftKickChargeStartedAt) / (LEFT_KICK_CHARGE_SECONDS * 1000), 0, 1);
 }
 
+function rightKickChargeFraction(now = performance.now()): number {
+  if (!rightKickChargingByPointer || rightKickChargeStartedAt <= 0) return 0;
+  return THREE.MathUtils.clamp((now - rightKickChargeStartedAt) / (LEFT_KICK_CHARGE_SECONDS * 1000), 0, 1);
+}
+
 function syncLeftKickChargeInput(now = performance.now()): void {
   if (!leftKickChargingByPointer) {
     input.kickLeftHeld = false;
@@ -1538,10 +1546,22 @@ function syncLeftKickChargeInput(now = performance.now()): void {
   input.kickLeftCharge = leftKickChargeFraction(now);
 }
 
+function syncRightKickChargeInput(now = performance.now()): void {
+  if (!rightKickChargingByPointer) {
+    input.kickRightHeld = false;
+    return;
+  }
+  input.kickRightHeld = true;
+  input.kickRightCharge = rightKickChargeFraction(now);
+}
+
 function syncLeftKickChargeDataset(now = performance.now()): void {
-  const charge = leftKickChargingByPointer ? leftKickChargeFraction(now) : 0;
+  const leftCharge = leftKickChargingByPointer ? leftKickChargeFraction(now) : 0;
+  const rightCharge = rightKickChargingByPointer ? rightKickChargeFraction(now) : 0;
+  const charge = Math.max(leftCharge, rightCharge);
   document.documentElement.dataset.localKickCharge = charge.toFixed(3);
-  document.documentElement.dataset.localKickChargeHeld = String(leftKickChargingByPointer);
+  document.documentElement.dataset.localKickChargeHeld = String(leftKickChargingByPointer || rightKickChargingByPointer);
+  document.documentElement.dataset.localKickChargeKind = rightKickChargingByPointer ? "right" : leftKickChargingByPointer ? "left" : "none";
 }
 
 function beginLeftKickCharge(pointerId: number): void {
@@ -1567,11 +1587,43 @@ function releaseLeftKickCharge(pointerId: number | null): boolean {
   return true;
 }
 
+function beginRightKickCharge(pointerId: number): void {
+  rightKickChargingByPointer = true;
+  rightKickChargingPointerId = pointerId;
+  rightKickChargeStartedAt = performance.now();
+  input.kickRightHeld = true;
+  input.kickRightCharge = 0;
+  syncLeftKickChargeDataset(rightKickChargeStartedAt);
+}
+
+function releaseRightKickCharge(pointerId: number | null): boolean {
+  if (!rightKickChargingByPointer) return false;
+  if (pointerId !== null && rightKickChargingPointerId !== null && pointerId !== rightKickChargingPointerId) return false;
+  const now = performance.now();
+  input.kickRightCharge = rightKickChargeFraction(now);
+  input.kickRightHeld = false;
+  input.kickRight += 1;
+  rightKickChargingByPointer = false;
+  rightKickChargingPointerId = null;
+  rightKickChargeStartedAt = 0;
+  triggerLocalHandStrikePreview();
+  syncLeftKickChargeDataset(now);
+  return true;
+}
+
 function cancelLeftKickCharge(): void {
   leftKickChargingByPointer = false;
   leftKickChargingPointerId = null;
   leftKickChargeStartedAt = 0;
   input.kickLeftHeld = false;
+  syncLeftKickChargeDataset();
+}
+
+function cancelRightKickCharge(): void {
+  rightKickChargingByPointer = false;
+  rightKickChargingPointerId = null;
+  rightKickChargeStartedAt = 0;
+  input.kickRightHeld = false;
   syncLeftKickChargeDataset();
 }
 
@@ -1611,6 +1663,7 @@ function updateResolvedInput(): void {
   const activeCodes = mergedPressedCodes();
   input = resolveMovementInput(settings.controls, activeCodes, localJoin?.team ?? null, input);
   syncLeftKickChargeInput();
+  syncRightKickChargeInput();
   syncInputTestPad(activeCodes);
   document.documentElement.dataset.resolvedInputDirections = [
     input.up ? "up" : "",
@@ -1625,7 +1678,9 @@ function updateResolvedInput(): void {
     `head:${input.head}`,
     `jump:${input.jump}`,
     `held:${input.kickLeftHeld}`,
-    `charge:${input.kickLeftCharge.toFixed(3)}`
+    `charge:${input.kickLeftCharge.toFixed(3)}`,
+    `rightHeld:${input.kickRightHeld}`,
+    `rightCharge:${input.kickRightCharge.toFixed(3)}`
   ].join(",");
   syncMobileControlsUi();
 }
@@ -4687,8 +4742,7 @@ function onMobilePointerDown(event: PointerEvent): void {
   } else if (action === "leftKick") {
     if (!leftKickChargingByPointer) beginLeftKickCharge(event.pointerId);
   } else if (action === "rightKick") {
-    input.kickRight += 1;
-    triggerLocalHandStrikePreview();
+    if (!rightKickChargingByPointer) beginRightKickCharge(event.pointerId);
   } else if (action === "headHit") {
     input.head += 1;
   }
@@ -4714,6 +4768,9 @@ function finishMobilePointer(pointerId: number, cancel = false): void {
   if (action === "leftKick") {
     if (cancel) cancelLeftKickCharge();
     else releaseLeftKickCharge(pointerId);
+  } else if (action === "rightKick") {
+    if (cancel) cancelRightKickCharge();
+    else releaseRightKickCharge(pointerId);
   }
   if (!hadDirection && !hadAction && !hadMoveVector) return;
   updateResolvedInput();
@@ -4726,6 +4783,7 @@ function clearMobileControls(): void {
   mobileActionPointers.clear();
   resetMobileMoveVector();
   if (leftKickChargingByPointer) cancelLeftKickCharge();
+  if (rightKickChargingByPointer) cancelRightKickCharge();
   updateResolvedInput();
   sendInput(true);
 }
@@ -4774,13 +4832,10 @@ addEventListener("keydown", (event) => {
   if (!event.repeat) {
     markHintsForPressedCodes(new Set([event.code]));
     if (actionPressed(settings.controls, "leftKick", new Set([event.code]))) {
-      input.kickLeftCharge = 0;
-      input.kickLeftHeld = false;
-      input.kickLeft += 1;
+      if (!leftKickChargingByPointer) beginLeftKickCharge(-1);
     }
     if (actionPressed(settings.controls, "rightKick", new Set([event.code]))) {
-      input.kickRight += 1;
-      triggerLocalHandStrikePreview();
+      if (!rightKickChargingByPointer) beginRightKickCharge(-2);
     }
     if (actionPressed(settings.controls, "headHit", new Set([event.code]))) input.head += 1;
     if (actionPressed(settings.controls, "jump", new Set([event.code]))) input.jump += 1;
@@ -4795,6 +4850,8 @@ addEventListener("keyup", (event) => {
   unlockAudio();
   if (isChatFocused()) return;
   pressedCodes.delete(event.code);
+  if (actionPressed(settings.controls, "leftKick", new Set([event.code]))) releaseLeftKickCharge(-1);
+  if (actionPressed(settings.controls, "rightKick", new Set([event.code]))) releaseRightKickCharge(-2);
   updateResolvedInput();
   sendInput(true);
 });
@@ -4915,8 +4972,12 @@ canvas.addEventListener("pointerdown", (event) => {
   }
   if (actionPressed(settings.controls, "rightKick", mouseCodes)) {
     markControlHintsUsed("rightKick");
-    input.kickRight += 1;
-    triggerLocalHandStrikePreview();
+    beginRightKickCharge(event.pointerId);
+    try {
+      canvas.setPointerCapture(event.pointerId);
+    } catch {
+      // Pointer capture is best-effort; release/cancel handlers still cover the input.
+    }
     handled = true;
   }
   if (actionPressed(settings.controls, "headHit", mouseCodes)) {
@@ -4929,7 +4990,8 @@ canvas.addEventListener("pointerdown", (event) => {
   sendInput(true);
 });
 canvas.addEventListener("pointerup", (event) => {
-  if (!releaseLeftKickCharge(event.pointerId)) return;
+  const released = releaseLeftKickCharge(event.pointerId) || releaseRightKickCharge(event.pointerId);
+  if (!released) return;
   try {
     canvas.releasePointerCapture(event.pointerId);
   } catch {
@@ -4939,14 +5001,28 @@ canvas.addEventListener("pointerup", (event) => {
   sendInput(true);
 });
 canvas.addEventListener("pointercancel", (event) => {
-  if (event.pointerId !== leftKickChargingPointerId) return;
-  cancelLeftKickCharge();
-  sendInput(true);
+  let cancelled = false;
+  if (event.pointerId === leftKickChargingPointerId) {
+    cancelLeftKickCharge();
+    cancelled = true;
+  }
+  if (event.pointerId === rightKickChargingPointerId) {
+    cancelRightKickCharge();
+    cancelled = true;
+  }
+  if (cancelled) sendInput(true);
 });
 canvas.addEventListener("lostpointercapture", (event) => {
-  if (event.pointerId !== leftKickChargingPointerId) return;
-  cancelLeftKickCharge();
-  sendInput(true);
+  let cancelled = false;
+  if (event.pointerId === leftKickChargingPointerId) {
+    cancelLeftKickCharge();
+    cancelled = true;
+  }
+  if (event.pointerId === rightKickChargingPointerId) {
+    cancelRightKickCharge();
+    cancelled = true;
+  }
+  if (cancelled) sendInput(true);
 });
 canvas.addEventListener("auxclick", (event) => {
   if (event.button === 1) event.preventDefault();
@@ -4954,7 +5030,14 @@ canvas.addEventListener("auxclick", (event) => {
 canvas.addEventListener("wheel", (event) => {
   unlockAudio();
   event.preventDefault();
-  openOrCycleEmotionWheel(event.deltaY);
+  if (settingsOpen || isChatFocused()) return;
+  if (emotionWheelOpen) {
+    openOrCycleEmotionWheel(event.deltaY);
+    return;
+  }
+  markControlHintsUsed("headHit");
+  input.head += 1;
+  sendInput(true);
 }, { passive: false });
 
 addEventListener("resize", resize);
@@ -4965,6 +5048,10 @@ addEventListener("blur", () => {
   }
   if (leftKickChargingByPointer) {
     cancelLeftKickCharge();
+    sendInput(true);
+  }
+  if (rightKickChargingByPointer) {
+    cancelRightKickCharge();
     sendInput(true);
   }
 });

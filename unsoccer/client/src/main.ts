@@ -42,6 +42,7 @@ import {
   type PlayerProfileSnapshot,
   type ServerAudioEvent,
   type ServerState,
+  type VehicleSnapshot,
   type VisualSettings,
   type WeatherSnapshot
 } from "@itch-games/unsoccer-shared";
@@ -105,6 +106,32 @@ interface NetworkChannel {
 interface WireMessage {
   event?: unknown;
   data?: unknown;
+}
+
+interface Free3dVehicleAsset {
+  guid: string;
+  kind: string;
+  vehicleKind: VehicleSnapshot["kind"];
+  title: string;
+  src10k: string;
+  src1k: string;
+  scale: number;
+  yawOffsetDeg?: number;
+  collider: {
+    halfWidth: number;
+    halfLength: number;
+  };
+  seatOffset: {
+    x: number;
+    y: number;
+    z: number;
+  };
+}
+
+interface Free3dVehicleRoster {
+  version: string;
+  mode: string;
+  assets: Free3dVehicleAsset[];
 }
 
 class WebSocketNetworkChannel implements NetworkChannel {
@@ -572,7 +599,14 @@ const goalNets: GoalNetVisual[] = [];
 const sidelineBalls: THREE.Group[] = [];
 const activeFree3dBalls: THREE.Object3D[] = [];
 const activeFree3dBallRoot = new THREE.Group();
+const free3dBallVariantByGuid = new Map<string, number>();
 const free3dBallLoader = new GLTFLoader();
+const free3dVehicleLoader = new GLTFLoader();
+const free3dVehicleTemplateCache = new Map<string, Promise<THREE.Object3D>>();
+let free3dVehicleRosterPromise: Promise<Free3dVehicleRoster> | null = null;
+const skinPreviewLoader = new GLTFLoader();
+const skinPreviewCache = new Map<string, Promise<string>>();
+let skinPreviewRenderer: THREE.WebGLRenderer | null = null;
 const free3dBallMaterial = registerLookdevMaterial("ball", new THREE.MeshStandardMaterial({
   color: 0xffffff,
   roughness: 0.56,
@@ -605,6 +639,7 @@ scene.add(ballAura);
 activeFree3dBallRoot.visible = false;
 scene.add(activeFree3dBallRoot);
 let currentActiveBallVariant = 0;
+let currentActiveBallSkinId: string = DEFAULT_BALL_SKIN_ID;
 
 const ACTION_TELEGRAPH: Record<KickKind, {
   color: number;
@@ -684,6 +719,20 @@ const PROFILE_STORAGE_KEY = "unsoccer.profile.v1";
 const SKIN_STORE_STORAGE_KEY = "unsoccer.skinStore.v1";
 const CHARACTER_SKIN_ROSTER_SRC = "assets/characters/free3d-10k/roster.json";
 const BALL_SKIN_ROSTER_SRC = "assets/balls/free3d/roster.json";
+const CHARACTER_SKIN_PRICES = [0, 4, 7, 11, 15, 19, 24, 30, 37, 45] as const;
+const BALL_SKIN_PRICES = [0, 2, 4, 7, 10, 14, 18, 23, 29, 36] as const;
+const BALL_SKIN_PREVIEW_SRC_BY_ID: Record<string, string> = {
+  "6493379": "assets/balls/free3d/01-6493379-vertex.glb",
+  "6493403": "assets/balls/free3d/02-6493403-vertex.glb",
+  "6493457": "assets/balls/free3d/03-6493457-vertex.glb",
+  "6493239": "assets/balls/free3d/04-6493239-vertex.glb",
+  "6493488": "assets/balls/free3d/05-6493488-vertex.glb",
+  "6493371": "assets/balls/free3d/06-6493371-vertex.glb",
+  "6493256": "assets/balls/free3d/07-6493256-vertex.glb",
+  "6493342": "assets/balls/free3d/08-6493342-vertex.glb",
+  "6493507": "assets/balls/free3d/09-6493507-vertex.glb",
+  "6493481": "assets/balls/free3d/10-6493481-vertex.glb"
+};
 const BROWSER_FINGERPRINT_STORAGE_KEY = "unsoccer.browserFingerprint.v1";
 const EMOTION_WHEEL_IDLE_MS = 2000;
 const APPLIED_EMOTION_FALLBACK_MS = 4200;
@@ -691,6 +740,7 @@ const APPLIED_EMOTION_LABEL_SCALE = 1.44;
 const APPLIED_EMOTION_LABEL_Y = 3.08;
 
 const players = new Map<string, PlayerVisual>();
+const vehicleVisuals = new Map<string, VehicleVisual>();
 let latestState: ServerState | null = null;
 let renderedState: ServerState | null = null;
 let localJoin: JoinAccepted | null = null;
@@ -758,6 +808,7 @@ let skinShopOpen = false;
 let skinShopTab: "players" | "balls" = "players";
 let characterSkinCatalog: SkinCatalogItem[] = [];
 let ballSkinCatalog: SkinCatalogItem[] = [];
+let skinShopRenderSignature = "";
 let profileSendTimer = 0;
 let emotionWheelOpen = false;
 let emotionWheelSelectedIndex = 0;
@@ -818,7 +869,7 @@ function sanitizeLocalBallSkin(value: string | undefined): string {
 }
 
 function migrateStoredSkin(value: string | undefined, hasExplicitSkin: boolean): string {
-  if (!hasExplicitSkin && value === "6299851") return rosterSkinFallback();
+  if (!hasExplicitSkin && value === "6288738") return rosterSkinFallback();
   return sanitizeLocalSkin(value || "");
 }
 
@@ -936,6 +987,24 @@ function saveSkinStore(): void {
   localStorage.setItem(SKIN_STORE_STORAGE_KEY, JSON.stringify(skinStore));
 }
 
+function defaultOwnedCharacterSkin(): string {
+  return skinStore.ownedCharacters.find((id) => (CHARACTER_ROSTER as readonly string[]).includes(id)) || rosterSkinFallback();
+}
+
+function ensureOwnedProfileSelection(): boolean {
+  let changed = false;
+  if (!skinStore.ownedCharacters.includes(localProfile.skinId)) {
+    localProfile.skinId = defaultOwnedCharacterSkin();
+    changed = true;
+  }
+  if (!skinStore.ownedBalls.includes(localProfile.ballSkinId)) {
+    localProfile.ballSkinId = DEFAULT_BALL_SKIN_ID;
+    changed = true;
+  }
+  if (changed) saveLocalProfile();
+  return changed;
+}
+
 function localGoalsEarned(): number {
   const localId = localJoin?.id;
   const player = localId ? latestState?.players.find((entry) => entry.id === localId) : null;
@@ -950,8 +1019,23 @@ function skinLabel(id: string, index: number): string {
   return t("profile.skinLabel", { index: index + 1, id: id.slice(0, 8) });
 }
 
+function renderProfileSkinOptions(): void {
+  const owned = new Set(skinStore.ownedCharacters);
+  const options = CHARACTER_ROSTER.filter((id) => owned.has(id));
+  const source = options.length ? options : [rosterSkinFallback()];
+  const html = source
+    .map((id) => {
+      const index = Math.max(0, (CHARACTER_ROSTER as readonly string[]).indexOf(id));
+      return `<option value="${escapeHtml(id)}">${escapeHtml(skinLabel(id, index))}</option>`;
+    })
+    .join("");
+  if (profileSkinSelect.innerHTML !== html) profileSkinSelect.innerHTML = html;
+}
+
 function syncProfileUi(): void {
   localProfile.nickname = localizeGeneratedPlayerName(localProfile.nickname);
+  ensureOwnedProfileSelection();
+  renderProfileSkinOptions();
   profileNameInput.value = localProfile.nickname;
   profileSkinSelect.value = localProfile.skinId;
   profilePicInput.value = localProfile.userPic;
@@ -1008,14 +1092,24 @@ function renderUserPicMarkup(value: string, className = "chat-avatar"): string {
 }
 
 function initializeProfileControls(): void {
-  profileSkinSelect.innerHTML = CHARACTER_ROSTER
-    .map((id, index) => `<option value="${escapeHtml(id)}">${escapeHtml(skinLabel(id, index))}</option>`)
-    .join("");
   syncProfileUi();
   renderEmotionWheel();
-  renderSkinShop();
+  renderSkinShop(true);
   void loadSkinCatalogs();
+  const autoShopTab = requestedSkinShopTab();
+  if (autoShopTab) {
+    setSkinShopTab(autoShopTab);
+    setSkinShopOpen(true);
+  }
   updateChatUi(latestState);
+}
+
+function requestedSkinShopTab(): "players" | "balls" | null {
+  const query = new URLSearchParams(location.search);
+  const value = query.get("skinShop") || query.get("shop") || "";
+  if (value === "balls" || value === "ball") return "balls";
+  if (value === "1" || value === "skins" || value === "players" || value === "player") return "players";
+  return null;
 }
 
 function hashSkinColor(id: string, salt: number): string {
@@ -1030,12 +1124,20 @@ function hashSkinColor(id: string, salt: number): string {
   return `hsl(${hue} ${saturation}% ${lightness}%)`;
 }
 
+function characterPreviewSrc(id: string): string {
+  return `assets/characters/free3d-10k/${id}/rigged_unity.glb`;
+}
+
+function fallbackBallPreviewSrc(id: string): string {
+  return BALL_SKIN_PREVIEW_SRC_BY_ID[id] || `assets/balls/free3d/03-${DEFAULT_BALL_SKIN_ID}-vertex.glb`;
+}
+
 function characterSkinPrice(index: number): number {
-  return index === 0 ? 0 : 1 + Math.floor(index / 3);
+  return CHARACTER_SKIN_PRICES[index] ?? CHARACTER_SKIN_PRICES[CHARACTER_SKIN_PRICES.length - 1] + (index - CHARACTER_SKIN_PRICES.length + 1) * 9;
 }
 
 function ballSkinPrice(index: number): number {
-  return index === 0 ? 0 : 1 + Math.floor(index / 4);
+  return BALL_SKIN_PRICES[index] ?? BALL_SKIN_PRICES[BALL_SKIN_PRICES.length - 1] + (index - BALL_SKIN_PRICES.length + 1) * 7;
 }
 
 function fallbackCharacterCatalog(): SkinCatalogItem[] {
@@ -1043,6 +1145,7 @@ function fallbackCharacterCatalog(): SkinCatalogItem[] {
     id,
     title: skinLabel(id, index),
     price: characterSkinPrice(index),
+    previewSrc: characterPreviewSrc(id),
     subtitle: "10k vertex PBR",
     swatchA: hashSkinColor(id, 1),
     swatchB: hashSkinColor(id, 5)
@@ -1054,6 +1157,7 @@ function fallbackBallCatalog(): SkinCatalogItem[] {
     id,
     title: index === 0 ? "Standard Soccer Ball" : `Ball Skin ${index + 1}`,
     price: ballSkinPrice(index),
+    previewSrc: fallbackBallPreviewSrc(id),
     subtitle: index === 0 ? "Default match ball" : "Vertex PBR ball",
     swatchA: hashSkinColor(id, 2),
     swatchB: hashSkinColor(id, 9)
@@ -1063,14 +1167,14 @@ function fallbackBallCatalog(): SkinCatalogItem[] {
 async function loadSkinCatalogs(): Promise<void> {
   characterSkinCatalog = fallbackCharacterCatalog();
   ballSkinCatalog = fallbackBallCatalog();
-  renderSkinShop();
+  renderSkinShop(true);
   try {
     const [characterResponse, ballResponse] = await Promise.all([
       fetch(resolveClientAsset(CHARACTER_SKIN_ROSTER_SRC), { cache: "no-cache" }),
       fetch(resolveClientAsset(BALL_SKIN_ROSTER_SRC), { cache: "no-cache" })
     ]);
     if (characterResponse.ok) {
-      const roster = await characterResponse.json() as { assets?: Array<{ guid: string; title: string; sourceLod?: string; vertexColors?: number; vertexColorAccessors?: number }> };
+      const roster = await characterResponse.json() as { assets?: Array<{ guid: string; title: string; src?: string; sourceLod?: string; vertexColors?: number; vertexColorAccessors?: number }> };
       const byGuid = new Map((roster.assets || []).map((asset) => [asset.guid, asset]));
       characterSkinCatalog = CHARACTER_ROSTER.map((id, index) => {
         const asset = byGuid.get(id);
@@ -1078,6 +1182,7 @@ async function loadSkinCatalogs(): Promise<void> {
           id,
           title: asset?.title || skinLabel(id, index),
           price: characterSkinPrice(index),
+          previewSrc: asset?.src || characterPreviewSrc(id),
           subtitle: `${asset?.sourceLod || "10k"} vertex PBR`,
           swatchA: hashSkinColor(id, 1),
           swatchB: hashSkinColor(id, 5)
@@ -1093,6 +1198,7 @@ async function loadSkinCatalogs(): Promise<void> {
           id,
           title: index === 0 ? "Standard Soccer Ball" : asset?.title || `Ball Skin ${index + 1}`,
           price: ballSkinPrice(index),
+          previewSrc: asset?.src || fallbackBallPreviewSrc(id),
           subtitle: asset?.lod ? `${asset.lod} vertex ball` : "Vertex PBR ball",
           swatchA: hashSkinColor(id, 2),
           swatchB: hashSkinColor(id, 9)
@@ -1102,7 +1208,7 @@ async function loadSkinCatalogs(): Promise<void> {
   } catch (error) {
     console.warn("Skin catalog load failed", error);
   }
-  renderSkinShop();
+  renderSkinShop(true);
 }
 
 function setSkinShopTab(tab: "players" | "balls"): void {
@@ -1113,17 +1219,35 @@ function setSkinShopTab(tab: "players" | "balls"): void {
   skinShopPlayerGrid.hidden = tab !== "players";
   skinShopBallGrid.hidden = tab !== "balls";
   document.documentElement.dataset.skinShopTab = tab;
+  skinShopRenderSignature = skinShopSignature(localGoalBalance());
 }
 
 function setSkinShopOpen(open: boolean): void {
   skinShopOpen = open;
   skinShopPanel.hidden = !open;
   document.documentElement.dataset.skinShopOpen = String(open);
-  if (open) renderSkinShop();
+  if (open) renderSkinShop(true);
 }
 
-function renderSkinShop(): void {
+function skinShopSignature(balance: number): string {
+  return [
+    skinShopTab,
+    balance,
+    skinStore.spentGoals,
+    localProfile.skinId,
+    localProfile.ballSkinId,
+    skinStore.ownedCharacters.join(","),
+    skinStore.ownedBalls.join(","),
+    characterSkinCatalog.length,
+    ballSkinCatalog.length
+  ].join("|");
+}
+
+function renderSkinShop(force = false): void {
   const balance = localGoalBalance();
+  const signature = skinShopSignature(balance);
+  if (!force && signature === skinShopRenderSignature) return;
+  skinShopRenderSignature = signature;
   skinShopBalanceEl.textContent = String(balance);
   skinShopStatusEl.textContent = `${balance} goals`;
   document.documentElement.dataset.skinShopGoals = String(localGoalsEarned());
@@ -1134,6 +1258,145 @@ function renderSkinShop(): void {
   setSkinShopTab(skinShopTab);
 }
 
+function getSkinPreviewRenderer(): THREE.WebGLRenderer {
+  if (skinPreviewRenderer) return skinPreviewRenderer;
+  const canvas = document.createElement("canvas");
+  canvas.width = 320;
+  canvas.height = 220;
+  skinPreviewRenderer = new THREE.WebGLRenderer({
+    canvas,
+    alpha: true,
+    antialias: true,
+    preserveDrawingBuffer: true
+  });
+  skinPreviewRenderer.setPixelRatio(1);
+  skinPreviewRenderer.setSize(320, 220, false);
+  skinPreviewRenderer.setClearColor(0x000000, 0);
+  skinPreviewRenderer.outputColorSpace = THREE.SRGBColorSpace;
+  return skinPreviewRenderer;
+}
+
+function prepareSkinPreviewObject(model: THREE.Object3D, kind: "character" | "ball"): THREE.Object3D {
+  const root = new THREE.Group();
+  root.add(model);
+  root.rotation.y = kind === "character" ? 0.08 : -0.52;
+  root.rotation.x = kind === "ball" ? -0.18 : 0;
+  model.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return;
+    child.castShadow = false;
+    child.receiveShadow = false;
+    child.frustumCulled = false;
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    const nextMaterials = materials.map((material) => {
+      if (!(material instanceof THREE.MeshStandardMaterial)) return material;
+      const clone = material.clone();
+      clone.vertexColors = Boolean(child.geometry.getAttribute("color")) || clone.vertexColors;
+      clone.roughness = Math.max(clone.roughness, 0.54);
+      clone.metalness *= 0.25;
+      clone.envMapIntensity = Math.max(clone.envMapIntensity, 0.55);
+      return clone;
+    });
+    child.material = Array.isArray(child.material) ? nextMaterials : nextMaterials[0];
+    child.geometry.computeVertexNormals();
+  });
+  const box = new THREE.Box3().setFromObject(root);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  if (kind === "character" && size.z > size.y * 1.35 && size.z > size.x) root.rotation.x = -Math.PI / 2;
+  root.updateMatrixWorld(true);
+  const orientedBox = new THREE.Box3().setFromObject(root);
+  const orientedSize = new THREE.Vector3();
+  const orientedCenter = new THREE.Vector3();
+  orientedBox.getSize(orientedSize);
+  orientedBox.getCenter(orientedCenter);
+  const metric = kind === "character"
+    ? Math.max(orientedSize.y, 0.001)
+    : Math.max(orientedSize.x, orientedSize.y, orientedSize.z, 0.001);
+  const targetSize = kind === "character" ? 2.42 : 1.58;
+  root.scale.setScalar(targetSize / metric);
+  root.updateMatrixWorld(true);
+  const finalBox = new THREE.Box3().setFromObject(root);
+  const finalCenter = new THREE.Vector3();
+  finalBox.getCenter(finalCenter);
+  root.position.sub(finalCenter);
+  if (kind === "character") root.position.y -= 0.08;
+  return root;
+}
+
+function disposeSkinPreviewObject(root: THREE.Object3D): void {
+  root.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return;
+    child.geometry.dispose();
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    for (const material of materials) material.dispose();
+  });
+}
+
+function renderSkinPreview(model: THREE.Object3D, kind: "character" | "ball"): string {
+  const renderer = getSkinPreviewRenderer();
+  const previewScene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(28, 320 / 220, 0.05, 20);
+  camera.position.set(kind === "character" ? 0.28 : 0.22, kind === "character" ? 0.34 : 0.18, kind === "character" ? 4.75 : 3.25);
+  camera.lookAt(0, kind === "character" ? 0.15 : 0, 0);
+  previewScene.add(new THREE.HemisphereLight(0xf7fff6, 0x26322f, 2.4));
+  const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
+  keyLight.position.set(2.6, 3.2, 3.4);
+  previewScene.add(keyLight);
+  const rimLight = new THREE.DirectionalLight(0x9ed8ff, 1.25);
+  rimLight.position.set(-3.2, 2.4, -2.4);
+  previewScene.add(rimLight);
+  const root = prepareSkinPreviewObject(model, kind);
+  previewScene.add(root);
+  renderer.clear(true, true, true);
+  renderer.render(previewScene, camera);
+  const url = renderer.domElement.toDataURL("image/webp", 0.88);
+  disposeSkinPreviewObject(root);
+  return url;
+}
+
+function loadSkinPreviewImage(kind: "character" | "ball", item: SkinCatalogItem): Promise<string> {
+  const key = `${kind}:${item.id}:${item.previewSrc}`;
+  const cached = skinPreviewCache.get(key);
+  if (cached) return cached;
+  const promise = new Promise<string>((resolve, reject) => {
+    skinPreviewLoader.load(
+      resolveClientAsset(item.previewSrc),
+      (gltf) => {
+        try {
+          resolve(renderSkinPreview(gltf.scene, kind));
+        } catch (error) {
+          reject(error);
+        }
+      },
+      undefined,
+      reject
+    );
+  });
+  skinPreviewCache.set(key, promise);
+  return promise;
+}
+
+function hydrateSkinShopPreviews(root: HTMLElement, items: SkinCatalogItem[], kind: "character" | "ball"): void {
+  const byId = new Map(items.map((item) => [item.id, item]));
+  for (const card of root.querySelectorAll<HTMLElement>(".skin-card[data-skin-id]")) {
+    const id = card.dataset.skinId || "";
+    const item = byId.get(id);
+    const image = card.querySelector<HTMLImageElement>(".skin-preview-image");
+    if (!item || !image) continue;
+    card.dataset.previewReady = "false";
+    void loadSkinPreviewImage(kind, item)
+      .then((src) => {
+        if (card.dataset.skinId !== id) return;
+        image.src = src;
+        card.dataset.previewReady = "true";
+      })
+      .catch((error) => {
+        card.dataset.previewReady = "error";
+        console.warn("Skin preview render failed", kind, id, error);
+      });
+  }
+}
+
 function renderSkinShopGrid(root: HTMLElement, items: SkinCatalogItem[], kind: "character" | "ball"): void {
   const owned = new Set(kind === "character" ? skinStore.ownedCharacters : skinStore.ownedBalls);
   const selectedId = kind === "character" ? localProfile.skinId : localProfile.ballSkinId;
@@ -1141,28 +1404,26 @@ function renderSkinShopGrid(root: HTMLElement, items: SkinCatalogItem[], kind: "
     const isOwned = owned.has(item.id);
     const isSelected = item.id === selectedId;
     const canBuy = localGoalBalance() >= item.price;
-    const state = isSelected ? "Selected" : isOwned ? "Select" : `Buy`;
+    const state = isSelected ? "selected" : isOwned ? "select" : canBuy ? "buy" : "locked";
+    const actionLabel = isSelected ? "Selected" : isOwned ? "Select" : canBuy ? `Buy for ${item.price} goals` : `Need ${item.price} goals`;
     const disabled = isSelected || (!isOwned && !canBuy) ? " disabled" : "";
     const classes = `skin-card${isSelected ? " is-selected" : ""}${isOwned ? "" : " is-locked"}`;
-    const price = item.price <= 0 ? "Free" : `${item.price} G`;
-    const swatchClass = kind === "ball" ? "skin-swatch ball" : "skin-swatch";
     return (
-      `<article class="${classes}" data-skin-kind="${kind}" data-skin-id="${escapeHtml(item.id)}">` +
-      `<div class="${swatchClass}" style="--skin-a:${escapeHtml(item.swatchA)};--skin-b:${escapeHtml(item.swatchB)}"></div>` +
-      `<h2>${escapeHtml(item.title)}</h2>` +
-      `<p>${escapeHtml(item.subtitle)}</p>` +
-      `<div class="skin-card-footer"><span class="skin-price">${escapeHtml(isOwned ? "Owned" : price)}</span>` +
-      `<button type="button" data-skin-action="${kind}" data-skin-id="${escapeHtml(item.id)}"${disabled}>${escapeHtml(state)}</button></div>` +
+      `<article class="${classes}" data-skin-kind="${kind}" data-skin-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.title)}">` +
+      `<div class="skin-preview" data-preview-kind="${kind}"><img class="skin-preview-image" alt="" aria-hidden="true" /></div>` +
+      `<div class="skin-card-footer"><span class="skin-price" aria-label="${escapeHtml(`${item.price} goals`)}"><i></i><b>${item.price}</b></span>` +
+      `<button type="button" data-skin-action="${kind}" data-skin-id="${escapeHtml(item.id)}" data-action-state="${state}" aria-label="${escapeHtml(actionLabel)}"${disabled}></button></div>` +
       `</article>`
     );
   }).join("");
+  hydrateSkinShopPreviews(root, items, kind);
 }
 
 function selectCharacterSkin(id: string): void {
   localProfile.skinId = sanitizeLocalSkin(id);
   saveLocalProfile();
   syncProfileUi();
-  renderSkinShop();
+  renderSkinShop(true);
   scheduleProfileSend();
 }
 
@@ -1170,12 +1431,14 @@ function selectBallSkin(id: string): void {
   localProfile.ballSkinId = sanitizeLocalBallSkin(id);
   saveLocalProfile();
   syncProfileUi();
-  renderSkinShop();
+  renderSkinShop(true);
   scheduleProfileSend();
 }
 
 function buyOrSelectSkin(kind: "character" | "ball", id: string): void {
-  const catalog = kind === "character" ? characterSkinCatalog : ballSkinCatalog;
+  const catalog = kind === "character"
+    ? (characterSkinCatalog.length ? characterSkinCatalog : fallbackCharacterCatalog())
+    : (ballSkinCatalog.length ? ballSkinCatalog : fallbackBallCatalog());
   const item = catalog.find((entry) => entry.id === id);
   if (!item) return;
   const ownedList = kind === "character" ? skinStore.ownedCharacters : skinStore.ownedBalls;
@@ -1879,6 +2142,23 @@ function cancelRightKickCharge(): void {
   syncLeftKickChargeDataset();
 }
 
+function localPlayerSnapshot(state = latestState): PlayerSnapshot | null {
+  const localId = localJoin?.id;
+  if (!localId || !state) return null;
+  return state.players.find((player) => player.id === localId && player.role === "player") || null;
+}
+
+function localPlayerMounted(): boolean {
+  return Boolean(localPlayerSnapshot()?.vehicleId);
+}
+
+function requestVehicleExit(): void {
+  cancelLeftKickCharge();
+  input.exitVehicle += 1;
+  document.documentElement.dataset.vehicleExitRequestedAt = String(Math.round(performance.now()));
+  sendInput(true);
+}
+
 function syncMobileControlsUi(): void {
   const enabled = forceMobileControls || mobilePointerMedia.matches || mobileWidthMedia.matches;
   const portrait = window.innerHeight >= window.innerWidth;
@@ -2041,6 +2321,7 @@ interface Free3dBallAsset {
   guid: string;
   title: string;
   src: string;
+  lod?: string;
 }
 
 interface Free3dBallRoster {
@@ -2053,6 +2334,7 @@ interface SkinCatalogItem {
   id: string;
   title: string;
   price: number;
+  previewSrc: string;
   subtitle: string;
   swatchA: string;
   swatchB: string;
@@ -2136,6 +2418,8 @@ async function hydrateFree3dSidelineBalls(): Promise<void> {
     const response = await fetch(resolveClientAsset("assets/balls/free3d/roster.json"), { cache: "no-cache" });
     if (!response.ok) throw new Error(`Free3D roster HTTP ${response.status}`);
     const roster = await response.json() as Free3dBallRoster;
+    free3dBallVariantByGuid.clear();
+    for (const asset of roster.assets) free3dBallVariantByGuid.set(asset.guid, asset.index);
     await Promise.all(roster.assets.slice(0, sidelineBalls.length).map(async (asset) => {
       const target = sidelineBalls[asset.index];
       if (!target) return;
@@ -2151,11 +2435,198 @@ async function hydrateFree3dSidelineBalls(): Promise<void> {
     }));
     document.documentElement.dataset.ballRack = `${roster.assets.length}-free3d-vertex-color-glb`;
     document.documentElement.dataset.free3dBallMode = roster.mode;
-    updateSidelineBallVisibility(currentActiveBallVariant);
-    updateActiveBallModel(currentActiveBallVariant);
+    updateSidelineBallVisibility(currentActiveBallVariant, currentActiveBallSkinId);
+    updateActiveBallModel(currentActiveBallVariant, currentActiveBallSkinId);
   } catch (error) {
     document.documentElement.dataset.free3dBallMode = "fallback-procedural";
     console.warn("Free3D sideline ball hydration failed", error);
+  }
+}
+
+function loadFree3dVehicleRoster(): Promise<Free3dVehicleRoster> {
+  if (!free3dVehicleRosterPromise) {
+    free3dVehicleRosterPromise = fetch(resolveClientAsset("assets/vehicles/free3d/roster.json"), { cache: "no-cache" })
+      .then((response) => {
+        if (!response.ok) throw new Error(`Free3D vehicle roster HTTP ${response.status}`);
+        return response.json() as Promise<Free3dVehicleRoster>;
+      })
+      .then((roster) => {
+        document.documentElement.dataset.free3dVehicleMode = roster.mode;
+        document.documentElement.dataset.free3dVehicleAssetCount = String(roster.assets.length);
+        document.documentElement.dataset.free3dVehicleYawOffsets = roster.assets
+          .filter((asset) => asset.yawOffsetDeg)
+          .map((asset) => `${asset.kind}:${asset.yawOffsetDeg}`)
+          .join(",");
+        return roster;
+      });
+  }
+  return free3dVehicleRosterPromise;
+}
+
+function prepareFree3dVehicleTemplate(model: THREE.Object3D, asset: Free3dVehicleAsset, lod: "1k" | "10k"): THREE.Object3D {
+  model.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return;
+    child.castShadow = true;
+    child.receiveShadow = true;
+    child.geometry.computeVertexNormals();
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    const prepared = materials.map((material) => {
+      const clone = material instanceof THREE.MeshStandardMaterial
+        ? material.clone()
+        : new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.62, metalness: 0.08 });
+      clone.map = null;
+      clone.normalMap = null;
+      clone.roughnessMap = null;
+      clone.metalnessMap = null;
+      clone.aoMap = null;
+      clone.emissiveMap = null;
+      clone.vertexColors = true;
+      clone.needsUpdate = true;
+      return clone;
+    });
+    child.material = Array.isArray(child.material) ? prepared : prepared[0];
+  });
+  const box = new THREE.Box3().setFromObject(model);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+  const maxAxis = Math.max(size.x, size.y, size.z, 0.001);
+  const scale = asset.scale / maxAxis;
+  const yawOffset = THREE.MathUtils.degToRad(asset.yawOffsetDeg || 0);
+  model.scale.setScalar(scale);
+  model.rotation.y = yawOffset;
+  const rotatedCenter = new THREE.Vector3(center.x * scale, 0, center.z * scale).applyAxisAngle(
+    new THREE.Vector3(0, 1, 0),
+    yawOffset
+  );
+  model.position.set(-rotatedCenter.x, -box.min.y * scale, -rotatedCenter.z);
+  model.userData.free3dGuid = asset.guid;
+  model.userData.vehicleAssetKind = asset.kind;
+  model.userData.vehicleLod = lod;
+  model.userData.vehicleYawOffsetDeg = asset.yawOffsetDeg || 0;
+  model.userData.vertexPbrOnly = true;
+  return model;
+}
+
+function loadFree3dVehicleTemplate(asset: Free3dVehicleAsset, lod: "1k" | "10k"): Promise<THREE.Object3D> {
+  const src = lod === "10k" ? asset.src10k : asset.src1k;
+  const cached = free3dVehicleTemplateCache.get(src);
+  if (cached) return cached;
+  const promise = new Promise<THREE.Object3D>((resolve, reject) => {
+    free3dVehicleLoader.load(
+      resolveClientAsset(src),
+      (gltf) => resolve(prepareFree3dVehicleTemplate(gltf.scene, asset, lod)),
+      undefined,
+      reject
+    );
+  });
+  free3dVehicleTemplateCache.set(src, promise);
+  return promise;
+}
+
+function createVehicleFallback(kind: VehicleSnapshot["kind"]): THREE.Group {
+  const group = new THREE.Group();
+  const color = kind === "tank" ? 0x627052 : kind === "tractor" ? 0x7b5a35 : 0x486f92;
+  const bodyMaterial = new THREE.MeshStandardMaterial({ color, roughness: 0.58, metalness: kind === "tank" ? 0.18 : 0.08 });
+  const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x101514, roughness: 0.86, metalness: 0.04 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(kind === "tank" ? 2.6 : 1.55, 0.5, kind === "tank" ? 4.2 : 2.7), bodyMaterial);
+  body.position.y = 0.38;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(kind === "tank" ? 1.25 : 1.0, 0.55, kind === "tank" ? 1.15 : 1.05), bodyMaterial);
+  cabin.position.set(0, 0.88, kind === "tank" ? -0.25 : 0.05);
+  cabin.castShadow = true;
+  group.add(cabin);
+  if (kind === "tank") {
+    const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 2.2), bodyMaterial);
+    barrel.position.set(0, 1.02, 1.25);
+    barrel.castShadow = true;
+    group.add(barrel);
+    for (const x of [-1.35, 1.35]) {
+      const track = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.32, 4.35), darkMaterial);
+      track.position.set(x, 0.24, 0);
+      track.castShadow = true;
+      group.add(track);
+    }
+  } else {
+    const wheelPositions = kind === "tractor"
+      ? [[-0.86, -0.82, 0.42], [0.86, -0.82, 0.42], [-0.72, 0.78, 0.28], [0.72, 0.78, 0.28]]
+      : [[-0.82, -0.9, 0.28], [0.82, -0.9, 0.28], [-0.82, 0.9, 0.28], [0.82, 0.9, 0.28]];
+    for (const [x, z, radius] of wheelPositions) {
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 0.22, 14), darkMaterial);
+      wheel.rotation.z = Math.PI / 2;
+      wheel.position.set(x, radius, z);
+      wheel.castShadow = true;
+      group.add(wheel);
+    }
+  }
+  return group;
+}
+
+class VehicleVisual {
+  readonly root = new THREE.Group();
+  private readonly fallback: THREE.Group;
+  private high: THREE.Object3D | null = null;
+  private low: THREE.Object3D | null = null;
+  private disposed = false;
+  private loadingAssetKind = "";
+  private loadedAssetKind = "";
+
+  constructor(snapshot: VehicleSnapshot) {
+    this.root.name = `vehicle-${snapshot.id}`;
+    this.fallback = createVehicleFallback(snapshot.kind);
+    this.root.add(this.fallback);
+    scene.add(this.root);
+    this.update(snapshot);
+  }
+
+  update(snapshot: VehicleSnapshot): void {
+    if (snapshot.assetKind !== this.loadingAssetKind && snapshot.assetKind !== this.loadedAssetKind) {
+      void this.attach(snapshot.assetKind);
+    }
+    this.root.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
+    this.root.rotation.y = snapshot.yaw;
+    const localOccupant = snapshot.occupantPlayerId === localJoin?.id;
+    const nearCamera = this.root.position.distanceTo(camera.position) < 24;
+    const useHigh = Boolean(this.high && (localOccupant || nearCamera));
+    if (this.high) this.high.visible = useHigh;
+    if (this.low) this.low.visible = !useHigh;
+    this.fallback.visible = !this.high && !this.low;
+    this.root.visible = true;
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    scene.remove(this.root);
+  }
+
+  private async attach(assetKind: string): Promise<void> {
+    this.loadingAssetKind = assetKind;
+    try {
+      const roster = await loadFree3dVehicleRoster();
+      const asset = roster.assets.find((candidate) => candidate.kind === assetKind);
+      if (!asset) throw new Error(`Unknown vehicle asset ${assetKind}`);
+      const [lowTemplate, highTemplate] = await Promise.all([
+        loadFree3dVehicleTemplate(asset, "1k"),
+        loadFree3dVehicleTemplate(asset, "10k")
+      ]);
+      if (this.disposed || this.loadingAssetKind !== assetKind) return;
+      this.low?.removeFromParent();
+      this.high?.removeFromParent();
+      this.low = lowTemplate.clone(true);
+      this.high = highTemplate.clone(true);
+      this.low.visible = true;
+      this.high.visible = false;
+      this.root.add(this.low, this.high);
+      this.loadedAssetKind = assetKind;
+      this.fallback.visible = false;
+      document.documentElement.dataset.free3dVehicleLoaded = "true";
+    } catch (error) {
+      document.documentElement.dataset.free3dVehicleLoaded = "false";
+      console.warn("Free3D vehicle hydration failed", assetKind, error);
+    }
   }
 }
 
@@ -2163,8 +2634,14 @@ function activeBallIndex(variant: number): number {
   return ((variant % BALL_VARIANT_COLORS.length) + BALL_VARIANT_COLORS.length) % BALL_VARIANT_COLORS.length;
 }
 
-function updateSidelineBallVisibility(activeVariant: number): void {
-  const activeIndex = activeBallIndex(activeVariant);
+function ballVariantForSkin(skinId: string | undefined, fallbackVariant = currentActiveBallVariant): number {
+  const safeSkinId = sanitizeLocalBallSkin(skinId);
+  return free3dBallVariantByGuid.get(safeSkinId) ?? activeBallIndex(fallbackVariant);
+}
+
+function updateSidelineBallVisibility(activeVariant: number, activeSkinId = currentActiveBallSkinId): void {
+  const safeSkinId = sanitizeLocalBallSkin(activeSkinId);
+  const activeIndex = ballVariantForSkin(safeSkinId, activeVariant);
   let visibleCount = 0;
   for (let index = 0; index < sidelineBalls.length; index += 1) {
     const ball = sidelineBalls[index];
@@ -2174,10 +2651,12 @@ function updateSidelineBallVisibility(activeVariant: number): void {
   }
   document.documentElement.dataset.ballRackVisible = String(visibleCount);
   document.documentElement.dataset.ballRackActiveRemoved = String(activeIndex);
+  document.documentElement.dataset.ballRackActiveSkin = safeSkinId;
 }
 
-function updateActiveBallModel(activeVariant: number): void {
-  const activeIndex = activeBallIndex(activeVariant);
+function updateActiveBallModel(activeVariant: number, activeSkinId = currentActiveBallSkinId): void {
+  const safeSkinId = sanitizeLocalBallSkin(activeSkinId);
+  const activeIndex = ballVariantForSkin(safeSkinId, activeVariant);
   const activeModel = activeFree3dBalls[activeIndex] || null;
   for (let index = 0; index < activeFree3dBalls.length; index += 1) {
     const model = activeFree3dBalls[index];
@@ -2186,6 +2665,8 @@ function updateActiveBallModel(activeVariant: number): void {
   activeFree3dBallRoot.visible = Boolean(activeModel);
   ballMesh.visible = !activeModel;
   document.documentElement.dataset.activeBallModel = activeModel ? "free3d-vertex-color-glb" : "procedural-fallback";
+  document.documentElement.dataset.activeBallSkin = safeSkinId;
+  document.documentElement.dataset.activeBallSkinIndex = String(activeIndex);
 }
 
 function buildSidelineBalls(root: THREE.Group): void {
@@ -2199,8 +2680,8 @@ function buildSidelineBalls(root: THREE.Group): void {
     sidelineBalls.push(ball);
   }
   document.documentElement.dataset.ballRack = "10-vertex-color-free3d-candidates";
-  updateSidelineBallVisibility(currentActiveBallVariant);
-  updateActiveBallModel(currentActiveBallVariant);
+  updateSidelineBallVisibility(currentActiveBallVariant, currentActiveBallSkinId);
+  updateActiveBallModel(currentActiveBallVariant, currentActiveBallSkinId);
   void hydrateFree3dSidelineBalls();
 }
 
@@ -3246,7 +3727,7 @@ class PlayerVisual {
   }
 
   private async attachCharacterModel(): Promise<void> {
-    const loaded = await loadFree3dCharacter("assets/characters/free3d/roster.json", this.snapshot.characterId);
+    const loaded = await loadFree3dCharacter(CHARACTER_SKIN_ROSTER_SRC, this.snapshot.characterId);
     if (!loaded || this.characterController) {
       if (!loaded) {
         document.documentElement.dataset.playerRigMode = "procedural-fallback";
@@ -3317,7 +3798,7 @@ class PlayerVisual {
     this.updateEmotion(snapshot);
     this.root.position.set(snapshot.position.x, snapshot.position.y - PLAYER_HEIGHT / 2, snapshot.position.z);
     this.root.rotation.y = snapshot.yaw;
-    this.root.visible = snapshot.role === "player";
+    this.root.visible = snapshot.role === "player" && !snapshot.vehicleId;
     const speed = Math.hypot(snapshot.velocity.x, snapshot.velocity.z);
     const stridePhase = time * (7.2 + Math.min(speed, 7) * 0.22) + snapshot.index * 0.7;
     const swing = Math.sin(stridePhase) * Math.min(0.78, speed * 0.09);
@@ -3793,6 +4274,7 @@ function acceptJoin(join: JoinAccepted) {
     localProfile = {
       nickname: localizeGeneratedPlayerName(join.profile.nickname),
       skinId: sanitizeLocalSkin(join.profile.skinId),
+      ballSkinId: sanitizeLocalBallSkin(join.profile.ballSkinId),
       userPic: sanitizeLocalUserPic(join.profile.userPic)
     };
     saveLocalProfile();
@@ -3808,6 +4290,7 @@ function acceptJoin(join: JoinAccepted) {
     ? t("player.joinedTeam", { team: teamNameLabel(localJoin.team), index: localJoin.index + 1 })
     : t("player.spectatorMode");
   updatePlayerChip();
+  renderSkinShop();
   updateResolvedInput();
 }
 
@@ -4073,6 +4556,7 @@ function receiveState(state: ServerState) {
   stateHistory.push({ state, receivedAt: latestSnapshotReceivedAt * 0.001 });
   while (stateHistory.length > STATE_HISTORY_LIMIT) stateHistory.shift();
   observeAudioState(state);
+  renderSkinShop();
   updateNetworkHud(latestSnapshotReceivedAt);
 }
 
@@ -4126,7 +4610,8 @@ function interpolateState(from: ServerState, to: ServerState, alpha: number): Se
   return {
     ...to,
     ball: interpolateBall(from.ball, to.ball, alpha),
-    players: to.players.map((player) => interpolatePlayer(previousPlayers.get(player.id), player, alpha))
+    players: to.players.map((player) => interpolatePlayer(previousPlayers.get(player.id), player, alpha)),
+    vehicles: interpolateVehicles(from.vehicles || [], to.vehicles || [], alpha)
   };
 }
 
@@ -4136,6 +4621,7 @@ function interpolateBall(from: ServerState["ball"], to: ServerState["ball"], alp
     position: lerpVec3(from.position, to.position, alpha),
     velocity: lerpVec3(from.velocity, to.velocity, alpha),
     variant: to.variant,
+    skinId: sanitizeLocalBallSkin(to.skinId || from.skinId),
     ownerPlayerId: to.ownerPlayerId
   };
 }
@@ -4143,6 +4629,24 @@ function interpolateBall(from: ServerState["ball"], to: ServerState["ball"], alp
 function interpolatePlayer(from: PlayerSnapshot | undefined, to: PlayerSnapshot, alpha: number): PlayerSnapshot {
   if (!from || from.role !== to.role || vecDistance(from.position, to.position) > PLAYER_SNAP_DISTANCE) return to;
   if (Boolean(from.ragdoll) !== Boolean(to.ragdoll)) return to;
+  if (from.vehicleId !== to.vehicleId) return to;
+  return {
+    ...to,
+    position: lerpVec3(from.position, to.position, alpha),
+    velocity: lerpVec3(from.velocity, to.velocity, alpha),
+    yaw: lerpAngle(from.yaw, to.yaw, alpha)
+  };
+}
+
+function interpolateVehicles(from: VehicleSnapshot[], to: VehicleSnapshot[], alpha: number): VehicleSnapshot[] {
+  const previousVehicles = new Map(from.map((vehicle) => [vehicle.id, vehicle]));
+  return to.map((vehicle) => interpolateVehicle(previousVehicles.get(vehicle.id), vehicle, alpha));
+}
+
+function interpolateVehicle(from: VehicleSnapshot | undefined, to: VehicleSnapshot, alpha: number): VehicleSnapshot {
+  if (!from || from.assetKind !== to.assetKind || from.kind !== to.kind || vecDistance(from.position, to.position) > PLAYER_SNAP_DISTANCE * 2) {
+    return to;
+  }
   return {
     ...to,
     position: lerpVec3(from.position, to.position, alpha),
@@ -4157,6 +4661,7 @@ function withResponsiveLocalPlayer(state: ServerState, nowSeconds: number): Serv
   const latestPlayer = latestState.players.find((player) => player.id === localId && player.role === "player");
   if (!latestPlayer) return state;
   if (latestPlayer.ragdoll) return state;
+  if (latestPlayer.vehicleId) return state;
   const playerIndex = state.players.findIndex((player) => player.id === localId);
   if (playerIndex < 0) return state;
 
@@ -4515,14 +5020,22 @@ function escapeHtml(value: string) {
 
 function applyState(state: ServerState, time: number, deltaSeconds = 1 / 60) {
   const variant = state.ball.variant || 0;
-  if (document.documentElement.dataset.activeBallVariant !== String(variant)) {
-    applyBallVertexColors(ballGeometry, variant);
-    setBallSeamVariant(ballMesh, variant);
+  const ballSkinId = sanitizeLocalBallSkin(state.ball.skinId);
+  const ballVisualVariant = ballVariantForSkin(ballSkinId, variant);
+  if (
+    document.documentElement.dataset.activeBallVariant !== String(variant)
+    || document.documentElement.dataset.activeBallSkin !== ballSkinId
+  ) {
+    applyBallVertexColors(ballGeometry, ballVisualVariant);
+    setBallSeamVariant(ballMesh, ballVisualVariant);
     ballGeometry.attributes.color.needsUpdate = true;
     currentActiveBallVariant = variant;
-    updateSidelineBallVisibility(variant);
-    updateActiveBallModel(variant);
+    currentActiveBallSkinId = ballSkinId;
+    updateSidelineBallVisibility(variant, ballSkinId);
+    updateActiveBallModel(variant, ballSkinId);
     document.documentElement.dataset.activeBallVariant = String(variant);
+    document.documentElement.dataset.activeBallSkin = ballSkinId;
+    document.documentElement.dataset.activeBallVisualVariant = String(ballVisualVariant);
   }
   ballMesh.position.set(state.ball.position.x, state.ball.position.y, state.ball.position.z);
   ballMesh.rotation.x += state.ball.velocity.z * 0.01;
@@ -4535,6 +5048,7 @@ function applyState(state: ServerState, time: number, deltaSeconds = 1 / 60) {
   ballAura.scale.setScalar(1 + ballPulse * 1.45);
   ballMaterial.emissive.setHex(ballPulse > 0 ? 0xffd87a : 0x000000);
   ballMaterial.emissiveIntensity = ballPulse * 0.35;
+  updateVehicleVisuals(state);
 
   const seen = new Set<string>();
   document.documentElement.dataset.handStrikeVisible = "false";
@@ -4662,6 +5176,28 @@ function applyState(state: ServerState, time: number, deltaSeconds = 1 / 60) {
   observeWeatherAudio(state);
   updateHud(state);
   updateAudioMix(state);
+}
+
+function updateVehicleVisuals(state: ServerState): void {
+  const seen = new Set<string>();
+  for (const vehicle of state.vehicles || []) {
+    seen.add(vehicle.id);
+    let visual = vehicleVisuals.get(vehicle.id);
+    if (!visual) {
+      visual = new VehicleVisual(vehicle);
+      vehicleVisuals.set(vehicle.id, visual);
+    }
+    visual.update(vehicle);
+  }
+  for (const [id, visual] of vehicleVisuals) {
+    if (seen.has(id)) continue;
+    visual.dispose();
+    vehicleVisuals.delete(id);
+  }
+  const occupiedCount = (state.vehicles || []).filter((vehicle) => vehicle.occupantPlayerId).length;
+  document.documentElement.dataset.vehicleCount = String((state.vehicles || []).length);
+  document.documentElement.dataset.vehicleOccupiedCount = String(occupiedCount);
+  document.documentElement.dataset.localVehicleId = localPlayerSnapshot(state)?.vehicleId || "";
 }
 
 function observeAudioState(state: ServerState) {
@@ -5028,6 +5564,13 @@ function onMobilePointerDown(event: PointerEvent): void {
 
   const action = button.dataset.mobileAction as MobileAction | undefined;
   if (!action) return;
+  if (localPlayerMounted()) {
+    document.documentElement.dataset.mobileLastAction = "vehicleExit";
+    document.documentElement.dataset.mobileLastActionAt = String(Math.round(performance.now()));
+    requestVehicleExit();
+    syncMobileControlsUi();
+    return;
+  }
   mobileActionPointers.set(event.pointerId, action);
   markInputActionHintUsed(action);
   document.documentElement.dataset.mobileLastAction = action;
@@ -5106,6 +5649,13 @@ addEventListener("keydown", (event) => {
     bindAction(pendingRebindAction, event.code);
     return;
   }
+  if (skinShopOpen) {
+    if (event.code === "Escape") {
+      event.preventDefault();
+      setSkinShopOpen(false);
+    }
+    return;
+  }
   if (!settingsOpen && event.code === "Enter") {
     event.preventDefault();
     if (document.activeElement === chatInputEl) submitChat();
@@ -5125,6 +5675,21 @@ addEventListener("keydown", (event) => {
     return;
   }
   if (settingsOpen) return;
+  const keyCodes = new Set([event.code]);
+  if (
+    !event.repeat
+    && localPlayerMounted()
+    && (
+      actionPressed(settings.controls, "leftKick", keyCodes)
+      || actionPressed(settings.controls, "rightKick", keyCodes)
+      || actionPressed(settings.controls, "headHit", keyCodes)
+      || actionPressed(settings.controls, "jump", keyCodes)
+    )
+  ) {
+    event.preventDefault();
+    requestVehicleExit();
+    return;
+  }
   pressedCodes.add(event.code);
   if (!event.repeat) {
     markHintsForPressedCodes(new Set([event.code]));
@@ -5134,10 +5699,10 @@ addEventListener("keydown", (event) => {
     if (actionPressed(settings.controls, "rightKick", new Set([event.code]))) {
       if (!rightKickChargingByPointer) beginRightKickCharge(-2);
     }
-    if (actionPressed(settings.controls, "headHit", new Set([event.code]))) input.head += 1;
-    if (actionPressed(settings.controls, "jump", new Set([event.code]))) input.jump += 1;
-    if (actionPressed(settings.controls, "muteAudio", new Set([event.code]))) toggleMute();
-    if (actionPressed(settings.controls, "cameraReset", new Set([event.code]))) resetCamera();
+    if (actionPressed(settings.controls, "headHit", keyCodes)) input.head += 1;
+    if (actionPressed(settings.controls, "jump", keyCodes)) input.jump += 1;
+    if (actionPressed(settings.controls, "muteAudio", keyCodes)) toggleMute();
+    if (actionPressed(settings.controls, "cameraReset", keyCodes)) resetCamera();
   }
   updateResolvedInput();
   sendInput(true);
@@ -5158,6 +5723,23 @@ settingsButton.addEventListener("click", () => {
   setSettingsOpen(true);
 });
 settingsCloseButton.addEventListener("click", () => setSettingsOpen(false));
+skinShopButton.addEventListener("click", () => setSkinShopOpen(true));
+skinShopCloseButton.addEventListener("click", () => setSkinShopOpen(false));
+skinShopPanel.addEventListener("click", (event) => {
+  if (event.target === skinShopPanel) {
+    setSkinShopOpen(false);
+    return;
+  }
+  const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>("button") : null;
+  if (!button || !skinShopPanel.contains(button)) return;
+  if (button.dataset.skinShopTab === "players" || button.dataset.skinShopTab === "balls") {
+    setSkinShopTab(button.dataset.skinShopTab);
+    return;
+  }
+  const action = button.dataset.skinAction;
+  const id = button.dataset.skinId;
+  if ((action === "character" || action === "ball") && id) buyOrSelectSkin(action, id);
+});
 muteButton.addEventListener("click", toggleMute);
 cameraResetButton.addEventListener("click", resetCamera);
 fullscreenButton.addEventListener("click", () => {
@@ -5255,6 +5837,11 @@ canvas.addEventListener("pointerdown", (event) => {
   canvas.focus();
   if (settingsOpen) return;
   if (isChatFocused()) return;
+  if (localPlayerMounted()) {
+    event.preventDefault();
+    requestVehicleExit();
+    return;
+  }
   const mouseCodes = new Set([`Mouse${event.button}`]);
   let handled = false;
   if (actionPressed(settings.controls, "leftKick", mouseCodes)) {

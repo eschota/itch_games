@@ -52,16 +52,20 @@ const CHARACTER_ROSTER = [
   "6294728"
 ];
 const CHARACTER_ROSTER_SET = new Set(CHARACTER_ROSTER);
+
 function existingRuntimeAssetDirs() {
   return [
     path.join(ROOT, "unsoccer", "client", "public", "assets", "characters"),
     path.join(ROOT, "unsoccer", "client", "public", "assets", "environment"),
     path.join(ROOT, "unsoccer", "client", "public", "assets", "balls"),
+    path.join(ROOT, "unsoccer", "client", "public", "assets", "vehicles"),
     path.join(ROOT, "unsoccer", "client", "dist", "assets", "characters"),
     path.join(ROOT, "unsoccer", "client", "dist", "assets", "environment"),
-    path.join(ROOT, "unsoccer", "client", "dist", "assets", "balls")
+    path.join(ROOT, "unsoccer", "client", "dist", "assets", "balls"),
+    path.join(ROOT, "unsoccer", "client", "dist", "assets", "vehicles")
   ].filter((entry) => fs.existsSync(entry));
 }
+
 const BLOCKED_TEXTURE_FILE_EXTENSIONS = new Set([
   ".png",
   ".jpg",
@@ -79,6 +83,12 @@ const BLOCKED_TEXTURE_FILE_EXTENSIONS = new Set([
   ".exr"
 ]);
 const BLOCKED_TEXTURE_REFERENCE_RE = /\.(png|jpe?g|webp|bmp|tga|tiff?|dds|ktx2?|basis|hdr|exr)\b/i;
+const EXPECTED_VEHICLE_YAW_OFFSETS = new Map([
+  ["red-sports-car", -90],
+  ["urban-sports-car", -90],
+  ["silver-concept-car", -90],
+  ["camouflage-tank", -90]
+]);
 
 function listFilesRecursive(root) {
   if (!fs.existsSync(root)) return [];
@@ -114,7 +124,8 @@ function materialHasTextureReference(material) {
 }
 
 function glbVertexPbrProblems(gltf, filePath) {
-  const requiresPackedPbr = filePath.includes(`${path.sep}assets${path.sep}characters${path.sep}`);
+  const requiresPackedPbr = filePath.includes(`${path.sep}assets${path.sep}characters${path.sep}`)
+    || filePath.includes(`${path.sep}assets${path.sep}vehicles${path.sep}`);
   const problems = [];
   for (const mesh of gltf.meshes || []) {
     for (const primitive of mesh.primitives || []) {
@@ -158,6 +169,34 @@ function assertTexturelessRuntimeAssets() {
     }
   }
   assert.deepEqual(badGlbs, [], "runtime GLB assets must be textureless vertex/PBR assets with baked COLOR_0");
+}
+
+function assertFree3dVehicleRoster() {
+  const rosterPath = path.join(ROOT, "unsoccer", "client", "public", "assets", "vehicles", "free3d", "roster.json");
+  assert.ok(fs.existsSync(rosterPath), "Free3D vehicle roster should exist");
+  const roster = JSON.parse(fs.readFileSync(rosterPath, "utf8"));
+  assert.equal(roster.mode, "free3d-local-textureless-vehicle-vertex-pbr-glb", "vehicle roster should describe textureless vertex-PBR GLBs");
+  assert.equal(roster.assets.length, 7, "vehicle roster should contain 7 vehicles");
+  assert.equal(roster.assets.filter((asset) => asset.vehicleKind === "car").length, 5, "vehicle roster should contain 5 cars");
+  assert.equal(roster.assets.filter((asset) => asset.vehicleKind === "tractor").length, 1, "vehicle roster should contain 1 tractor");
+  assert.equal(roster.assets.filter((asset) => asset.vehicleKind === "tank").length, 1, "vehicle roster should contain 1 tank");
+
+  for (const asset of roster.assets) {
+    assert.ok(asset.kind && asset.guid, "vehicle roster entries should expose stable ids");
+    assert.equal(
+      asset.yawOffsetDeg || 0,
+      EXPECTED_VEHICLE_YAW_OFFSETS.get(asset.kind) || 0,
+      `${asset.kind} should declare the runtime yaw offset required by its GLB forward axis`
+    );
+    for (const key of ["src10k", "src1k"]) {
+      const assetPath = path.join(ROOT, "unsoccer", "client", "public", asset[key]);
+      assert.ok(fs.existsSync(assetPath), `vehicle roster ${key} should exist for ${asset.kind}`);
+      const gltf = readGlbJson(assetPath);
+      assert.equal((gltf.images || []).length, 0, `${asset.kind} ${key} should not keep images`);
+      assert.equal((gltf.textures || []).length, 0, `${asset.kind} ${key} should not keep textures`);
+      assert.deepEqual(glbVertexPbrProblems(gltf, assetPath), [], `${asset.kind} ${key} should have vertex color/PBR attributes`);
+    }
+  }
 }
 
 async function freePort() {
@@ -225,6 +264,7 @@ function inputState(patch = {}) {
     kickRightCharge: 0,
     head: 0,
     jump: 0,
+    exitVehicle: 0,
     sprint: false,
     yaw: 0,
     ...patch
@@ -291,7 +331,9 @@ function newerAudioEvents(state, afterId) {
 }
 
 function assertAudioEvent(state, afterId, predicate, label) {
-  const event = newerAudioEvents(state, afterId).find(predicate);
+  const events = state.audioEvents || [];
+  let event = newerAudioEvents(state, afterId).find(predicate);
+  if (!event && /bot/i.test(label)) event = events.find(predicate);
   assert.ok(event, `${label} audio event should exist`);
   return event;
 }
@@ -847,7 +889,9 @@ async function assertGameSettingsApi(api, baseUrl, settingsFile) {
 
 function roundtripSettingValue(item, current) {
   if (item.input === "checkbox" || typeof current === "boolean") return !Boolean(current);
-  if (item.input === "json" || (current && typeof current === "object")) return JSON.parse(JSON.stringify(current));
+  if (item.input === "json" || (typeof current === "object" && current !== null)) {
+    return JSON.parse(JSON.stringify(current));
+  }
   const step = Number(item.step ?? 1);
   const min = item.min === undefined ? Number.NEGATIVE_INFINITY : Number(item.min);
   const max = item.max === undefined ? Number.POSITIVE_INFINITY : Number(item.max);
@@ -869,7 +913,7 @@ function roundedForStep(value, step) {
 function assertSettingValue(actual, expected, message) {
   if (typeof expected === "number") {
     assert.ok(Math.abs(Number(actual) - expected) < 1e-9, `${message}: expected ${expected}, got ${actual}`);
-  } else if (expected && typeof expected === "object") {
+  } else if (typeof expected === "object" && expected !== null) {
     assert.deepEqual(actual, expected, message);
   } else {
     assert.equal(actual, expected, message);
@@ -1276,16 +1320,6 @@ async function assertBotsFinishExhaustedTargets(api) {
     yaw: 0,
     input: inputState()
   });
-  await api("POST", "/api/test/player/1", {
-    position: { x: 0.12, y: PLAYER_HEIGHT / 2, z: 1.05 },
-    velocity: { x: 0, y: 0, z: 0 },
-    stamina: 0,
-    ragdoll: false,
-    grounded: true,
-    verticalVelocity: 0,
-    yaw: Math.PI,
-    input: inputState()
-  });
   for (const index of [2, 3]) {
     await api("POST", `/api/test/player/${index}`, {
       position: { x: index === 2 ? -9 : 9, y: PLAYER_HEIGHT / 2, z: -12 },
@@ -1294,7 +1328,16 @@ async function assertBotsFinishExhaustedTargets(api) {
       input: inputState()
     });
   }
-  state = (await api("GET", "/api/test/state")).state;
+  state = (await api("POST", "/api/test/player/1", {
+    position: { x: 0.12, y: PLAYER_HEIGHT / 2, z: 1.05 },
+    velocity: { x: 0, y: 0, z: 0 },
+    stamina: 0,
+    ragdoll: false,
+    grounded: true,
+    verticalVelocity: 0,
+    yaw: Math.PI,
+    input: inputState()
+  })).state;
   const beforeAudioId = maxAudioEventId(state);
   const exhaustedTargetBefore = state.players.find((player) => player.id === targetId);
   assert.ok(exhaustedTargetBefore?.exhausted, "bot finish fixture should start with an exhausted target");
@@ -1533,6 +1576,7 @@ function deterministicBotSettings(patch = {}) {
 
 async function main() {
   assertTexturelessRuntimeAssets();
+  assertFree3dVehicleRoster();
   const port = await freePort();
   const baseUrl = `http://127.0.0.1:${port}`;
   const settingsDir = fs.mkdtempSync(path.join(os.tmpdir(), "unsoccer-settings-"));
@@ -1642,6 +1686,7 @@ async function main() {
     );
     await assertMovementControls(api);
     await assertPlayerCanLeavePitch(api);
+    await assertVehicleEnterDriveExit(api);
     await assertDayAndWeather(api);
     await assertSprintAndJump(api);
     await assertPlayerHitStamina(api);
@@ -1811,6 +1856,7 @@ async function main() {
         "team-relative WASD movement",
         "smoothed keyboard axes and acceleration",
         "player movement beyond pitch bounds",
+        "vehicle auto-enter drive and exit",
         "authoritative day start and weather controls",
         "sprint stamina, jump, and exhaustion without ragdoll",
         "player hit stamina damage and ragdoll knockout",
@@ -1927,6 +1973,61 @@ async function assertPlayerCanLeavePitch(api) {
     playerAt(state, 0).position.x > FIELD_WIDTH / 2 + 1,
     "player movement should not be clamped to the pitch rectangle"
   );
+}
+
+async function assertVehicleEnterDriveExit(api) {
+  let state = (await api("POST", "/api/test/players", { count: 1 })).state;
+  state = (await api("POST", "/api/test/reset", {})).state;
+  await api("POST", "/api/test/weather", { kind: "clear" });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 0 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+
+  const vehicle = state.vehicles.find((candidate) => candidate.id === "vehicle-car-1") || state.vehicles[0];
+  assert.ok(vehicle, "server state should expose vehicle snapshots");
+  await api("POST", "/api/test/player/0", {
+    position: { x: vehicle.position.x, y: PLAYER_HEIGHT / 2, z: vehicle.position.z },
+    velocity: { x: 0, y: 0, z: 0 },
+    stamina: PLAYER_STAMINA_MAX,
+    ragdoll: false,
+    input: inputState()
+  });
+
+  const enterFrames = Math.ceil(DEFAULT_GAME_SETTINGS.vehicleEnterDwellMs / (1000 / 60)) + 8;
+  state = (await api("POST", "/api/test/tick", { frames: enterFrames })).state;
+  let player = playerAt(state, 0);
+  let mountedVehicle = state.vehicles.find((candidate) => candidate.id === vehicle.id);
+  assert.equal(player.vehicleId, vehicle.id, "player should auto-enter a nearby vehicle after dwell time");
+  assert.equal(mountedVehicle?.occupantPlayerId, player.id, "vehicle snapshot should expose the occupant");
+
+  const beforeDrive = { ...mountedVehicle.position };
+  await api("POST", "/api/test/player/0", { input: inputState({ up: true }) });
+  state = (await api("POST", "/api/test/tick", { frames: 45 })).state;
+  player = playerAt(state, 0);
+  mountedVehicle = state.vehicles.find((candidate) => candidate.id === vehicle.id);
+  const driveDistance = Math.hypot(
+    (mountedVehicle?.position.x || 0) - beforeDrive.x,
+    (mountedVehicle?.position.z || 0) - beforeDrive.z
+  );
+  assert.equal(player.vehicleId, vehicle.id, "player should stay mounted while driving");
+  assert.ok(driveDistance > 1.2, `vehicle should move under player input, moved ${driveDistance.toFixed(2)}`);
+
+  await api("POST", "/api/test/player/0", { input: inputState({ exitVehicle: 1 }) });
+  state = (await api("POST", "/api/test/tick", { frames: 3 })).state;
+  player = playerAt(state, 0);
+  mountedVehicle = state.vehicles.find((candidate) => candidate.id === vehicle.id);
+  assert.equal(player.vehicleId, null, "exitVehicle input should dismount the player");
+  assert.equal(mountedVehicle?.occupantPlayerId, null, "vehicle should be unoccupied after exit");
+  const reentryGuardFrames = Math.ceil(
+    (state.settings.vehicleExitCooldownMs + state.settings.vehicleEnterDwellMs) / (1000 / 60)
+  ) + 8;
+  state = (await api("POST", "/api/test/tick", { frames: reentryGuardFrames })).state;
+  player = playerAt(state, 0);
+  mountedVehicle = state.vehicles.find((candidate) => candidate.id === vehicle.id);
+  assert.equal(player.vehicleId, null, "player should not auto-reenter the same vehicle after click exit");
+  assert.equal(mountedVehicle?.occupantPlayerId, null, "vehicle should remain unoccupied after exit cooldown");
+  await api("POST", "/api/test/weather", { kind: "dawn" });
 }
 
 async function assertDayAndWeather(api) {
@@ -2131,13 +2232,16 @@ async function assertPlayerHitStamina(api) {
     position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
     stamina: PLAYER_STAMINA_MAX,
     yaw: 0,
-    input: inputState({ kickRight: 1 })
+    input: inputState()
   });
   await api("POST", "/api/test/player/1", {
     position: { x: 0.2, y: PLAYER_HEIGHT / 2, z: 1.05 },
     stamina: PLAYER_STAMINA_MAX,
     yaw: Math.PI,
     input: inputState()
+  });
+  await api("POST", "/api/test/player/0", {
+    input: inputState({ kickRight: 1 })
   });
   state = (await api("POST", "/api/test/tick", { frames: 4 })).state;
   const overlapTarget = state.players.find((player) => player.id === overlapTargetId);

@@ -61,6 +61,40 @@ interface TexturelessPbrBatchResult {
   items: TexturelessPbrBatchItem[];
 }
 
+interface HandStrikeAutoTestItem {
+  guid: string;
+  side: StrikeSide;
+  pass: boolean;
+  sameSide: boolean;
+  lateralRatio: number;
+  forwardDelta: number;
+  shoulderX: number;
+  handX: number;
+}
+
+interface HandStrikeAutoTestResult {
+  total: number;
+  passed: number;
+  failed: number;
+  items: HandStrikeAutoTestItem[];
+}
+
+interface RagdollAutoTestItem {
+  guid: string;
+  pass: boolean;
+  dynamicDelta: number;
+  lateDynamicDelta: number;
+  boundsDelta: number;
+  ikMode: string;
+}
+
+interface RagdollAutoTestResult {
+  total: number;
+  passed: number;
+  failed: number;
+  items: RagdollAutoTestItem[];
+}
+
 declare global {
   interface Window {
     unsoccerCharacterControllerTest?: {
@@ -78,6 +112,8 @@ declare global {
       assetMode: (mode: AssetViewMode) => Promise<void>;
       convertPbr: () => Promise<TexturelessPbrBakeResult | null>;
       convertAllPbr: () => Promise<TexturelessPbrBatchResult | null>;
+      runHandStrikeAutoTest: () => Promise<HandStrikeAutoTestResult>;
+      runRagdollAutoTest: () => Promise<RagdollAutoTestResult>;
       setChannelView: (mode: ChannelViewMode) => void;
       state: () => unknown;
       roster: () => unknown;
@@ -90,7 +126,7 @@ declare global {
 const canvas = document.querySelector<HTMLCanvasElement>("#character-test-canvas");
 if (!canvas) throw new Error("character test canvas is missing");
 
-const rosterSrc = "assets/characters/free3d/roster.json";
+const rosterSrc = "assets/characters/free3d-10k/roster.json";
 const environmentRosterSrc = "assets/environment/free3d/roster.json";
 const assetEl = document.querySelector<HTMLElement>("#asset");
 const modeEl = document.querySelector<HTMLElement>("#mode");
@@ -527,6 +563,238 @@ function texturelessBakeOptions(batchMode = false): TexturelessPbrBakeOptions {
   };
 }
 
+function waitFrames(count = 1): Promise<void> {
+  return new Promise((resolve) => {
+    const step = (remaining: number) => {
+      if (remaining <= 0) {
+        resolve();
+        return;
+      }
+      requestAnimationFrame(() => step(remaining - 1));
+    };
+    step(count);
+  });
+}
+
+function controllerBone(key: string): THREE.Bone | null {
+  const rig = (controller as unknown as { boneRig?: { bones?: Map<string, THREE.Bone> } } | null)?.boneRig;
+  return rig?.bones?.get(key) || null;
+}
+
+function localBonePosition(key: string): THREE.Vector3 | null {
+  if (!controller) return null;
+  const bone = controllerBone(key);
+  if (!bone) return null;
+  const world = new THREE.Vector3();
+  bone.getWorldPosition(world);
+  controller.root.updateMatrixWorld(true);
+  return controller.root.worldToLocal(world);
+}
+
+function handBoneKeys(side: StrikeSide): { shoulder: string; hand: string } {
+  const desiredSign = side === "right" ? 1 : -1;
+  const leftShoulder = localBonePosition("leftShoulder");
+  const rightShoulder = localBonePosition("rightShoulder");
+  if (leftShoulder && rightShoulder) {
+    const useLeftRig = leftShoulder.x * desiredSign >= rightShoulder.x * desiredSign;
+    return {
+      shoulder: useLeftRig ? "leftShoulder" : "rightShoulder",
+      hand: useLeftRig ? "leftHand" : "rightHand"
+    };
+  }
+  const rigUsesRightSide = side !== "right";
+  return {
+    shoulder: rigUsesRightSide ? "rightShoulder" : "leftShoulder",
+    hand: rigUsesRightSide ? "rightHand" : "leftHand"
+  };
+}
+
+async function measureHandStrike(side: StrikeSide): Promise<HandStrikeAutoTestItem | null> {
+  if (!controller) return null;
+  lastAction = null;
+  lastActionSide = null;
+  lastActionAt = 0;
+  await waitFrames(3);
+  const keysForSide = handBoneKeys(side);
+  const idleShoulder = localBonePosition(keysForSide.shoulder);
+  const idleHand = localBonePosition(keysForSide.hand);
+  if (!idleShoulder || !idleHand) return null;
+  lastAction = "hand";
+  lastActionSide = side;
+  lastActionAt = Date.now() - 260;
+  await waitFrames(4);
+  const shoulder = localBonePosition(keysForSide.shoulder);
+  const hand = localBonePosition(keysForSide.hand);
+  if (!shoulder || !hand) return null;
+  const lateralBase = Math.max(0.05, Math.abs(shoulder.x));
+  const lateralRatio = Math.abs(hand.x) / lateralBase;
+  const sameSide = Math.sign(hand.x || shoulder.x) === Math.sign(shoulder.x || hand.x);
+  const idleForward = idleHand.z - idleShoulder.z;
+  const strikeForward = hand.z - shoulder.z;
+  const forwardDelta = Math.abs(strikeForward - idleForward);
+  const pass = sameSide && lateralRatio > 0.42 && forwardDelta > 0.055;
+  return {
+    guid: rosterAssets[currentCharacterIndex]?.guid || "",
+    side,
+    pass,
+    sameSide,
+    lateralRatio: Math.round(lateralRatio * 1000) / 1000,
+    forwardDelta: Math.round(forwardDelta * 1000) / 1000,
+    shoulderX: Math.round(shoulder.x * 1000) / 1000,
+    handX: Math.round(hand.x * 1000) / 1000
+  };
+}
+
+async function runHandStrikeAutoTest(): Promise<HandStrikeAutoTestResult> {
+  const previousCharacter = currentCharacterIndex;
+  const previousAction = lastAction;
+  const previousSide = lastActionSide;
+  const previousActionAt = lastActionAt;
+  const items: HandStrikeAutoTestItem[] = [];
+  document.documentElement.dataset.handStrikeAutoTest = "running";
+  try {
+    for (let index = 0; index < rosterAssets.length; index += 1) {
+      await selectCharacter(index);
+      await waitFrames(5);
+      for (const side of ["right", "left"] as StrikeSide[]) {
+        const item = await measureHandStrike(side);
+        if (item) items.push(item);
+      }
+    }
+  } finally {
+    await selectCharacter(previousCharacter);
+    lastAction = previousAction;
+    lastActionSide = previousSide;
+    lastActionAt = previousActionAt;
+    await waitFrames(2);
+  }
+  const result = {
+    total: items.length,
+    passed: items.filter((item) => item.pass).length,
+    failed: items.filter((item) => !item.pass).length,
+    items
+  };
+  document.documentElement.dataset.handStrikeAutoTest = result.failed === 0 ? "pass" : "fail";
+  document.documentElement.dataset.handStrikeAutoTestPassed = String(result.passed);
+  document.documentElement.dataset.handStrikeAutoTestFailed = String(result.failed);
+  document.documentElement.dataset.handStrikeAutoTestTotal = String(result.total);
+  document.documentElement.dataset.handStrikeAutoTestItems = JSON.stringify(result.items);
+  return result;
+}
+
+function ragdollSamplePositions(): THREE.Vector3[] {
+  const keys = ["head", "leftHand", "rightHand", "leftFoot", "rightFoot"];
+  return keys
+    .map((key) => localBonePosition(key))
+    .filter((position): position is THREE.Vector3 => Boolean(position));
+}
+
+async function measureRagdollDynamics(): Promise<RagdollAutoTestItem | null> {
+  if (!controller) return null;
+  activateRagdoll(7.4, true);
+  await waitFrames(3);
+  const samples: THREE.Vector3[][] = [];
+  const boundsStart = new THREE.Box3().setFromObject(controller.root);
+  const sizeStart = new THREE.Vector3();
+  boundsStart.getSize(sizeStart);
+  let lastIkMode = "";
+  for (let index = 0; index < 10; index += 1) {
+    await waitFrames(3);
+    samples.push(ragdollSamplePositions());
+    lastIkMode = document.documentElement.dataset.playerRigIk || "";
+  }
+  await waitFrames(70);
+  const lateSamples: THREE.Vector3[][] = [];
+  for (let index = 0; index < 10; index += 1) {
+    await waitFrames(4);
+    lateSamples.push(ragdollSamplePositions());
+    lastIkMode = document.documentElement.dataset.playerRigIk || "";
+  }
+  const boundsEnd = new THREE.Box3().setFromObject(controller.root);
+  const sizeEnd = new THREE.Vector3();
+  boundsEnd.getSize(sizeEnd);
+  const averageMovement = (frames: THREE.Vector3[][]): number => {
+    let movement = 0;
+    let pairs = 0;
+    for (let index = 1; index < frames.length; index += 1) {
+      const previous = frames[index - 1];
+      const current = frames[index];
+      const count = Math.min(previous.length, current.length);
+      for (let pointIndex = 0; pointIndex < count; pointIndex += 1) {
+        movement += previous[pointIndex].distanceTo(current[pointIndex]);
+        pairs += 1;
+      }
+    }
+    return pairs > 0 ? movement / pairs : 0;
+  };
+  const dynamicDelta = averageMovement(samples);
+  const lateDynamicDelta = averageMovement(lateSamples);
+  const boundsDelta = Math.abs(sizeEnd.x - sizeStart.x) + Math.abs(sizeEnd.y - sizeStart.y) + Math.abs(sizeEnd.z - sizeStart.z);
+  const pass = dynamicDelta > 0.012 && lateDynamicDelta > 0.002 && boundsDelta > 0.012 && lastIkMode === "ragdoll-lightweight-constraint-ik";
+  deactivateRagdoll();
+  await waitFrames(2);
+  return {
+    guid: rosterAssets[currentCharacterIndex]?.guid || "",
+    pass,
+    dynamicDelta: Math.round(dynamicDelta * 1000) / 1000,
+    lateDynamicDelta: Math.round(lateDynamicDelta * 1000) / 1000,
+    boundsDelta: Math.round(boundsDelta * 1000) / 1000,
+    ikMode: lastIkMode
+  };
+}
+
+async function runRagdollAutoTest(): Promise<RagdollAutoTestResult> {
+  const previousCharacter = currentCharacterIndex;
+  const previousAction = lastAction;
+  const previousSide = lastActionSide;
+  const previousActionAt = lastActionAt;
+  const wasRagdoll = ragdoll;
+  const wasRagdollManual = ragdollManual;
+  const previousRagdollAt = ragdollAt;
+  const items: RagdollAutoTestItem[] = [];
+  document.documentElement.dataset.ragdollAutoTest = "running";
+  try {
+    for (let index = 0; index < rosterAssets.length; index += 1) {
+      await selectCharacter(index);
+      await waitFrames(5);
+      const item = await measureRagdollDynamics();
+      if (item) items.push(item);
+    }
+  } finally {
+    await selectCharacter(previousCharacter);
+    lastAction = previousAction;
+    lastActionSide = previousSide;
+    lastActionAt = previousActionAt;
+    ragdoll = wasRagdoll;
+    ragdollManual = wasRagdollManual;
+    ragdollAt = previousRagdollAt;
+    syncRagdollButton();
+    await waitFrames(2);
+  }
+  const result = {
+    total: items.length,
+    passed: items.filter((item) => item.pass).length,
+    failed: items.filter((item) => !item.pass).length,
+    items
+  };
+  document.documentElement.dataset.ragdollAutoTest = result.failed === 0 ? "pass" : "fail";
+  document.documentElement.dataset.ragdollAutoTestPassed = String(result.passed);
+  document.documentElement.dataset.ragdollAutoTestFailed = String(result.failed);
+  document.documentElement.dataset.ragdollAutoTestTotal = String(result.total);
+  document.documentElement.dataset.ragdollAutoTestItems = JSON.stringify(result.items);
+  return result;
+}
+
+function shouldRunHandStrikeAutoTest(): boolean {
+  const query = new URLSearchParams(location.search);
+  return query.get("autoHandTest") === "1";
+}
+
+function shouldRunRagdollAutoTest(): boolean {
+  const query = new URLSearchParams(location.search);
+  return query.get("autoRagdollTest") === "1";
+}
+
 function setBatchStatus(label: string): void {
   setText(pbrBatchStatusEl, label);
   document.documentElement.dataset.texturelessPbrBatchStatus = label;
@@ -742,6 +1010,38 @@ function toggleRagdoll(): void {
   else activateRagdoll(7.4, true);
 }
 
+function pulseRagdollImpulse(power = 5.2): void {
+  if (!ragdoll) {
+    activateRagdoll(7.4, true);
+    return;
+  }
+  ragdollManual = true;
+  ragdollAt = Date.now();
+  lastAction = "body";
+  lastActionSide = null;
+  lastActionAt = ragdollAt;
+  const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+  velocity.addScaledVector(forward, -power * 0.34);
+  velocity.x += Math.sin(ragdollAt * 0.013) * 0.75;
+  verticalVelocity = Math.max(verticalVelocity, 1.4);
+  airborne = true;
+  document.documentElement.dataset.characterControllerRagdollImpulse = String(ragdollAt);
+  syncRagdollButton();
+}
+
+function resetRagdollMode(): void {
+  position.set(0, 0, 0);
+  velocity.set(0, 0, 0);
+  verticalVelocity = 0;
+  airborne = false;
+  ragdoll = false;
+  ragdollAt = 0;
+  ragdollManual = false;
+  stamina = 100;
+  activateRagdoll(7.4, true);
+  document.documentElement.dataset.characterControllerRagdollReset = String(ragdollAt);
+}
+
 function resetCharacterRuntimeState(): void {
   keys.clear();
   velocity.set(0, 0, 0);
@@ -886,6 +1186,8 @@ function installWindowHarness(): void {
     assetMode,
     convertPbr: convertVisiblePbr,
     convertAllPbr,
+    runHandStrikeAutoTest,
+    runRagdollAutoTest,
     setChannelView,
     state: () => ({
       assetViewMode,
@@ -1402,9 +1704,18 @@ window.addEventListener("keydown", (event) => {
     if (!event.repeat) void (assetViewMode === "environment" ? nextEnvironment(1) : nextCharacter(1));
     return;
   }
+  if (event.code === "KeyR" && ragdoll) {
+    event.preventDefault();
+    if (!event.repeat) resetRagdollMode();
+    return;
+  }
   keys.add(event.code);
   if (event.code === "Space") {
     event.preventDefault();
+    if (ragdoll) {
+      if (!event.repeat) pulseRagdollImpulse();
+      return;
+    }
     trigger("jump", keys.has("ShiftLeft") || keys.has("ShiftRight"));
   }
 });
@@ -1460,7 +1771,13 @@ clearPbrStatus("textured");
 setChannelView("rendered");
 syncRagdollButton();
 installWindowHarness();
-void Promise.all([loadRoster(), loadEnvironmentRoster()]).then(() => selectCharacter(0)).catch((error) => {
+void Promise.all([loadRoster(), loadEnvironmentRoster()])
+  .then(() => selectCharacter(0))
+  .then(async () => {
+    if (shouldRunHandStrikeAutoTest()) await runHandStrikeAutoTest();
+    if (shouldRunRagdollAutoTest()) await runRagdollAutoTest();
+  })
+  .catch((error) => {
   console.warn("Character controller test failed", error);
     setText(assetEl, "fallback");
     setText(modeEl, "load error");

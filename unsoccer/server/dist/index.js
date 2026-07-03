@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { CHARACTER_ROSTER, DEFAULT_USER_PICS, DEFAULT_INPUT, DEFAULT_GAME_SETTINGS, GAME_VERSION, GAME_SETTINGS_SCHEMA, MAX_ROOM_CLIENTS, SERVER_TICK_RATE, SNAPSHOT_RATE, clamp, emotionChoiceById, normalizeGameSettingsPatch, sanitizePlayerName } from "@itch-games/unsoccer-shared";
+import { BALL_SKIN_ROSTER, CHARACTER_ROSTER, DEFAULT_BALL_SKIN_ID, DEFAULT_USER_PICS, DEFAULT_INPUT, DEFAULT_GAME_SETTINGS, GAME_VERSION, GAME_SETTINGS_SCHEMA, MAX_ROOM_CLIENTS, SERVER_TICK_RATE, SNAPSHOT_RATE, clamp, emotionChoiceById, normalizeGameSettingsPatch, sanitizePlayerName } from "@itch-games/unsoccer-shared";
 const ACTION_READY_AT = Number.NEGATIVE_INFINITY;
 const WEBSOCKET_ACCEPT_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 const MAX_WEBSOCKET_PAYLOAD_BYTES = 64 * 1024;
@@ -15,6 +15,16 @@ const CHAT_MESSAGE_MAX_LENGTH = 160;
 const USER_PIC_MAX_LENGTH = 96;
 const EMOTION_VISIBLE_MS = 4200;
 const STANCE_MIN_SPEED = 0.22;
+const VEHICLE_WORLD_MARGIN = 42;
+const VEHICLE_SPAWN_TEMPLATES = [
+    { id: "vehicle-car-1", assetKind: "emerald-hypercar", kind: "car", side: "west", xOffset: -13.4, zOffset: -25, yaw: Math.PI / 2, halfWidth: 0.98, halfLength: 2.05, seatOffset: { x: 0, y: 0.95, z: 0.1 } },
+    { id: "vehicle-car-2", assetKind: "silver-sports-car", kind: "car", side: "west", xOffset: -13.4, zOffset: -14, yaw: Math.PI / 2, halfWidth: 0.96, halfLength: 2.0, seatOffset: { x: 0, y: 0.92, z: 0.05 } },
+    { id: "vehicle-car-3", assetKind: "red-sports-car", kind: "car", side: "east", xOffset: 13.4, zOffset: -22, yaw: -Math.PI / 2, halfWidth: 0.96, halfLength: 2.0, seatOffset: { x: 0, y: 0.92, z: 0.05 } },
+    { id: "vehicle-car-4", assetKind: "urban-sports-car", kind: "car", side: "east", xOffset: 13.4, zOffset: -10, yaw: -Math.PI / 2, halfWidth: 0.98, halfLength: 2.02, seatOffset: { x: 0, y: 0.94, z: 0.05 } },
+    { id: "vehicle-car-5", assetKind: "silver-concept-car", kind: "car", side: "south", xOffset: 16, zOffset: 13.6, yaw: Math.PI, halfWidth: 1.0, halfLength: 2.06, seatOffset: { x: 0, y: 0.96, z: 0.08 } },
+    { id: "vehicle-tractor-1", assetKind: "steampunk-tractor", kind: "tractor", side: "north", xOffset: -17, zOffset: 14.2, yaw: 0.18, halfWidth: 1.12, halfLength: 1.9, seatOffset: { x: 0, y: 1.1, z: -0.05 } },
+    { id: "vehicle-tank-1", assetKind: "camouflage-tank", kind: "tank", side: "north", xOffset: 17, zOffset: 17.2, yaw: -0.42, halfWidth: 1.32, halfLength: 2.36, seatOffset: { x: 0, y: 1.28, z: -0.15 } }
+];
 class WebSocketChannel {
     socket;
     id = `ws-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -417,6 +427,7 @@ function cloneInput(input) {
         kickRightCharge: clamp(Number(input.kickRightCharge || 0), 0, 1),
         head: Number(input.head || 0),
         jump: Number(input.jump || 0),
+        exitVehicle: Number(input.exitVehicle || 0),
         sprint: Boolean(input.sprint),
         yaw: Number.isFinite(input.yaw) ? input.yaw : 0
     };
@@ -480,6 +491,10 @@ function sanitizeSkinId(value, fallback) {
     const raw = typeof value === "string" ? value : "";
     return CHARACTER_ROSTER.includes(raw) ? raw : fallback;
 }
+function sanitizeBallSkinId(value, fallback = DEFAULT_BALL_SKIN_ID) {
+    const raw = typeof value === "string" ? value : "";
+    return BALL_SKIN_ROSTER.includes(raw) ? raw : fallback;
+}
 function sanitizeUserPic(value, fallback) {
     const raw = typeof value === "string" ? value.trim() : "";
     if (!raw)
@@ -506,6 +521,7 @@ function profileFromPlayer(player) {
     return {
         nickname: player.name,
         skinId: player.characterId,
+        ballSkinId: player.ballSkinId,
         userPic: player.userPic
     };
 }
@@ -519,6 +535,7 @@ class UnsoccerServer {
     world;
     ballBody;
     players = new Map();
+    vehicles = new Map();
     persistedPlayers = new Map();
     characterDeck = [];
     score = { blue: 0, orange: 0 };
@@ -542,7 +559,9 @@ class UnsoccerServer {
     nextWeatherChangeAt = this.startedAt + this.randomWeatherDelayMs();
     testDayTimeOverrideSeconds = null;
     testNow = this.startedAt;
+    testDayCycleStartedAt = this.startedAt;
     activeBallVariant = 0;
+    activeBallSkinId = DEFAULT_BALL_SKIN_ID;
     goalReset = null;
     botSettings = { ...DEFAULT_BOT_SETTINGS };
     nextBotId = 1;
@@ -559,8 +578,10 @@ class UnsoccerServer {
         await RAPIER.init();
         this.loadGameSettingsFromDisk({ resetPhysics: false, source: "startup" });
         this.createPhysicsWorld();
+        this.resetVehicles();
         this.physicsReady = true;
-        this.watchGameSettingsFile();
+        if (!TEST_MODE)
+            this.watchGameSettingsFile();
         this.configureHttp();
         this.configureWebSocket();
         this.rebalanceRoles();
@@ -675,6 +696,7 @@ class UnsoccerServer {
             player.ragdollVelocity = zeroVec();
         }
         this.createPhysicsWorld();
+        this.resetVehicles();
         this.resetMatch(now);
         this.message = "\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438 \u0438\u0433\u0440\u044b \u043f\u0440\u0438\u043c\u0435\u043d\u0435\u043d\u044b";
         this.broadcast("state", this.snapshot(now));
@@ -841,6 +863,8 @@ class UnsoccerServer {
             if (!this.allowTestRequest(request, response))
                 return;
             this.testNow = Date.now();
+            this.testDayCycleStartedAt = this.testNow;
+            this.testDayTimeOverrideSeconds = null;
             this.resetMatch(this.testNow);
             response.json({ ok: true, state: this.snapshot() });
         });
@@ -904,6 +928,7 @@ class UnsoccerServer {
             const body = this.requestBody(request);
             if (body.clear === true) {
                 this.testDayTimeOverrideSeconds = null;
+                this.testDayCycleStartedAt = this.testNow;
             }
             else {
                 this.testDayTimeOverrideSeconds = this.numberField(body.dayTimeSeconds, this.settings.dayStartSeconds, 0, 24 * 60 * 60 - 1);
@@ -1085,6 +1110,7 @@ class UnsoccerServer {
             id: player.id,
             name: player.name,
             characterId: player.characterId,
+            ballSkinId: player.ballSkinId,
             userPic: player.userPic,
             goals: player.goals
         });
@@ -1317,7 +1343,8 @@ class UnsoccerServer {
     dayTimeSeconds(now) {
         if (this.testDayTimeOverrideSeconds !== null)
             return this.testDayTimeOverrideSeconds;
-        const elapsedSeconds = Math.max(0, (now - this.startedAt) / 1000);
+        const cycleStartedAt = TEST_MODE ? this.testDayCycleStartedAt : this.startedAt;
+        const elapsedSeconds = Math.max(0, (now - cycleStartedAt) / 1000);
         const dayAdvanceSeconds = elapsedSeconds / Math.max(1, this.settings.dayCycleSeconds) * 24 * 60 * 60;
         return (this.settings.dayStartSeconds + dayAdvanceSeconds) % (24 * 60 * 60);
     }
@@ -1368,6 +1395,7 @@ class UnsoccerServer {
             joinOrder: this.joinCounter++,
             goals: persisted?.goals || 0,
             characterId: persisted?.characterId || this.nextCharacterId(),
+            ballSkinId: sanitizeBallSkinId(persisted?.ballSkinId),
             clientFingerprint: options.clientFingerprint || null,
             userPic: DEFAULT_USER_PICS[botSeed % DEFAULT_USER_PICS.length] || DEFAULT_USER_PICS[0] || "⚽",
             emotion: null,
@@ -1375,6 +1403,11 @@ class UnsoccerServer {
             transport: options.transport,
             input: { ...DEFAULT_INPUT },
             inputSequence: 0,
+            vehicleId: null,
+            vehicleEnterCandidateId: null,
+            vehicleEnterCandidateSince: 0,
+            vehicleExitCooldownUntil: 0,
+            lastExitVehicle: 0,
             body: null,
             moveAxis: { x: 0, z: 0 },
             moveVelocity: zeroVec(),
@@ -1432,6 +1465,7 @@ class UnsoccerServer {
         if (nameValue !== undefined)
             player.name = sanitizePlayerName(nameValue);
         player.characterId = sanitizeSkinId(source.skinId ?? source.characterId, player.characterId);
+        player.ballSkinId = sanitizeBallSkinId(source.ballSkinId ?? source.ball_skin_id, player.ballSkinId);
         player.userPic = sanitizeUserPic(source.userPic ?? source.user_pic, player.userPic);
     }
     applyEmotion(player, emotionId, now) {
@@ -1478,11 +1512,17 @@ class UnsoccerServer {
         for (const session of this.persistedPlayers.values())
             session.goals = 0;
         this.resetBall(now);
+        this.resetVehicles();
         this.countdownUntil = 0;
         this.lastCountdownAudioSecond = null;
         this.message = "\u0416\u0434\u0451\u043c \u0438\u0433\u0440\u043e\u043a\u043e\u0432";
         for (const player of this.players.values()) {
             player.input = { ...DEFAULT_INPUT };
+            player.vehicleId = null;
+            player.vehicleEnterCandidateId = null;
+            player.vehicleEnterCandidateSince = 0;
+            player.vehicleExitCooldownUntil = 0;
+            player.lastExitVehicle = 0;
             player.goals = 0;
             player.inputSequence = 0;
             player.lastKickAt = ACTION_READY_AT;
@@ -1558,7 +1598,17 @@ class UnsoccerServer {
                 player.stamina = clamp(stamina, 0, this.settings.playerStaminaMax);
             player.exhausted = player.stamina <= 0.01 || player.exhausted && player.stamina < this.settings.playerExhaustedRecoveryThreshold;
         }
-        if (body.profile !== undefined || body.name !== undefined || body.nickname !== undefined || body.skinId !== undefined || body.userPic !== undefined) {
+        if (body.goals !== undefined) {
+            const goals = Number(body.goals);
+            if (Number.isFinite(goals))
+                player.goals = clamp(Math.floor(goals), 0, 9999);
+        }
+        if (body.profile !== undefined
+            || body.name !== undefined
+            || body.nickname !== undefined
+            || body.skinId !== undefined
+            || body.ballSkinId !== undefined
+            || body.userPic !== undefined) {
             this.applyProfile(player, { ...body, ...profilePatchSource(body.profile) });
         }
         if (body.trailingFoot !== undefined) {
@@ -1616,6 +1666,146 @@ class UnsoccerServer {
             .setRestitution(this.settings.ballRestitution)
             .setFriction(0.78)
             .setDensity(this.settings.ballDensity), this.ballBody);
+    }
+    resetVehicles() {
+        this.vehicles.clear();
+        for (const template of VEHICLE_SPAWN_TEMPLATES) {
+            const position = this.vehicleSpawnPosition(template);
+            this.vehicles.set(template.id, {
+                id: template.id,
+                assetKind: template.assetKind,
+                kind: template.kind,
+                position,
+                home: { ...position },
+                velocity: zeroVec(),
+                yaw: template.yaw,
+                homeYaw: template.yaw,
+                speed: 0,
+                halfWidth: template.halfWidth,
+                halfLength: template.halfLength,
+                seatOffset: { ...template.seatOffset },
+                occupantPlayerId: null
+            });
+        }
+    }
+    vehicleSpawnPosition(template) {
+        const halfW = this.settings.fieldWidth / 2;
+        const halfL = this.settings.fieldLength / 2;
+        if (template.side === "west")
+            return { x: -halfW + template.xOffset, y: 0, z: template.zOffset };
+        if (template.side === "east")
+            return { x: halfW + template.xOffset, y: 0, z: template.zOffset };
+        if (template.side === "north")
+            return { x: template.xOffset, y: 0, z: halfL + template.zOffset };
+        return { x: template.xOffset, y: 0, z: -halfL - template.zOffset };
+    }
+    vehicleProfile(kind) {
+        if (kind === "tractor") {
+            return {
+                maxSpeed: this.settings.vehicleTractorMaxSpeed,
+                acceleration: this.settings.vehicleTractorAcceleration,
+                turnRate: this.settings.vehicleTractorTurnRate
+            };
+        }
+        if (kind === "tank") {
+            return {
+                maxSpeed: this.settings.vehicleTankMaxSpeed,
+                acceleration: this.settings.vehicleTankAcceleration,
+                turnRate: this.settings.vehicleTankTurnRate
+            };
+        }
+        return {
+            maxSpeed: this.settings.vehicleCarMaxSpeed,
+            acceleration: this.settings.vehicleCarAcceleration,
+            turnRate: this.settings.vehicleCarTurnRate
+        };
+    }
+    vehicleSeatPosition(vehicle) {
+        const forwardX = Math.sin(vehicle.yaw);
+        const forwardZ = Math.cos(vehicle.yaw);
+        const rightX = Math.cos(vehicle.yaw);
+        const rightZ = -Math.sin(vehicle.yaw);
+        return {
+            x: vehicle.position.x + rightX * vehicle.seatOffset.x + forwardX * vehicle.seatOffset.z,
+            y: this.settings.playerHeight / 2,
+            z: vehicle.position.z + rightZ * vehicle.seatOffset.x + forwardZ * vehicle.seatOffset.z
+        };
+    }
+    syncMountedPlayer(player, vehicle) {
+        if (!player.body)
+            return;
+        const seat = this.vehicleSeatPosition(vehicle);
+        player.body.setNextKinematicTranslation(seat);
+        player.body.setTranslation(seat, true);
+        player.velocity = { ...vehicle.velocity };
+        player.moveAxis = { x: 0, z: 0 };
+        player.moveVelocity = zeroVec();
+        player.pushVelocity = zeroVec();
+        player.ragdollVelocity = zeroVec();
+        player.verticalVelocity = 0;
+        player.grounded = true;
+        player.sprinting = false;
+        player.yaw = vehicle.yaw;
+    }
+    mountVehicle(player, vehicle, now) {
+        if (!player.body || player.role !== "player" || vehicle.occupantPlayerId)
+            return;
+        if (this.ballOwnerPlayerId === player.id)
+            this.dropBallOwner(now);
+        player.vehicleId = vehicle.id;
+        player.vehicleEnterCandidateId = null;
+        player.vehicleEnterCandidateSince = 0;
+        player.lastExitVehicle = player.input.exitVehicle;
+        player.ragdoll = false;
+        player.ragdollAt = 0;
+        player.exhausted = false;
+        vehicle.occupantPlayerId = player.id;
+        this.syncMountedPlayer(player, vehicle);
+        this.message = `${player.name} сел в транспорт`;
+    }
+    dismountVehicle(player, now) {
+        const vehicle = player.vehicleId ? this.vehicles.get(player.vehicleId) : null;
+        if (!vehicle) {
+            player.vehicleId = null;
+            return;
+        }
+        vehicle.occupantPlayerId = null;
+        player.vehicleId = null;
+        player.vehicleExitCooldownUntil = now + this.settings.vehicleExitCooldownMs;
+        player.vehicleEnterCandidateId = null;
+        player.vehicleEnterCandidateSince = 0;
+        player.lastExitVehicle = player.input.exitVehicle;
+        const side = this.vehicleExitPosition(vehicle);
+        if (player.body) {
+            player.body.setNextKinematicTranslation(side);
+            player.body.setTranslation(side, true);
+        }
+        player.velocity = zeroVec();
+        player.moveAxis = { x: 0, z: 0 };
+        player.moveVelocity = zeroVec();
+        player.pushVelocity = zeroVec();
+        player.yaw = vehicle.yaw;
+        this.message = `${player.name} вышел из транспорта`;
+    }
+    vehicleExitPosition(vehicle) {
+        const rightX = Math.cos(vehicle.yaw);
+        const rightZ = -Math.sin(vehicle.yaw);
+        const enterDistance = this.settings.vehicleEnterRadius + Math.max(vehicle.halfWidth, vehicle.halfLength);
+        const offset = enterDistance + this.settings.playerRadius + 0.35;
+        return {
+            x: vehicle.position.x + rightX * offset,
+            y: this.settings.playerHeight / 2,
+            z: vehicle.position.z + rightZ * offset
+        };
+    }
+    releasePlayerVehicle(player, now = Date.now()) {
+        const vehicle = player.vehicleId ? this.vehicles.get(player.vehicleId) : null;
+        if (vehicle?.occupantPlayerId === player.id)
+            vehicle.occupantPlayerId = null;
+        player.vehicleId = null;
+        player.vehicleEnterCandidateId = null;
+        player.vehicleEnterCandidateSince = 0;
+        player.vehicleExitCooldownUntil = now + this.settings.vehicleExitCooldownMs;
     }
     onConnection(channel) {
         const id = channel.id;
@@ -1741,6 +1931,8 @@ class UnsoccerServer {
             }
             if (active && !player.body)
                 this.createBody(player);
+            if (!active && player.vehicleId)
+                this.releasePlayerVehicle(player, now);
             if (!active && player.body)
                 this.destroyBody(player);
             if (previousRole !== player.role) {
@@ -1765,6 +1957,8 @@ class UnsoccerServer {
             return;
         if (this.ballOwnerPlayerId === player.id)
             this.dropBallOwner(Date.now());
+        if (player.vehicleId)
+            this.releasePlayerVehicle(player);
         this.world.removeRigidBody(player.body);
         player.body = null;
     }
@@ -2070,6 +2264,111 @@ class UnsoccerServer {
         }
         return best;
     }
+    updateVehicles(dt, now) {
+        for (const vehicle of this.vehicles.values()) {
+            const previous = { ...vehicle.position };
+            const occupant = vehicle.occupantPlayerId ? this.players.get(vehicle.occupantPlayerId) || null : null;
+            if (!occupant || occupant.role !== "player" || occupant.vehicleId !== vehicle.id) {
+                if (vehicle.occupantPlayerId)
+                    vehicle.occupantPlayerId = null;
+                this.applyVehicleDrag(vehicle, dt);
+            }
+            else if (occupant.input.exitVehicle > occupant.lastExitVehicle) {
+                this.dismountVehicle(occupant, now);
+                this.applyVehicleDrag(vehicle, dt);
+            }
+            else {
+                this.driveVehicle(vehicle, occupant.input, dt);
+                this.syncMountedPlayer(occupant, vehicle);
+            }
+            vehicle.velocity = {
+                x: (vehicle.position.x - previous.x) / Math.max(dt, 0.001),
+                y: 0,
+                z: (vehicle.position.z - previous.z) / Math.max(dt, 0.001)
+            };
+        }
+    }
+    driveVehicle(vehicle, input, dt) {
+        const profile = this.vehicleProfile(vehicle.kind);
+        const throttle = (input.up ? 1 : 0) - (input.down ? 1 : 0);
+        const steer = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+        const braking = throttle !== 0 && vehicle.speed !== 0 && Math.sign(throttle) !== Math.sign(vehicle.speed);
+        if (braking) {
+            vehicle.speed = approachScalar(vehicle.speed, 0, this.settings.vehicleBrakeStrength, dt);
+        }
+        else if (Math.abs(throttle) > 0.001) {
+            vehicle.speed += throttle * profile.acceleration * dt;
+        }
+        else {
+            vehicle.speed *= Math.exp(-this.settings.vehicleDrag * dt);
+            if (Math.abs(vehicle.speed) < 0.015)
+                vehicle.speed = 0;
+        }
+        vehicle.speed = clamp(vehicle.speed, -profile.maxSpeed * 0.42, profile.maxSpeed);
+        const speed01 = clamp(Math.abs(vehicle.speed) / Math.max(0.001, profile.maxSpeed), 0, 1);
+        const signedMotion = Math.abs(vehicle.speed) > 0.08 ? Math.sign(vehicle.speed) : 1;
+        vehicle.yaw += steer * profile.turnRate * (0.28 + speed01 * 0.72) * signedMotion * dt;
+        vehicle.position.x += Math.sin(vehicle.yaw) * vehicle.speed * dt;
+        vehicle.position.z += Math.cos(vehicle.yaw) * vehicle.speed * dt;
+        this.containVehicle(vehicle);
+    }
+    applyVehicleDrag(vehicle, dt) {
+        vehicle.speed *= Math.exp(-this.settings.vehicleDrag * dt);
+        if (Math.abs(vehicle.speed) < 0.015)
+            vehicle.speed = 0;
+        if (vehicle.speed !== 0) {
+            vehicle.position.x += Math.sin(vehicle.yaw) * vehicle.speed * dt;
+            vehicle.position.z += Math.cos(vehicle.yaw) * vehicle.speed * dt;
+            this.containVehicle(vehicle);
+        }
+    }
+    containVehicle(vehicle) {
+        const maxX = this.settings.fieldWidth / 2 + VEHICLE_WORLD_MARGIN;
+        const maxZ = this.settings.fieldLength / 2 + VEHICLE_WORLD_MARGIN;
+        const nextX = clamp(vehicle.position.x, -maxX, maxX);
+        const nextZ = clamp(vehicle.position.z, -maxZ, maxZ);
+        if (nextX !== vehicle.position.x || nextZ !== vehicle.position.z) {
+            vehicle.position.x = nextX;
+            vehicle.position.z = nextZ;
+            vehicle.speed = 0;
+        }
+    }
+    updateVehicleAutoEntry(now) {
+        for (const player of this.players.values()) {
+            if (player.role !== "player" || !player.body)
+                continue;
+            if (player.vehicleId || player.ragdoll || now < player.vehicleExitCooldownUntil) {
+                player.vehicleEnterCandidateId = null;
+                player.vehicleEnterCandidateSince = 0;
+                continue;
+            }
+            const position = this.runtimePosition(player);
+            let nearest = null;
+            let nearestDistance = Number.POSITIVE_INFINITY;
+            for (const vehicle of this.vehicles.values()) {
+                if (vehicle.occupantPlayerId)
+                    continue;
+                const distance = distance2d(position, vehicle.position);
+                const enterDistance = this.settings.vehicleEnterRadius + Math.max(vehicle.halfWidth, vehicle.halfLength);
+                if (distance <= enterDistance && distance < nearestDistance) {
+                    nearest = vehicle;
+                    nearestDistance = distance;
+                }
+            }
+            if (!nearest) {
+                player.vehicleEnterCandidateId = null;
+                player.vehicleEnterCandidateSince = 0;
+                continue;
+            }
+            if (player.vehicleEnterCandidateId !== nearest.id) {
+                player.vehicleEnterCandidateId = nearest.id;
+                player.vehicleEnterCandidateSince = now;
+            }
+            if (now - player.vehicleEnterCandidateSince >= this.settings.vehicleEnterDwellMs) {
+                this.mountVehicle(player, nearest, now);
+            }
+        }
+    }
     tick(now = Date.now(), emitSnapshot = true) {
         const dt = 1 / SERVER_TICK_RATE;
         this.tickCount += 1;
@@ -2082,9 +2381,11 @@ class UnsoccerServer {
             if (player.body)
                 previousPlayerPositions.set(player.id, vec3FromRapier(player.body.translation()));
         }
+        this.updateVehicles(dt, now);
         for (const player of this.players.values()) {
             this.updatePlayer(player, dt, now);
         }
+        this.updateVehicleAutoEntry(now);
         this.syncBallToOwner(now);
         const previousBallTranslation = this.ballBody.translation();
         const previousBallPosition = {
@@ -2244,6 +2545,19 @@ class UnsoccerServer {
     updatePlayer(player, dt, now) {
         if (!player.body)
             return;
+        if (player.vehicleId) {
+            const vehicle = this.vehicles.get(player.vehicleId);
+            if (vehicle?.occupantPlayerId === player.id) {
+                if (player.input.exitVehicle > player.lastExitVehicle)
+                    this.dismountVehicle(player, now);
+                else
+                    this.syncMountedPlayer(player, vehicle);
+            }
+            else {
+                this.releasePlayerVehicle(player, now);
+            }
+            return;
+        }
         const current = player.body.translation();
         const groundY = this.settings.playerHeight / 2;
         if (player.ragdoll) {
@@ -2481,6 +2795,7 @@ class UnsoccerServer {
         this.lastBallTouchPlayerId = player.id;
         this.lastBallTouchTeam = player.team;
         this.lastBallTouchAt = now;
+        this.activeBallSkinId = sanitizeBallSkinId(player.ballSkinId);
     }
     ballOwner() {
         if (!this.ballOwnerPlayerId)
@@ -3028,6 +3343,8 @@ class UnsoccerServer {
         for (const player of this.players.values()) {
             if (!player.body)
                 continue;
+            if (player.vehicleId)
+                this.releasePlayerVehicle(player);
             const spawn = this.spawnForIndex(player.index);
             player.body.setNextKinematicTranslation(spawn);
             player.body.setTranslation(spawn, true);
@@ -3089,6 +3406,7 @@ class UnsoccerServer {
         this.ballBody.setLinvel(zeroVec(), true);
         this.ballBody.setAngvel(zeroVec(), true);
         this.activeBallVariant = (this.activeBallVariant + 1) % BALL_VARIANT_COUNT;
+        this.activeBallSkinId = DEFAULT_BALL_SKIN_ID;
         this.countdownUntil = now + this.settings.kickoffCountdownMs;
         this.goalReset = null;
         this.message = "\u0420\u043e\u0437\u044b\u0433\u0440\u044b\u0448 \u0441 \u0446\u0435\u043d\u0442\u0440\u0430";
@@ -3337,6 +3655,7 @@ class UnsoccerServer {
         this.ballBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
         this.ballBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
         this.activeBallVariant = (this.activeBallVariant + 1) % BALL_VARIANT_COUNT;
+        this.activeBallSkinId = DEFAULT_BALL_SKIN_ID;
         this.countdownUntil = now + this.settings.kickoffCountdownMs;
         this.resetPlayersForKickoff();
     }
@@ -3377,6 +3696,7 @@ class UnsoccerServer {
             position: vec3FromRapier(this.ballBody.translation()),
             velocity: vec3FromRapier(this.ballBody.linvel()),
             variant: this.activeBallVariant,
+            skinId: this.activeBallSkinId,
             ownerPlayerId: this.ballOwnerPlayerId
         };
         return {
@@ -3389,6 +3709,9 @@ class UnsoccerServer {
             players: [...this.players.values()]
                 .sort((a, b) => a.index - b.index)
                 .map((player) => this.snapshotPlayer(player, now)),
+            vehicles: [...this.vehicles.values()]
+                .sort((a, b) => a.id.localeCompare(b.id))
+                .map((vehicle) => this.snapshotVehicle(vehicle)),
             ball,
             score: { ...this.score },
             message: this.message,
@@ -3415,6 +3738,7 @@ class UnsoccerServer {
             index: player.index,
             goals: player.goals,
             characterId: player.characterId,
+            vehicleId: player.vehicleId,
             position,
             velocity: player.velocity,
             yaw: player.yaw,
@@ -3434,6 +3758,18 @@ class UnsoccerServer {
             celebrationAt: player.celebrationAt,
             celebrationAvailableUntil: player.celebrationAvailableUntil,
             emotion
+        };
+    }
+    snapshotVehicle(vehicle) {
+        return {
+            id: vehicle.id,
+            assetKind: vehicle.assetKind,
+            kind: vehicle.kind,
+            position: { ...vehicle.position },
+            velocity: { ...vehicle.velocity },
+            yaw: vehicle.yaw,
+            speed: vehicle.speed,
+            occupantPlayerId: vehicle.occupantPlayerId
         };
     }
     serverInfo() {

@@ -1,0 +1,350 @@
+{
+  "version": "v0.0.055",
+  "runtimeRoster": "unsoccer/client/public/assets/vehicles/free3d/roster.json",
+  "source": {
+    "apiSearch": "https://free3d.online/api-embeddings/",
+    "note": "Vehicle GLBs were resolved from public Free3D worker paths.json inventories and shipped locally as textureless vertex-PBR runtime assets."
+  },
+  "assets": [
+    {
+      "guid": "6449614",
+      "kind": "emerald-hypercar",
+      "vehicleKind": "car",
+      "title": "Emerald Hypercar model pack",
+      "source": "https://free3d.online/model/6449614-emerald-hypercar-model-pack",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6449614_Emerald Hypercar model pack/paths.json",
+      "src10k": "assets/vehicles/free3d/6449614-emerald-hypercar-10k.glb",
+      "src1k": "assets/vehicles/free3d/6449614-emerald-hypercar-1k.glb",
+      "scale": 4.6,
+      "collider": {
+        "halfWidth": 0.98,
+        "halfLength": 2.05
+      },
+      "seatOffset": {
+        "x": 0,
+        "y": 0.95,
+        "z": 0.1
+      },
+      "drive": "sport",
+      "lods": {
+        "10k": {
+          "lod": "10k",
+          "src": "assets/vehicles/free3d/6449614-emerald-hypercar-10k.glb",
+          "bytes": 990528,
+          "triangles": 23999,
+          "vertices": 15083,
+          "colorAccessors": 1,
+          "avgRoughness": 0.1447,
+          "avgMetalness": 0.014
+        },
+        "1k": {
+          "lod": "1k",
+          "src": "assets/vehicles/free3d/6449614-emerald-hypercar-1k.glb",
+          "bytes": 139812,
+          "triangles": 2715,
+          "vertices": 2171,
+          "colorAccessors": 1,
+          "avgRoughness": 0.1474,
+          "avgMetalness": 0.0137
+        }
+      },
+      "remotePaths": {
+        "10k": "uploads_files_6449614_10k/Emerald Hypercar model pack_preview_632703cb-330a-431d-8df1-fcdb7d56b1b7.glb",
+        "1k": "uploads_files_6449614_1k/Emerald Hypercar model pack_preview_632703cb-330a-431d-8df1-fcdb7d56b1b7.glb"
+      },
+      "texturePolicy": "textureless-vertex-pbr-no-runtime-images"
+    },
+    {
+      "guid": "6451005",
+      "kind": "silver-sports-car",
+      "vehicleKind": "car",
+      "title": "Sleek Silver Sports Car model pack",
+      "source": "https://free3d.online/model/6451005-sleek-silver-sports-car-model-pack",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6451005_Sleek Silver Sports Car model pack/paths.json",
+      "src10k": "assets/vehicles/free3d/6451005-silver-sports-car-10k.glb",
+      "src1k": "assets/vehicles/free3d/6451005-silver-sports-car-1k.glb",
+      "scale": 4.5,
+      "collider": {
+        "halfWidth": 0.96,
+        "halfLength": 2.0
+      },
+      "seatOffset": {
+        "x": 0,
+        "y": 0.92,
+        "z": 0.05
+      },
+      "drive": "sport",
+      "lods": {
+        "10k": {
+          "lod": "10k",
+          "src": "assets/vehicles/free3d/6451005-silver-sports-car-10k.glb",
+          "bytes": 824524,
+          "triangles": 20795,
+          "vertices": 12462,
+          "colorAccessors": 1,
+          "avgRoughness": 0.171,
+          "avgMetalness": 0.0192
+        },
+        "1k": {
+          "lod": "1k",
+          "src": "assets/vehicles/free3d/6451005-silver-sports-car-1k.glb",
+          "bytes": 113808,
+          "triangles": 2357,
+          "vertices": 1745,
+          "colorAccessors": 1,
+          "avgRoughness": 0.1539,
+          "avgMetalness": 0.0175
+        }
+      },
+      "remotePaths": {
+        "10k": "uploads_files_6451005_10k/Sleek Silver Sports Car model pack_preview_adfa12a5-77ba-4d7d-99c5-de0fbf80080a.glb",
+        "1k": "uploads_files_6451005_1k/Sleek Silver Sports Car model pack_preview_adfa12a5-77ba-4d7d-99c5-de0fbf80080a.glb"
+      },
+      "texturePolicy": "textureless-vertex-pbr-no-runtime-images"
+    },
+    {
+      "guid": "6448105",
+      "kind": "red-sports-car",
+      "vehicleKind": "car",
+      "title": "Sleek Red Sports Car model pack",
+      "source": "https://free3d.online/model/6448105-sleek-red-sports-car-model-pack",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6448105_Sleek Red Sports Car model pack/paths.json",
+      "src10k": "assets/vehicles/free3d/6448105-red-sports-car-10k.glb",
+      "src1k": "assets/vehicles/free3d/6448105-red-sports-car-1k.glb",
+      "scale": 4.5,
+      "yawOffsetDeg": -90,
+      "collider": {
+        "halfWidth": 0.96,
+        "halfLength": 2.0
+      },
+      "seatOffset": {
+        "x": 0,
+        "y": 0.92,
+        "z": 0.05
+      },
+      "drive": "sport",
+      "lods": {
+        "10k": {
+          "lod": "10k",
+          "src": "assets/vehicles/free3d/6448105-red-sports-car-10k.glb",
+          "bytes": 989032,
+          "triangles": 22714,
+          "vertices": 15194,
+          "colorAccessors": 1,
+          "avgRoughness": 0.3334,
+          "avgMetalness": 0.0172
+        },
+        "1k": {
+          "lod": "1k",
+          "src": "assets/vehicles/free3d/6448105-red-sports-car-1k.glb",
+          "bytes": 149108,
+          "triangles": 2668,
+          "vertices": 2342,
+          "colorAccessors": 1,
+          "avgRoughness": 0.33,
+          "avgMetalness": 0.0175
+        }
+      },
+      "remotePaths": {
+        "10k": "uploads_files_6448105_10k/Sleek Red Sports Car model pack_preview_2874f787-dda4-490e-b5b4-c5178602c18f.glb",
+        "1k": "uploads_files_6448105_1k/Sleek Red Sports Car model pack_preview_2874f787-dda4-490e-b5b4-c5178602c18f.glb"
+      },
+      "texturePolicy": "textureless-vertex-pbr-no-runtime-images"
+    },
+    {
+      "guid": "6451668",
+      "kind": "urban-sports-car",
+      "vehicleKind": "car",
+      "title": "Sleek Urban Sports Car model pack",
+      "source": "https://free3d.online/model/6451668-sleek-urban-sports-car-model-pack",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6451668_Sleek Urban Sports Car model pack/paths.json",
+      "src10k": "assets/vehicles/free3d/6451668-urban-sports-car-10k.glb",
+      "src1k": "assets/vehicles/free3d/6451668-urban-sports-car-1k.glb",
+      "scale": 4.55,
+      "yawOffsetDeg": -90,
+      "collider": {
+        "halfWidth": 0.98,
+        "halfLength": 2.02
+      },
+      "seatOffset": {
+        "x": 0,
+        "y": 0.94,
+        "z": 0.05
+      },
+      "drive": "balanced",
+      "lods": {
+        "10k": {
+          "lod": "10k",
+          "src": "assets/vehicles/free3d/6451668-urban-sports-car-10k.glb",
+          "bytes": 879788,
+          "triangles": 22464,
+          "vertices": 13270,
+          "colorAccessors": 1,
+          "avgRoughness": 0.1962,
+          "avgMetalness": 0.0226
+        },
+        "1k": {
+          "lod": "1k",
+          "src": "assets/vehicles/free3d/6451668-urban-sports-car-1k.glb",
+          "bytes": 140184,
+          "triangles": 2618,
+          "vertices": 2188,
+          "colorAccessors": 1,
+          "avgRoughness": 0.2029,
+          "avgMetalness": 0.0232
+        }
+      },
+      "remotePaths": {
+        "10k": "uploads_files_6451668_10k/Sleek Urban Sports Car model pack_preview_4749eba7-d0d7-4941-b977-700ea89d6944.glb",
+        "1k": "uploads_files_6451668_1k/Sleek Urban Sports Car model pack_preview_4749eba7-d0d7-4941-b977-700ea89d6944.glb"
+      },
+      "texturePolicy": "textureless-vertex-pbr-no-runtime-images"
+    },
+    {
+      "guid": "6451894",
+      "kind": "silver-concept-car",
+      "vehicleKind": "car",
+      "title": "Futuristic Silver Car model pack",
+      "source": "https://free3d.online/model/6451894-futuristic-silver-car-model-pack",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6451894_Futuristic Silver Car model pack/paths.json",
+      "src10k": "assets/vehicles/free3d/6451894-silver-concept-car-10k.glb",
+      "src1k": "assets/vehicles/free3d/6451894-silver-concept-car-1k.glb",
+      "scale": 4.6,
+      "yawOffsetDeg": -90,
+      "collider": {
+        "halfWidth": 1.0,
+        "halfLength": 2.06
+      },
+      "seatOffset": {
+        "x": 0,
+        "y": 0.96,
+        "z": 0.08
+      },
+      "drive": "balanced",
+      "lods": {
+        "10k": {
+          "lod": "10k",
+          "src": "assets/vehicles/free3d/6451894-silver-concept-car-10k.glb",
+          "bytes": 888536,
+          "triangles": 23271,
+          "vertices": 13340,
+          "colorAccessors": 1,
+          "avgRoughness": 0.0367,
+          "avgMetalness": 0.0041
+        },
+        "1k": {
+          "lod": "1k",
+          "src": "assets/vehicles/free3d/6451894-silver-concept-car-1k.glb",
+          "bytes": 136716,
+          "triangles": 2973,
+          "vertices": 2088,
+          "colorAccessors": 1,
+          "avgRoughness": 0.0418,
+          "avgMetalness": 0.0044
+        }
+      },
+      "remotePaths": {
+        "10k": "uploads_files_6451894_10k/Futuristic Silver Car model pack_preview_c13bd10e-c0fa-4826-ab15-9faacc08d9df.glb",
+        "1k": "uploads_files_6451894_1k/Futuristic Silver Car model pack_preview_c13bd10e-c0fa-4826-ab15-9faacc08d9df.glb"
+      },
+      "texturePolicy": "textureless-vertex-pbr-no-runtime-images"
+    },
+    {
+      "guid": "5885560",
+      "kind": "steampunk-tractor",
+      "vehicleKind": "tractor",
+      "title": "Steampunk Tractor with Ornate Brass Details",
+      "source": "https://free3d.online/model/5885560-steampunk-tractor-with-ornate-brass-details",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/5885560_Steampunk Tractor with Ornate Brass Details/paths.json",
+      "src10k": "assets/vehicles/free3d/5885560-steampunk-tractor-10k.glb",
+      "src1k": "assets/vehicles/free3d/5885560-steampunk-tractor-1k.glb",
+      "scale": 4.35,
+      "collider": {
+        "halfWidth": 1.12,
+        "halfLength": 1.9
+      },
+      "seatOffset": {
+        "x": 0,
+        "y": 1.1,
+        "z": -0.05
+      },
+      "drive": "tractor",
+      "lods": {
+        "10k": {
+          "lod": "10k",
+          "src": "assets/vehicles/free3d/5885560-steampunk-tractor-10k.glb",
+          "bytes": 594184,
+          "triangles": 9972,
+          "vertices": 8433,
+          "colorAccessors": 1,
+          "avgRoughness": 0.4161,
+          "avgMetalness": 0.5416
+        },
+        "1k": {
+          "lod": "1k",
+          "src": "assets/vehicles/free3d/5885560-steampunk-tractor-1k.glb",
+          "bytes": 72800,
+          "triangles": 876,
+          "vertices": 1072,
+          "colorAccessors": 1,
+          "avgRoughness": 0.4522,
+          "avgMetalness": 0.4016
+        }
+      },
+      "remotePaths": {
+        "10k": "uploads_files_5885560_middlepoly/middlepoly.glb",
+        "1k": "uploads_files_5885560_lowpoly/lowpoly.glb"
+      },
+      "texturePolicy": "textureless-vertex-pbr-no-runtime-images"
+    },
+    {
+      "guid": "6512341",
+      "kind": "camouflage-tank",
+      "vehicleKind": "tank",
+      "title": "Camouflage Tank model pack",
+      "source": "https://free3d.online/model/6512341-camouflage-tank-model-pack",
+      "inventoryUrl": "https://worker-0001.free3d.online/storage/6512341_Camouflage Tank model pack/paths.json",
+      "src10k": "assets/vehicles/free3d/6512341-camouflage-tank-10k.glb",
+      "src1k": "assets/vehicles/free3d/6512341-camouflage-tank-1k.glb",
+      "scale": 5.5,
+      "yawOffsetDeg": -90,
+      "collider": {
+        "halfWidth": 1.32,
+        "halfLength": 2.36
+      },
+      "seatOffset": {
+        "x": 0,
+        "y": 1.28,
+        "z": -0.15
+      },
+      "drive": "tank",
+      "lods": {
+        "10k": {
+          "lod": "10k",
+          "src": "assets/vehicles/free3d/6512341-camouflage-tank-10k.glb",
+          "bytes": 887424,
+          "triangles": 20750,
+          "vertices": 13590,
+          "colorAccessors": 1,
+          "avgRoughness": 0.4278,
+          "avgMetalness": 0.0062
+        },
+        "1k": {
+          "lod": "1k",
+          "src": "assets/vehicles/free3d/6512341-camouflage-tank-1k.glb",
+          "bytes": 161220,
+          "triangles": 2848,
+          "vertices": 2539,
+          "colorAccessors": 1,
+          "avgRoughness": 0.421,
+          "avgMetalness": 0.0074
+        }
+      },
+      "remotePaths": {
+        "10k": "uploads_files_6512341_10k/Camouflage Tank model pack_preview_751f7396-bd52-4e70-a66e-4ea4bfaa3ca1.glb",
+        "1k": "uploads_files_6512341_1k/Camouflage Tank model pack_preview_751f7396-bd52-4e70-a66e-4ea4bfaa3ca1.glb"
+      },
+      "texturePolicy": "textureless-vertex-pbr-no-runtime-images"
+    }
+  ]
+}

@@ -131,6 +131,8 @@ export declare const EMOTION_CHOICES: readonly [{
     readonly label: "Корона";
 }];
 export declare const DEFAULT_USER_PICS: readonly ["⚽", "⭐", "🔥", "👑", "😎", "🤝", "🚀", "🎯", "🧤"];
+export declare const BALL_SKIN_ROSTER: readonly ["6493457", "6493379", "6493403", "6493239", "6493488", "6493371", "6493256", "6493342", "6493507", "6493481"];
+export declare const DEFAULT_BALL_SKIN_ID: "6493457";
 export type EmotionId = typeof EMOTION_CHOICES[number]["id"];
 export interface Vec3 {
     x: number;
@@ -150,12 +152,14 @@ export interface InputState {
     kickRightCharge: number;
     head: number;
     jump: number;
+    exitVehicle: number;
     sprint: boolean;
     yaw: number;
 }
 export interface PlayerProfileSnapshot {
     nickname: string;
     skinId: string;
+    ballSkinId: string;
     userPic: string;
 }
 export interface PlayerEmotionSnapshot {
@@ -184,6 +188,7 @@ export interface PlayerSnapshot {
     index: number;
     goals: number;
     characterId: string;
+    vehicleId: string | null;
     position: Vec3;
     velocity: Vec3;
     yaw: number;
@@ -208,7 +213,19 @@ export interface BallSnapshot {
     position: Vec3;
     velocity: Vec3;
     variant: number;
+    skinId: string;
     ownerPlayerId: string | null;
+}
+export type VehicleKind = "car" | "tractor" | "tank";
+export interface VehicleSnapshot {
+    id: string;
+    assetKind: string;
+    kind: VehicleKind;
+    position: Vec3;
+    velocity: Vec3;
+    yaw: number;
+    speed: number;
+    occupantPlayerId: string | null;
 }
 export type GoalResetPhase = "none" | "celebration" | "returning" | "kickoff";
 export interface GoalResetSnapshot {
@@ -297,6 +314,7 @@ export interface ServerState {
     settings: GameSettings;
     tick: number;
     players: PlayerSnapshot[];
+    vehicles: VehicleSnapshot[];
     ball: BallSnapshot;
     score: ScoreState;
     message: string;
@@ -344,7 +362,7 @@ export interface ServerInfo {
     };
 }
 export declare const DEFAULT_INPUT: InputState;
-export declare const CHARACTER_ROSTER: readonly ["6288738", "6299851", "6243756", "6270571", "6324128", "6244727", "6304269", "6298522", "6255142", "6294728"];
+export declare const CHARACTER_ROSTER: readonly ["6299851", "6288738", "6243756", "6270571", "6324128", "6244727", "6304269", "6298522", "6255142", "6294728"];
 export interface VisualColorMaterialSettings {
     color: string;
     roughness?: number;
@@ -567,6 +585,20 @@ export interface GameSettings {
     propDamping: number;
     propReturnStrength: number;
     propMaxDisplacementMultiplier: number;
+    vehicleEnterRadius: number;
+    vehicleEnterDwellMs: number;
+    vehicleExitCooldownMs: number;
+    vehicleCarMaxSpeed: number;
+    vehicleTractorMaxSpeed: number;
+    vehicleTankMaxSpeed: number;
+    vehicleCarAcceleration: number;
+    vehicleTractorAcceleration: number;
+    vehicleTankAcceleration: number;
+    vehicleCarTurnRate: number;
+    vehicleTractorTurnRate: number;
+    vehicleTankTurnRate: number;
+    vehicleBrakeStrength: number;
+    vehicleDrag: number;
     postGoalCelebrationMs: number;
     postGoalBallReturnMs: number;
     kickoffCountdownMs: number;

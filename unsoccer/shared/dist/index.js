@@ -95,6 +95,19 @@ export const EMOTION_CHOICES = [
     { id: "crown", emoji: "👑", label: "Корона" }
 ];
 export const DEFAULT_USER_PICS = ["⚽", "⭐", "🔥", "👑", "😎", "🤝", "🚀", "🎯", "🧤"];
+export const BALL_SKIN_ROSTER = [
+    "6493457",
+    "6493379",
+    "6493403",
+    "6493239",
+    "6493488",
+    "6493371",
+    "6493256",
+    "6493342",
+    "6493507",
+    "6493481"
+];
+export const DEFAULT_BALL_SKIN_ID = BALL_SKIN_ROSTER[0];
 export const DEFAULT_INPUT = {
     up: false,
     down: false,
@@ -108,12 +121,13 @@ export const DEFAULT_INPUT = {
     kickRightCharge: 0,
     head: 0,
     jump: 0,
+    exitVehicle: 0,
     sprint: false,
     yaw: 0
 };
 export const CHARACTER_ROSTER = [
-    "6288738",
     "6299851",
+    "6288738",
     "6243756",
     "6270571",
     "6324128",
@@ -325,6 +339,20 @@ export const DEFAULT_GAME_SETTINGS = {
     propDamping: 2.4,
     propReturnStrength: 1.25,
     propMaxDisplacementMultiplier: 1,
+    vehicleEnterRadius: 1.4,
+    vehicleEnterDwellMs: 350,
+    vehicleExitCooldownMs: 1000,
+    vehicleCarMaxSpeed: 15.5,
+    vehicleTractorMaxSpeed: 9.2,
+    vehicleTankMaxSpeed: 7.4,
+    vehicleCarAcceleration: 11.5,
+    vehicleTractorAcceleration: 7.2,
+    vehicleTankAcceleration: 5.8,
+    vehicleCarTurnRate: 2.9,
+    vehicleTractorTurnRate: 2.05,
+    vehicleTankTurnRate: 1.35,
+    vehicleBrakeStrength: 14,
+    vehicleDrag: 1.1,
     postGoalCelebrationMs: POST_GOAL_CELEBRATION_MS,
     postGoalBallReturnMs: POST_GOAL_BALL_RETURN_MS,
     kickoffCountdownMs: KICKOFF_COUNTDOWN_MS,
@@ -450,6 +478,20 @@ export const GAME_SETTINGS_SCHEMA = [
     { key: "propDamping", group: "Объекты", label: "Затухание объектов", description: "Как быстро подвижные объекты теряют скорость после толчка.", input: "range", min: 0.1, max: 8, step: 0.05 },
     { key: "propReturnStrength", group: "Объекты", label: "Возврат объектов", description: "Пружинная сила, возвращающая локальные объекты окружения к домашней позиции.", input: "range", min: 0, max: 6, step: 0.05 },
     { key: "propMaxDisplacementMultiplier", group: "Объекты", label: "Лимит сдвига объектов", description: "Множитель максимального смещения каждого физического объекта от домашней точки.", input: "range", min: 0.25, max: 4, step: 0.05 },
+    { key: "vehicleEnterRadius", group: "Vehicles", label: "Enter radius", description: "Distance where a player can auto-enter an unoccupied vehicle.", input: "range", min: 0.5, max: 4, step: 0.05 },
+    { key: "vehicleEnterDwellMs", group: "Vehicles", label: "Enter dwell", description: "Milliseconds the player must stay near a vehicle before auto-entering.", input: "number", min: 0, max: 2500, step: 50 },
+    { key: "vehicleExitCooldownMs", group: "Vehicles", label: "Exit cooldown", description: "Milliseconds after exit before the player can auto-enter again.", input: "number", min: 0, max: 5000, step: 50 },
+    { key: "vehicleCarMaxSpeed", group: "Vehicles", label: "Car max speed", description: "Maximum arcade speed for cars.", input: "range", min: 2, max: 30, step: 0.1 },
+    { key: "vehicleTractorMaxSpeed", group: "Vehicles", label: "Tractor max speed", description: "Maximum arcade speed for the tractor.", input: "range", min: 1, max: 24, step: 0.1 },
+    { key: "vehicleTankMaxSpeed", group: "Vehicles", label: "Tank max speed", description: "Maximum arcade speed for the tank.", input: "range", min: 1, max: 20, step: 0.1 },
+    { key: "vehicleCarAcceleration", group: "Vehicles", label: "Car acceleration", description: "Forward acceleration for cars.", input: "range", min: 1, max: 40, step: 0.1 },
+    { key: "vehicleTractorAcceleration", group: "Vehicles", label: "Tractor acceleration", description: "Forward acceleration for the tractor.", input: "range", min: 1, max: 30, step: 0.1 },
+    { key: "vehicleTankAcceleration", group: "Vehicles", label: "Tank acceleration", description: "Forward acceleration for the tank.", input: "range", min: 1, max: 25, step: 0.1 },
+    { key: "vehicleCarTurnRate", group: "Vehicles", label: "Car turn rate", description: "Yaw turn rate for cars.", input: "range", min: 0.2, max: 8, step: 0.05 },
+    { key: "vehicleTractorTurnRate", group: "Vehicles", label: "Tractor turn rate", description: "Yaw turn rate for the tractor.", input: "range", min: 0.2, max: 8, step: 0.05 },
+    { key: "vehicleTankTurnRate", group: "Vehicles", label: "Tank turn rate", description: "Yaw turn rate for the tank.", input: "range", min: 0.1, max: 6, step: 0.05 },
+    { key: "vehicleBrakeStrength", group: "Vehicles", label: "Brake strength", description: "How strongly reverse input brakes a moving vehicle.", input: "range", min: 1, max: 40, step: 0.1 },
+    { key: "vehicleDrag", group: "Vehicles", label: "Vehicle drag", description: "Passive speed decay for unthrottled vehicles.", input: "range", min: 0, max: 6, step: 0.05 },
     { key: "postGoalCelebrationMs", group: "Матч", label: "Празднование гола", description: "Миллисекунды после гола до начала возврата мяча.", input: "number", min: 0, max: 20000, step: 100 },
     { key: "postGoalBallReturnMs", group: "Матч", label: "Возврат мяча", description: "Миллисекунды, за которые мяч летит обратно к центру после гола.", input: "number", min: 100, max: 5000, step: 100 },
     { key: "kickoffCountdownMs", group: "Матч", label: "Отсчет розыгрыша", description: "Миллисекунды отсчета перед розыгрышем после возврата мяча.", input: "number", min: 0, max: 10000, step: 100 },

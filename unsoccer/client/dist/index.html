@@ -150,11 +150,11 @@
         }
       }
     </style>
-    <script type="module" crossorigin src="./assets/main-Bu6XRDDx.js"></script>
-    <link rel="modulepreload" crossorigin href="./assets/index-uLWgS3hx.js">
-    <link rel="modulepreload" crossorigin href="./assets/character-controller-D7eAs6Az.js">
-    <link rel="modulepreload" crossorigin href="./assets/visual-pipeline-cjCO2XCU.js">
-    <link rel="stylesheet" crossorigin href="./assets/main-Dxg089M5.css">
+    <script type="module" crossorigin src="./assets/main-BYJmXtoR.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/index-CZRSNPYH.js">
+    <link rel="modulepreload" crossorigin href="./assets/character-controller-BRyKP8O4.js">
+    <link rel="modulepreload" crossorigin href="./assets/visual-pipeline-DG8wxFcX.js">
+    <link rel="stylesheet" crossorigin href="./assets/main-DiNoqHF5.css">
   </head>
   <body>
     <main id="app" aria-label="UnSoccer">
@@ -234,6 +234,29 @@
         <button id="camera-reset-button" class="icon-button" type="button" title="Camera reset" aria-label="Camera reset" hidden aria-hidden="true"></button>
       </div>
       <div id="version-badge">v0.0.056 / 39.92 MB</div>
+      <button id="skin-shop-button" class="skin-shop-button" type="button" aria-label="Skin shop">SKINS <b id="skin-shop-balance">0</b></button>
+      <section id="skin-shop-panel" class="skin-shop-panel" aria-modal="true" role="dialog" aria-labelledby="skin-shop-title" hidden>
+        <div class="skin-shop-shell">
+          <header class="skin-shop-header">
+            <div>
+              <p class="eyebrow">GOALS</p>
+              <h1 id="skin-shop-title">Skin Shop</h1>
+            </div>
+            <div class="skin-shop-actions">
+              <span id="skin-shop-status">0 goals</span>
+              <button id="skin-shop-close-button" type="button">Game</button>
+            </div>
+          </header>
+          <nav class="skin-shop-tabs" aria-label="Skin shop tabs">
+            <button type="button" data-skin-shop-tab="players" aria-selected="true">Players</button>
+            <button type="button" data-skin-shop-tab="balls">Balls</button>
+          </nav>
+          <div class="skin-shop-body">
+            <section id="skin-shop-players" class="skin-shop-grid" data-skin-shop-panel="players"></section>
+            <section id="skin-shop-balls" class="skin-shop-grid" data-skin-shop-panel="balls" hidden></section>
+          </div>
+        </div>
+      </section>
       <section id="settings-panel" class="settings-panel" aria-modal="true" role="dialog" aria-labelledby="settings-title" hidden>
         <form id="settings-form" class="settings-shell">
           <header class="settings-header">

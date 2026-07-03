@@ -14,6 +14,237 @@
   "ambientIntensity": 1,
   "floodlightIntensity": 1,
   "toneMappingExposure": 1,
+  "cameraDistance": 12.4,
+  "visual": {
+    "renderer": {
+      "exposureBase": 1.12,
+      "exposureDay": 0.9,
+      "exposureSunset": 0.18,
+      "precipitationExposurePenalty": 0.16,
+      "shadows": true
+    },
+    "sky": {
+      "dayColor": "#8fd7ff",
+      "sunsetColor": "#ff9b5a",
+      "nightColor": "#07110f",
+      "fogDayColor": "#b7ede0",
+      "fogNightColor": "#07110f",
+      "snowFogColor": "#d9f3ff",
+      "domeFogMix": 0.18,
+      "fogNearBase": 32,
+      "fogNearDay": 18,
+      "fogFarBase": 86,
+      "fogFarDay": 34,
+      "fogSnowPenalty": 8
+    },
+    "sun": {
+      "intensityBase": 1.05,
+      "intensityDay": 4.15,
+      "intensitySunset": 1.05,
+      "precipitationPenalty": 0.38,
+      "orbitRadius": 46,
+      "visualOrbitRadius": 70,
+      "visualHeight": 42,
+      "markerScaleBase": 0.82,
+      "markerScaleDay": 0.34,
+      "markerScaleSunset": 0.28,
+      "glowOpacityBase": 0.12,
+      "glowOpacityDay": 0.34,
+      "glowOpacitySunset": 0.3
+    },
+    "moon": {
+      "color": "#bfd6ff",
+      "opacityBase": 0.08,
+      "opacityNight": 0.78
+    },
+    "ambient": {
+      "hemiSkyColor": "#d8fff2",
+      "hemiGroundColor": "#172822",
+      "hemiBase": 1.05,
+      "hemiDay": 2.1,
+      "hemiPrecipitationPenalty": 0.16,
+      "fillBase": 0.34,
+      "fillDay": 0.58,
+      "fillNight": 0.12,
+      "fillSnow": 0.02,
+      "bounceColor": "#9fc7b3",
+      "bounceBase": 0.48,
+      "bounceDay": 1.12,
+      "bounceSunset": 0.42,
+      "bounceNight": 0.18,
+      "rimColor": "#8bbcff",
+      "rimBase": 0.28,
+      "rimNight": 0.72,
+      "rimSunset": 0.24
+    },
+    "floodlights": {
+      "powerNightStart": 0.18,
+      "powerNightEnd": 0.82,
+      "intensityBase": 3.1,
+      "precipitationBoost": 0.28,
+      "lightThreshold": 0.035,
+      "coneThreshold": 0.055,
+      "lights": [
+        {
+          "x": -29.9,
+          "y": 12.9,
+          "z": -40.8,
+          "targetX": 16.32,
+          "targetY": 0.18,
+          "targetZ": 23.76,
+          "color": "#eaf4ff",
+          "angleDeg": 63.2,
+          "distance": 96,
+          "penumbra": 0.88,
+          "decay": 1.05,
+          "coneRadius": 13.4,
+          "coneOpacity": 0.095,
+          "flickerDepth": 0.07,
+          "flickerSpeed": 3.4,
+          "widthScale": 0.95,
+          "intensityBias": 0.94
+        },
+        {
+          "x": 29.9,
+          "y": 12.9,
+          "z": -40.8,
+          "targetX": -16.32,
+          "targetY": 0.18,
+          "targetZ": 23.76,
+          "color": "#fff0d4",
+          "angleDeg": 58.4,
+          "distance": 96,
+          "penumbra": 0.88,
+          "decay": 1.05,
+          "coneRadius": 13.4,
+          "coneOpacity": 0.095,
+          "flickerDepth": 0.088,
+          "flickerSpeed": 3.77,
+          "widthScale": 0.985,
+          "intensityBias": 0.985
+        },
+        {
+          "x": -29.9,
+          "y": 12.9,
+          "z": 40.8,
+          "targetX": 16.32,
+          "targetY": 0.18,
+          "targetZ": -23.76,
+          "color": "#dcefff",
+          "angleDeg": 63.2,
+          "distance": 96,
+          "penumbra": 0.88,
+          "decay": 1.05,
+          "coneRadius": 13.4,
+          "coneOpacity": 0.095,
+          "flickerDepth": 0.106,
+          "flickerSpeed": 4.14,
+          "widthScale": 1.02,
+          "intensityBias": 1.03
+        },
+        {
+          "x": 29.9,
+          "y": 12.9,
+          "z": 40.8,
+          "targetX": -16.32,
+          "targetY": 0.18,
+          "targetZ": -23.76,
+          "color": "#f7f2ff",
+          "angleDeg": 63.2,
+          "distance": 96,
+          "penumbra": 0.88,
+          "decay": 1.05,
+          "coneRadius": 13.4,
+          "coneOpacity": 0.095,
+          "flickerDepth": 0.124,
+          "flickerSpeed": 4.51,
+          "widthScale": 1.055,
+          "intensityBias": 1.075
+        }
+      ]
+    },
+    "materials": {
+      "field": {
+        "color": "#19845f",
+        "roughness": 0.9
+      },
+      "fieldStripe": {
+        "color": "#1d966c",
+        "roughness": 0.92
+      },
+      "marking": {
+        "color": "#f4fff6",
+        "opacity": 0.96
+      },
+      "markingSecondary": {
+        "color": "#d9f7e4",
+        "opacity": 0.82
+      },
+      "goalPost": {
+        "color": "#f0f3ec",
+        "roughness": 0.38,
+        "metalness": 0.16
+      },
+      "mast": {
+        "color": "#aebbc4",
+        "roughness": 0.36,
+        "metalness": 0.36
+      },
+      "courtyard": {
+        "color": "#36413e",
+        "roughness": 0.96
+      },
+      "fence": {
+        "color": "#20342e",
+        "roughness": 0.72,
+        "metalness": 0.16
+      },
+      "road": {
+        "color": "#202927",
+        "roughness": 0.94
+      },
+      "sidewalk": {
+        "color": "#606f68",
+        "roughness": 0.9
+      },
+      "curb": {
+        "color": "#d8dfd7",
+        "roughness": 0.72
+      },
+      "foliage": {
+        "color": "#3d8c58",
+        "roughness": 0.92
+      },
+      "metal": {
+        "color": "#28302f",
+        "roughness": 0.62,
+        "metalness": 0.22
+      },
+      "brightMetal": {
+        "color": "#b8c5c7",
+        "roughness": 0.38,
+        "metalness": 0.34
+      },
+      "fallbackPlayerBlue": {
+        "color": "#bfe5ff",
+        "roughness": 0.5
+      },
+      "fallbackPlayerOrange": {
+        "color": "#ffd37a",
+        "roughness": 0.5
+      },
+      "ball": {
+        "color": "#ffffff",
+        "roughness": 0.5,
+        "metalness": 0.03
+      }
+    },
+    "weather": {
+      "rainLightPenalty": 0.38,
+      "snowFogBoost": 0.1,
+      "conePrecipitationBoost": 0.035
+    }
+  },
   "weatherChangeMinMs": 60000,
   "weatherChangeMaxMs": 120000,
   "weatherDawnWeight": 3,

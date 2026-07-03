@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { GameCharacterController, loadFree3dCharacter, type Free3dCharacterAsset, type Free3dCharacterRoster } from "./character-controller";
 import { bakeTexturelessPbr, type TexturelessPbrBakeOptions, type TexturelessPbrBakeResult } from "./textureless-pbr-converter";
-import type { CelebrationKind, KickKind } from "@itch-games/unsoccer-shared";
+import type { CelebrationKind, KickKind, StrikeSide } from "@itch-games/unsoccer-shared";
 
 interface EnvironmentAsset {
   guid: string;
@@ -68,6 +68,8 @@ declare global {
       trigger: (action: KickKind, sprintJump?: boolean) => void;
       sprintJump: () => void;
       ragdoll: () => void;
+      toggleRagdoll: () => void;
+      setRagdoll: (active: boolean) => void;
       celebrate: (action: CelebrationKind) => void;
       selectCharacter: (indexOrGuid: number | string) => Promise<void>;
       nextCharacter: (direction?: number) => Promise<void>;
@@ -116,6 +118,7 @@ const aoContrastValueEl = document.querySelector<HTMLOutputElement>("#ao-contras
 const environmentGallery = document.querySelector<HTMLElement>("#environment-gallery");
 const characterRow = document.querySelector<HTMLElement>(".character-row");
 const batchConvertButton = document.querySelector<HTMLButtonElement>("#btn-batch-convert-pbr");
+const ragdollButton = document.querySelector<HTMLButtonElement>("#btn-ragdoll");
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -129,7 +132,7 @@ scene.background = new THREE.Color(0x0b1613);
 scene.fog = new THREE.Fog(0x0b1613, 18, 46);
 
 const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 80);
-camera.position.set(0, 2.05, 4.85);
+camera.position.set(0.82, 2.0, 5.25);
 camera.lookAt(0, 1.1, 0);
 
 const hemi = new THREE.HemisphereLight(0xdffff1, 0x15231d, 1.45);
@@ -168,7 +171,9 @@ const boundsCenter = new THREE.Vector3();
 let controller: GameCharacterController | null = null;
 let lastTime = performance.now() / 1000;
 let lastAction: KickKind | null = null;
+let lastActionSide: StrikeSide | null = null;
 let lastActionAt = 0;
+let nextFootStrikeSide: StrikeSide = "left";
 let celebration: CelebrationKind | null = null;
 let celebrationAt = 0;
 let celebrationAvailableUntil = 0;
@@ -177,6 +182,7 @@ let verticalVelocity = 0;
 let airborne = false;
 let ragdoll = false;
 let ragdollAt = 0;
+let ragdollManual = false;
 let sprinting = false;
 let sprintJumpUntil = 0;
 let yaw = Math.PI;
@@ -234,6 +240,16 @@ const channelModeIds: Record<ChannelViewMode, number> = {
 
 function setText(element: HTMLElement | null, value: string): void {
   if (element) element.textContent = value;
+}
+
+function syncRagdollButton(): void {
+  if (ragdollButton) {
+    ragdollButton.textContent = ragdoll ? "Ragdoll: On" : "Ragdoll: Off";
+    ragdollButton.setAttribute("aria-pressed", String(ragdoll));
+    ragdollButton.classList.toggle("is-active", ragdoll);
+  }
+  document.documentElement.dataset.characterControllerRagdollToggle = ragdoll ? "on" : "off";
+  document.documentElement.dataset.characterControllerRagdollManual = String(ragdollManual);
 }
 
 function wrapIndex(index: number, length: number): number {
@@ -507,9 +523,9 @@ function clearPbrStatus(label = "textured"): void {
   document.documentElement.dataset.texturelessPbrAverageAo = "1.000";
 }
 
-function setPbrStatus(result: TexturelessPbrBakeResult): void {
+function setPbrStatus(result: TexturelessPbrBakeResult, label = result.converted ? "converted" : "empty"): void {
   lastPbrResult = result;
-  setText(pbrStatusEl, result.converted ? "converted" : "empty");
+  setText(pbrStatusEl, label);
   setText(pbrVerticesEl, result.vertexCount.toLocaleString("en-US"));
   setText(pbrTexturesEl, String(result.strippedTextureCount));
   setText(pbrAoEl, result.averageAo.toFixed(2));
@@ -622,6 +638,12 @@ function trigger(action: KickKind, sprintJump = false): void {
   celebrationAt = 0;
   celebrationAvailableUntil = 0;
   lastAction = action;
+  if (action === "left") {
+    lastActionSide = nextFootStrikeSide;
+    nextFootStrikeSide = nextFootStrikeSide === "left" ? "right" : "left";
+  } else {
+    lastActionSide = null;
+  }
   lastActionAt = Date.now();
   if (action === "jump" && !airborne && stamina >= 12) {
     airborne = true;
@@ -639,18 +661,51 @@ function trigger(action: KickKind, sprintJump = false): void {
   if (stamina <= 0.5) activateRagdoll(action === "hand" ? 7.2 : action === "left" ? 6.4 : 5.6);
 }
 
-function activateRagdoll(power = 6.2): void {
-  if (ragdoll) return;
+function activateRagdoll(power = 6.2, manual = false): void {
+  if (ragdoll) {
+    if (manual) ragdollManual = true;
+    syncRagdollButton();
+    return;
+  }
   ragdoll = true;
+  ragdollManual = manual;
   ragdollAt = Date.now();
   stamina = 0;
   lastAction = "body";
+  lastActionSide = null;
   lastActionAt = ragdollAt;
   const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
-  if (velocity.length() < 1.2) velocity.addScaledVector(forward, power);
-  else velocity.addScaledVector(forward, power * 0.65);
-  verticalVelocity = Math.max(verticalVelocity, 3.6);
+  const impulse = manual ? -power * 0.48 : power;
+  if (velocity.length() < 1.2) velocity.addScaledVector(forward, impulse);
+  else velocity.addScaledVector(forward, impulse * 0.65);
+  verticalVelocity = Math.max(verticalVelocity, manual ? 2.15 : 3.6);
   airborne = true;
+  syncRagdollButton();
+}
+
+function deactivateRagdoll(): void {
+  if (!ragdoll) {
+    ragdollManual = false;
+    syncRagdollButton();
+    return;
+  }
+  ragdoll = false;
+  ragdollManual = false;
+  ragdollAt = 0;
+  airborne = false;
+  verticalVelocity = 0;
+  position.y = 0;
+  velocity.multiplyScalar(0.18);
+  stamina = Math.max(stamina, 55);
+  lastAction = null;
+  lastActionSide = null;
+  lastActionAt = 0;
+  syncRagdollButton();
+}
+
+function toggleRagdoll(): void {
+  if (ragdoll) deactivateRagdoll();
+  else activateRagdoll(7.4, true);
 }
 
 function celebrate(action: CelebrationKind): void {
@@ -659,6 +714,7 @@ function celebrate(action: CelebrationKind): void {
   celebrationAt = Date.now();
   celebrationAvailableUntil = celebrationAt + 6500;
   lastAction = null;
+  lastActionSide = null;
   lastActionAt = 0;
 }
 
@@ -755,7 +811,12 @@ function installWindowHarness(): void {
       controller,
       trigger,
       sprintJump: () => trigger("jump", true),
-      ragdoll: () => activateRagdoll(7.4),
+      ragdoll: toggleRagdoll,
+      toggleRagdoll,
+      setRagdoll: (active: boolean) => {
+        if (active) activateRagdoll(7.4, true);
+        else deactivateRagdoll();
+      },
       celebrate,
       selectCharacter,
     nextCharacter,
@@ -775,9 +836,11 @@ function installWindowHarness(): void {
       airborne,
       ragdoll,
       ragdollAt,
+      ragdollManual,
       sprinting,
       stamina,
       lastAction,
+      lastActionSide,
       lastActionAt,
       celebration,
       celebrationAt,
@@ -854,6 +917,7 @@ async function selectCharacter(indexOrGuid: number | string): Promise<void> {
   setText(modeEl, loaded.asset.mode);
   setText(clipCountEl, String(Object.keys(loaded.clips).length));
   setText(textureCountEl, String(loaded.textureCount));
+  if (loaded.texturelessPbr) setPbrStatus(loaded.texturelessPbr, "baked");
   document.documentElement.dataset.playerRig = "free3d-skinned-character-controller";
   document.documentElement.dataset.playerRigAsset = loaded.asset.guid;
   document.documentElement.dataset.playerRigMode = loaded.roster.mode;
@@ -1127,11 +1191,14 @@ function updateKinematics(dt: number): void {
     }
     stamina = Math.min(100, stamina + dt * 17);
     sprinting = false;
-    if (!airborne && Date.now() - ragdollAt > 1600 && stamina >= 22 && velocity.length() < 1.05) {
+    if (!ragdollManual && !airborne && Date.now() - ragdollAt > 1600 && stamina >= 22 && velocity.length() < 1.05) {
       ragdoll = false;
       ragdollAt = 0;
+      ragdollManual = false;
       lastAction = null;
+      lastActionSide = null;
       lastActionAt = 0;
+      syncRagdollButton();
     }
     return;
   }
@@ -1193,6 +1260,7 @@ function animate(): void {
       ragdoll,
       ragdollAt,
       lastAction,
+      lastActionSide,
       lastActionAt,
       celebration,
       celebrationAt,
@@ -1201,7 +1269,11 @@ function animate(): void {
     controller.root.position.y += position.y;
     setText(actionEl, debug.action);
     setText(speedEl, debug.speed.toFixed(2));
-    const strikeLabel = debug.strike === "hand" ? `${debug.strikeSide}-hand` : debug.strike;
+    const strikeLabel = debug.strike === "hand"
+      ? `${debug.strikeSide}-hand`
+      : debug.strike === "left"
+        ? `${debug.strikeSide}-foot`
+        : debug.strike;
     const overlayLabel = debug.celebration !== "none"
       ? `${debug.celebration} ${debug.celebrationPulse.toFixed(2)}`
       : `${strikeLabel} ${debug.strikePulse.toFixed(2)}`;
@@ -1215,6 +1287,7 @@ function animate(): void {
     document.documentElement.dataset.playerRigRagdoll = String(debug.ragdoll);
     document.documentElement.dataset.characterControllerRagdoll = String(ragdoll);
     document.documentElement.dataset.characterControllerRagdollAt = String(ragdollAt);
+    document.documentElement.dataset.characterControllerRagdollManual = String(ragdollManual);
     document.documentElement.dataset.characterControllerSprinting = String(sprinting);
     document.documentElement.dataset.playerRigCelebration = debug.celebration;
     document.documentElement.dataset.playerRigCelebrationPulse = debug.celebrationPulse.toFixed(2);
@@ -1248,7 +1321,7 @@ function animate(): void {
   const previewRadius = environmentPreview ? Math.max(boundsSize.x, boundsSize.y, boundsSize.z, 1.8) : 0;
   const cameraTarget = environmentPreview
     ? new THREE.Vector3(boundsCenter.x, Math.max(1.8, boundsCenter.y + previewRadius * 0.34), boundsCenter.z + Math.max(3.4, previewRadius * 2.25))
-    : new THREE.Vector3(position.x, 2.05, position.z + 4.85);
+    : new THREE.Vector3(position.x + 0.82, 2, position.z + 5.25);
   camera.position.lerp(cameraTarget, 1 - Math.exp(-dt * 5.5));
   camera.lookAt(focus);
   renderer.render(scene, camera);
@@ -1301,7 +1374,7 @@ document.querySelector("#btn-hand")?.addEventListener("click", () => trigger("ha
 document.querySelector("#btn-head")?.addEventListener("click", () => trigger("head"));
 document.querySelector("#btn-jump")?.addEventListener("click", () => trigger("jump"));
 document.querySelector("#btn-sprint-jump")?.addEventListener("click", () => trigger("jump", true));
-document.querySelector("#btn-ragdoll")?.addEventListener("click", () => activateRagdoll(7.4));
+ragdollButton?.addEventListener("click", () => toggleRagdoll());
 document.querySelector("#btn-celebrate-1")?.addEventListener("click", () => celebrate("celebrate1"));
 document.querySelector("#btn-celebrate-2")?.addEventListener("click", () => celebrate("celebrate2"));
 document.querySelector("#btn-celebrate-3")?.addEventListener("click", () => celebrate("celebrate3"));
@@ -1323,6 +1396,7 @@ updateAoContrast(Number(aoContrastInput?.value || aoContrast));
 setBatchStatus("idle");
 clearPbrStatus("textured");
 setChannelView("rendered");
+syncRagdollButton();
 installWindowHarness();
 void Promise.all([loadRoster(), loadEnvironmentRoster()]).then(() => selectCharacter(0)).catch((error) => {
   console.warn("Character controller test failed", error);

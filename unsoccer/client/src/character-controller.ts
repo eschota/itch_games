@@ -127,7 +127,7 @@ function ragdollMotion(snapshot: CharacterControllerSnapshot): { speed: number; 
   const speed = Math.hypot(snapshot.velocity.x, snapshot.velocity.z);
   if (speed < 0.08) {
     const side = Math.sin((snapshot.ragdollAt || 0) * 0.013) >= 0 ? 1 : -1;
-    return { speed, forward: 0.72, side };
+    return { speed, forward: -0.72, side };
   }
   const velocityYaw = Math.atan2(snapshot.velocity.x, snapshot.velocity.z);
   const localYaw = normalizeAngle(velocityYaw - (snapshot.yaw ?? velocityYaw));
@@ -452,14 +452,23 @@ export class GameCharacterController {
     const breath = ragdoll ? 0 : snapshot.exhausted ? Math.sin(time * 9) * 0.012 : Math.sin(time * 2.4) * 0.006;
     if (ragdoll) {
       const ragdollAge = Math.max(0, Date.now() - (snapshot.ragdollAt || 0));
-      const fall = easeOutCubic(THREE.MathUtils.clamp(ragdollAge / 480, 0, 1));
+      const fall = easeOutCubic(THREE.MathUtils.clamp(ragdollAge / 520, 0, 1));
+      const settle = easeOutCubic(THREE.MathUtils.clamp((ragdollAge - 520) / 920, 0, 1));
       const motion = ragdollMotion(snapshot);
       const side = Math.abs(motion.side) > 0.12 ? motion.side : Math.sign(motion.side || 1);
-      const forwardFall = 0.82 + Math.max(0, motion.forward) * 0.34;
-      const backwardCatch = Math.max(0, -motion.forward) * 0.18;
-      this.root.position.y = 0.22 - fall * 0.18 + Math.sin(time * 18) * 0.012 * (1 - fall);
-      this.root.rotation.set((-1.08 * forwardFall + backwardCatch) * fall, motion.side * 0.18 * fall, side * 0.5 * fall);
-      this.root.scale.set(1 + 0.03 * (1 - fall), 1 - 0.04 * fall, 1 + 0.08 * fall);
+      const forwardFall = Math.max(0, motion.forward);
+      const backwardFall = Math.max(0, -motion.forward);
+      const pitch = motion.forward >= -0.18
+        ? -1.62 - forwardFall * 0.22
+        : 1.38 + backwardFall * 0.18;
+      const sideFall = 1 - Math.min(1, Math.abs(motion.forward));
+      this.root.position.y = 0.055 + (1 - fall) * 0.26 + Math.sin(time * 16) * 0.014 * (1 - settle);
+      this.root.rotation.set(
+        pitch * fall,
+        motion.side * 0.18 * fall * (1 - settle * 0.7),
+        side * (0.48 + sideFall * 0.5) * fall
+      );
+      this.root.scale.set(1 + 0.026 * (1 - settle), 1 - 0.11 * fall, 1 + 0.08 * fall);
     } else {
       this.root.position.y = bob + breath + celebrationPose.hop;
       this.root.rotation.set(0, 0, 0);
@@ -585,16 +594,38 @@ export class GameCharacterController {
   private strikePose(action: KickKind | null, ageMs: number, jumpStyle: JumpStyle = "standing"): StrikePose {
     const empty = { pulse: 0, chamber: 0, impact: 0, recover: 0 };
     if (!action) return empty;
-    const duration = action === "head" ? 780 : action === "jump" ? (jumpStyle === "run" ? 620 : 420) : action === "body" ? 300 : 880;
+    const duration = action === "hand"
+      ? 560
+      : action === "left"
+        ? 620
+        : action === "head"
+          ? 620
+          : action === "jump"
+            ? (jumpStyle === "run" ? 620 : 420)
+            : action === "body"
+              ? 300
+              : 760;
     if (ageMs >= duration) return empty;
     const t = THREE.MathUtils.clamp(ageMs / duration, 0, 1);
     if (action === "body") {
       const pulse = Math.sin((1 - t) * Math.PI);
       return { pulse, chamber: 0, impact: pulse, recover: 1 - t };
     }
-    const chamber = t < 0.18 ? easeOutCubic(t / 0.18) : Math.max(0, 1 - (t - 0.18) / 0.18);
-    const impact = t < 0.12 ? 0 : t < 0.28 ? easeOutCubic((t - 0.12) / 0.16) : t < 0.68 ? 1 : Math.max(0, 1 - (t - 0.68) / 0.32);
-    const recover = t < 0.68 ? 0 : easeOutCubic((t - 0.68) / 0.32);
+    const chamberEnd = action === "hand" ? 0.24 : action === "left" ? 0.22 : action === "head" ? 0.3 : 0.28;
+    const impactStart = action === "hand" ? 0.16 : action === "left" ? 0.14 : action === "head" ? 0.22 : 0.2;
+    const impactEnd = action === "hand" ? 0.46 : action === "left" ? 0.44 : action === "head" ? 0.54 : 0.56;
+    const holdEnd = action === "hand" ? 0.58 : action === "left" ? 0.55 : action === "head" ? 0.62 : 0.66;
+    const chamber = t < chamberEnd
+      ? easeOutCubic(t / chamberEnd)
+      : Math.max(0, 1 - (t - chamberEnd) / Math.max(0.001, impactEnd - chamberEnd));
+    const impact = t < impactStart
+      ? 0
+      : t < impactEnd
+        ? easeOutCubic((t - impactStart) / Math.max(0.001, impactEnd - impactStart))
+        : t < holdEnd
+          ? 1
+          : Math.max(0, 1 - (t - holdEnd) / Math.max(0.001, 1 - holdEnd));
+    const recover = t < holdEnd ? 0 : easeOutCubic((t - holdEnd) / Math.max(0.001, 1 - holdEnd));
     return {
       pulse: Math.max(chamber * 0.55, impact),
       chamber,
@@ -626,32 +657,34 @@ export class GameCharacterController {
 
   private applyRagdollIk(snapshot: CharacterControllerSnapshot, time: number): void {
     const ragdollAge = Math.max(0, Date.now() - (snapshot.ragdollAt || 0));
-    const fall = easeOutCubic(THREE.MathUtils.clamp(ragdollAge / 520, 0, 1));
-    const settle = THREE.MathUtils.clamp((ragdollAge - 520) / 800, 0, 1);
+    const fall = easeOutCubic(THREE.MathUtils.clamp(ragdollAge / 560, 0, 1));
+    const settle = easeOutCubic(THREE.MathUtils.clamp((ragdollAge - 560) / 920, 0, 1));
     const motion = ragdollMotion(snapshot);
     const speed = motion.speed;
-    const flutter = Math.sin(time * 18 + (snapshot.ragdollAt || 0) * 0.001) * (1 - settle) * THREE.MathUtils.clamp(speed / 8, 0.12, 0.8);
+    const flutter = Math.sin(time * 18 + (snapshot.ragdollAt || 0) * 0.001) * (1 - settle) * THREE.MathUtils.clamp(speed / 8, 0.08, 0.72);
     const side = Math.abs(motion.side) > 0.12 ? motion.side : Math.sin((snapshot.ragdollAt || 0) * 0.013) >= 0 ? 1 : -1;
-    const forward = THREE.MathUtils.clamp(motion.forward, -0.45, 1);
+    const forward = THREE.MathUtils.clamp(motion.forward, -0.7, 1);
+    const faceDown = forward >= -0.18 ? 1 : 0;
+    const backward = 1 - faceDown;
 
-    this.rotateBone("spine1", 0.32 + 0.22 * forward, 0.12 * side, 0.18 * side, fall);
-    this.rotateBone("spine2", 0.52 + 0.26 * forward, 0.18 * side, 0.22 * side, fall);
-    this.rotateBone("neck", 0.42, -0.1 * side, 0.12 * side, fall);
-    this.rotateBone("head", 0.62, -0.16 * side, 0.18 * side, fall);
-    this.rotateBone("leftShoulder", -0.34 + flutter * 0.08, 0, -0.92, fall);
-    this.rotateBone("rightShoulder", -0.28 - flutter * 0.08, 0, 0.78, fall);
-    this.rotateBone("leftArm", -1.05 + flutter * 0.18, 0.08 * side, -0.74, fall);
-    this.rotateBone("rightArm", -0.88 - flutter * 0.14, -0.08 * side, 0.66, fall);
-    this.rotateBone("leftForearm", -0.72, 0, -0.34 + flutter * 0.16, fall);
-    this.rotateBone("rightForearm", -0.58, 0, 0.38 - flutter * 0.14, fall);
-    this.rotateBone("leftHand", -0.16, 0, -0.16, fall);
-    this.rotateBone("rightHand", -0.14, 0, 0.16, fall);
-    this.rotateBone("leftThigh", 0.72, 0.08 * side, -0.28, fall);
-    this.rotateBone("rightThigh", -0.36, -0.06 * side, 0.32, fall);
-    this.rotateBone("leftLeg", -0.58, 0, 0.12, fall);
-    this.rotateBone("rightLeg", 0.42, 0, -0.08, fall);
-    this.rotateBone("leftFoot", 0.18, 0, -0.12, fall);
-    this.rotateBone("rightFoot", -0.14, 0, 0.1, fall);
+    this.rotateBone("spine1", (0.26 + 0.24 * forward) * faceDown - 0.2 * backward, 0.1 * side, 0.2 * side, fall);
+    this.rotateBone("spine2", (0.5 + 0.24 * forward) * faceDown - 0.32 * backward, 0.14 * side, 0.24 * side, fall);
+    this.rotateBone("neck", 0.38 * faceDown - 0.24 * backward, -0.1 * side, 0.12 * side, fall);
+    this.rotateBone("head", 0.58 * faceDown - 0.36 * backward, -0.14 * side, 0.18 * side, fall);
+    this.rotateBone("leftShoulder", -0.12 + flutter * 0.06, 0.08 * side, -1.08, fall);
+    this.rotateBone("rightShoulder", -0.1 - flutter * 0.06, -0.08 * side, 1.0, fall);
+    this.rotateBone("leftArm", -0.46 + flutter * 0.12, 0.1 * side, -0.86, fall);
+    this.rotateBone("rightArm", -0.38 - flutter * 0.1, -0.1 * side, 0.8, fall);
+    this.rotateBone("leftForearm", -0.24 + 0.06 * backward, 0, -0.46 + flutter * 0.1, fall);
+    this.rotateBone("rightForearm", -0.18 + 0.08 * backward, 0, 0.48 - flutter * 0.09, fall);
+    this.rotateBone("leftHand", -0.22, 0, -0.18, fall);
+    this.rotateBone("rightHand", -0.2, 0, 0.18, fall);
+    this.rotateBone("leftThigh", 0.28 * faceDown - 0.24 * backward, 0.06 * side, -0.24, fall);
+    this.rotateBone("rightThigh", -0.16 * faceDown + 0.36 * backward, -0.05 * side, 0.28, fall);
+    this.rotateBone("leftLeg", -0.34 + 0.16 * backward, 0, 0.1, fall);
+    this.rotateBone("rightLeg", 0.22 - 0.18 * backward, 0, -0.08, fall);
+    this.rotateBone("leftFoot", 0.12, 0, -0.1, fall);
+    this.rotateBone("rightFoot", -0.1, 0, 0.08, fall);
   }
 
   private applyProceduralIk(snapshot: CharacterControllerSnapshot, pose: StrikePose, celebration: CelebrationPose): void {
@@ -673,17 +706,17 @@ export class GameCharacterController {
       const strikeLeg = isRight ? "rightLeg" : "leftLeg";
       const strikeFoot = isRight ? "rightFoot" : "leftFoot";
       const plantThigh = isRight ? "leftThigh" : "rightThigh";
-      this.rotateBone(strikeThigh, 0, 0, -0.55 * side, chamber);
-      this.rotateBone(strikeLeg, 0, 0, 0.3 * side, chamber);
-      this.rotateBone(strikeFoot, 0.04, 0, -0.08 * side, chamber);
-      this.rotateBone(strikeThigh, 0.02, 0, 1.25 * side, impact);
-      this.rotateBone(strikeLeg, -0.06, 0, 0.48 * side, impact);
-      this.rotateBone(strikeFoot, 0.1, 0, 0.12 * side, impact);
-      this.rotateBone(plantThigh, 0, 0, -0.16 * side, pulse);
-      this.rotateBone("spine1", 0.18, 0.08, -0.04, impact);
-      this.rotateBone("spine2", 0.3, 0.1, -0.06, impact);
-      this.rotateBone(isRight ? "leftArm" : "rightArm", -0.24, 0, 0.2 * -side, pulse);
-      this.rotateBone(isRight ? "rightArm" : "leftArm", 0, 0, -0.24 * side, chamber);
+      this.rotateBone(strikeThigh, 0.16, -0.08, 0.46 * side, chamber);
+      this.rotateBone(strikeLeg, -0.5, 0, -0.16 * side, chamber);
+      this.rotateBone(strikeFoot, 0.08, 0, 0.06 * side, chamber);
+      this.rotateBone(strikeThigh, 0.2, -0.24, 1.64 * side, impact);
+      this.rotateBone(strikeLeg, 0.48, 0, -0.52 * side, impact);
+      this.rotateBone(strikeFoot, -0.26, 0, -0.2 * side, impact);
+      this.rotateBone(plantThigh, -0.14, 0, 0.04 * side, pulse);
+      this.rotateBone("spine1", -0.16, 0.04 * side, -0.02 * side, pulse);
+      this.rotateBone("spine2", -0.22, 0.06 * side, -0.02 * side, impact);
+      this.rotateBone(isRight ? "leftArm" : "rightArm", -0.5, 0, -0.18 * side, pulse);
+      this.rotateBone(isRight ? "rightArm" : "leftArm", 0.18, 0, 0.12 * side, chamber);
     } else if (snapshot.lastAction === "hand") {
       const isRight = this.activeHandStrikeSide === "right";
       // The imported Free3D roster reads left/right arm bones mirrored in gameplay view.
@@ -696,34 +729,34 @@ export class GameCharacterController {
       const counterArm = rigUsesRightSide ? "leftArm" : "rightArm";
       const counterForearm = rigUsesRightSide ? "leftForearm" : "rightForearm";
       const side = isRight ? 1 : -1;
-      this.rotateBone(strikeShoulder, -0.36, 0, -0.34 * side, chamber);
-      this.rotateBone(strikeArm, -0.52, 0, -0.28 * side, chamber);
-      this.rotateBone(strikeForearm, 0.14, 0, -0.16 * side, chamber);
-      this.rotateBone(strikeHand, -0.04, 0, -0.04 * side, chamber);
-      this.rotateBone(strikeShoulder, -0.52, 0, 0.54 * side, impact);
-      this.rotateBone(strikeArm, -0.9, 0, 0.58 * side, impact);
-      this.rotateBone(strikeForearm, -0.46, 0, 0.28 * side, impact);
-      this.rotateBone(strikeHand, -0.14, 0, 0.1 * side, impact);
-      this.rotateBone("spine1", 0.06, -0.16 * side, 0, pulse);
-      this.rotateBone("spine2", 0.1, -0.22 * side, 0, impact);
-      this.rotateBone(counterShoulder, -0.16, 0, 0.1 * side, pulse);
-      this.rotateBone(counterArm, -0.3, 0, 0.12 * side, pulse);
-      this.rotateBone(counterForearm, -0.18, 0, 0.08 * side, pulse);
+      this.rotateBone(strikeShoulder, -0.22, 0.16 * side, -0.46 * side, chamber);
+      this.rotateBone(strikeArm, -0.34, 0.08 * side, -0.42 * side, chamber);
+      this.rotateBone(strikeForearm, 0.62, 0, -0.2 * side, chamber);
+      this.rotateBone(strikeHand, -0.04, 0, -0.08 * side, chamber);
+      this.rotateBone(strikeShoulder, -0.92, -0.18 * side, 0.16 * side, impact);
+      this.rotateBone(strikeArm, -1.18, -0.14 * side, 0.08 * side, impact);
+      this.rotateBone(strikeForearm, 0.34, 0, 0.02 * side, impact);
+      this.rotateBone(strikeHand, -0.12, 0, 0.02 * side, impact);
+      this.rotateBone("spine1", -0.06, -0.22 * side, -0.04 * side, pulse);
+      this.rotateBone("spine2", -0.1, -0.34 * side, -0.05 * side, impact);
+      this.rotateBone(counterShoulder, -0.22, 0, 0.2 * side, pulse);
+      this.rotateBone(counterArm, -0.62, 0.04 * side, 0.18 * side, pulse);
+      this.rotateBone(counterForearm, -0.46, 0, 0.12 * side, pulse);
     } else if (snapshot.lastAction === "head") {
-      this.rotateBone("spine1", -0.18, 0, 0, chamber);
-      this.rotateBone("spine2", -0.34, 0, 0, chamber);
-      this.rotateBone("neck", -0.5, 0, 0, chamber);
-      this.rotateBone("head", -0.62, 0, 0, chamber);
-      this.rotateBone("spine1", 0.5, 0, 0, impact);
-      this.rotateBone("spine2", 0.86, 0, 0, impact);
-      this.rotateBone("neck", 1.28, 0, 0, impact);
-      this.rotateBone("head", 1.55, 0, 0, impact);
+      this.rotateBone("spine1", -0.24, 0, 0, chamber);
+      this.rotateBone("spine2", -0.38, 0, 0, chamber);
+      this.rotateBone("neck", -0.56, 0, 0, chamber);
+      this.rotateBone("head", -0.68, 0, 0, chamber);
+      this.rotateBone("spine1", 0.36, 0, 0, impact);
+      this.rotateBone("spine2", 0.62, 0, 0, impact);
+      this.rotateBone("neck", 1.08, 0, 0, impact);
+      this.rotateBone("head", 1.34, 0, 0, impact);
       this.rotateBone("leftShoulder", 0.02, 0, -0.12, pulse);
       this.rotateBone("rightShoulder", 0.02, 0, 0.12, pulse);
-      this.rotateBone("leftArm", 0.04, 0, -0.32, pulse);
-      this.rotateBone("rightArm", 0.04, 0, 0.32, pulse);
-      this.rotateBone("leftForearm", -0.02, 0, -0.18, pulse);
-      this.rotateBone("rightForearm", -0.02, 0, 0.18, pulse);
+      this.rotateBone("leftArm", -0.18, 0, -0.38, pulse);
+      this.rotateBone("rightArm", -0.18, 0, 0.38, pulse);
+      this.rotateBone("leftForearm", -0.22, 0, -0.22, pulse);
+      this.rotateBone("rightForearm", -0.22, 0, 0.22, pulse);
     } else if (snapshot.lastAction === "jump") {
       if (this.activeJumpStyle === "run") {
         const drive = THREE.MathUtils.clamp(0.58 + this.smoothedSpeed / 8.5, 0.72, 1.18);

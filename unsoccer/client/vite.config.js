@@ -13,7 +13,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, "index.html"),
-        characterControllerTest: resolve(__dirname, "character-controller-test.html")
+        characterControllerTest: resolve(__dirname, "character-controller-test.html"),
+        viz: resolve(__dirname, "viz/index.html")
       }
     }
   }

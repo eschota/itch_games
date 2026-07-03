@@ -532,7 +532,7 @@ function ballOverlapsPlayerBodyHeight(playerPosition: Vec3, ballPosition: Vec3):
 function kickContactVerticalRange(kind: KickKind): number {
   const settings = gameSettings();
   if (kind === "head") return settings.ballRadius + 0.18;
-  if (kind === "hand") return settings.playerHeight * 0.5;
+  if (kind === "hand") return settings.playerHeight * 0.58;
   return settings.ballRadius + 0.24;
 }
 
@@ -545,7 +545,7 @@ function kickAssistHorizontalRange(kind: KickKind): number {
 
 function playerHitProfile(kind: KickKind): { range: number; cone: number } {
   const settings = gameSettings();
-  if (kind === "hand") return { range: Math.max(1.7, settings.handKickAssistRange + settings.playerRadius * 0.35), cone: -0.22 };
+  if (kind === "hand") return { range: Math.max(1.9, settings.handKickAssistRange + settings.playerRadius * 0.38), cone: 0.04 };
   if (kind === "head") return { range: Math.max(1.45, settings.headKickAssistRange + settings.playerRadius * 0.18), cone: -0.08 };
   return { range: Math.max(1.8, settings.footKickAssistRange + settings.playerRadius * 0.22), cone: -0.2 };
 }
@@ -885,7 +885,7 @@ class UnsoccerServer {
       }
       next();
     });
-    this.app.use(express.json({ limit: "32kb" }));
+    this.app.use(express.json({ limit: "128kb" }));
     this.app.get("/api/health", (_request, response) => {
       response.json(this.serverInfo());
     });
@@ -2997,20 +2997,20 @@ class UnsoccerServer {
     const side = kind === "left" ? sideValue(player.trailingFoot) : kind === "hand" ? player.nextHandSide : 0;
     const contact = kind === "head"
       ? {
-          x: playerPosition.x + forwardX * 0.18,
+          x: playerPosition.x + forwardX * 0.48,
           y: playerPosition.y + this.settings.playerHeight * 0.48,
-          z: playerPosition.z + forwardZ * 0.18
+          z: playerPosition.z + forwardZ * 0.48
         }
       : kind === "hand"
         ? {
-            x: playerPosition.x + sideX * 0.36 + forwardX * 0.42,
-            y: playerPosition.y + this.settings.playerHeight * 0.08,
-            z: playerPosition.z + sideZ * 0.36 + forwardZ * 0.42
+            x: playerPosition.x + sideX * side * 0.24 + forwardX * 0.78,
+            y: playerPosition.y + this.settings.playerHeight * 0.18,
+            z: playerPosition.z + sideZ * side * 0.24 + forwardZ * 0.78
           }
       : {
-          x: playerPosition.x + sideX * side * 0.34 + forwardX * 0.28,
+          x: playerPosition.x + sideX * side * 0.34 + forwardX * 0.52,
           y: playerPosition.y - this.settings.playerHeight / 2 + this.settings.ballRadius * 1.05,
-          z: playerPosition.z + sideZ * side * 0.34 + forwardZ * 0.28
+          z: playerPosition.z + sideZ * side * 0.34 + forwardZ * 0.52
         };
     const dx = ballPosition.x - contact.x;
     const dy = ballPosition.y - contact.y;

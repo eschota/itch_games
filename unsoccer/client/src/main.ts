@@ -6,7 +6,9 @@ import {
   CHARACTER_ROSTER,
   DAY_CYCLE_SECONDS,
   DAY_START_SECONDS,
+  DEFAULT_GAME_SETTINGS,
   DEFAULT_USER_PICS,
+  DEFAULT_VISUAL_SETTINGS,
   DEFAULT_INPUT,
   EMOTION_CHOICES,
   FIELD_LENGTH,
@@ -38,6 +40,7 @@ import {
   type PlayerProfileSnapshot,
   type ServerAudioEvent,
   type ServerState,
+  type VisualSettings,
   type WeatherSnapshot
 } from "@itch-games/unsoccer-shared";
 import { UnSoccerAudio, type AudioRuntimeSnapshot } from "./audio";
@@ -46,7 +49,7 @@ import {
   loadFree3dCharacter,
   type CharacterControllerDebugSnapshot
 } from "./character-controller";
-import { installCourtyardEnvironment, type CourtyardEnvironmentRuntime } from "./environment-props";
+import { applyEnvironmentLookdevMaterials, installCourtyardEnvironment, type CourtyardEnvironmentRuntime } from "./environment-props";
 import { actionPressed, codeForAction, resolveMovementInput } from "./input-map";
 import {
   bindingConflicts,
@@ -63,6 +66,13 @@ import {
   type UnSoccerSettings
 } from "./settings";
 import { WeatherVisualLayer } from "./weather";
+import {
+  applyLookdevMaterial,
+  applyVisualLighting,
+  configureVisualRenderer,
+  type VisualFloodlightRuntime,
+  type VisualRig
+} from "./visual-pipeline";
 import "./styles.css";
 
 interface NetworkChannel {
@@ -282,11 +292,7 @@ document.documentElement.dataset.movementSmoothing = "axis-inertia-accel-decel";
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFShadowMap;
+configureVisualRenderer(renderer, DEFAULT_VISUAL_SETTINGS);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x07110f);
@@ -392,33 +398,13 @@ const skyDome = new THREE.Mesh(new THREE.SphereGeometry(124, 32, 18), skyMateria
 skyDome.position.y = 4;
 scene.add(skyDome);
 
-const FLOODLIGHT_POINTS = [
-  { x: -FIELD_WIDTH / 2 - 5.9, z: -FIELD_LENGTH / 2 - 4.8, targetX: FIELD_WIDTH * 0.34, targetZ: FIELD_LENGTH * 0.33 },
-  { x: FIELD_WIDTH / 2 + 5.9, z: -FIELD_LENGTH / 2 - 4.8, targetX: -FIELD_WIDTH * 0.34, targetZ: FIELD_LENGTH * 0.33 },
-  { x: -FIELD_WIDTH / 2 - 5.9, z: FIELD_LENGTH / 2 + 4.8, targetX: FIELD_WIDTH * 0.34, targetZ: -FIELD_LENGTH * 0.33 },
-  { x: FIELD_WIDTH / 2 + 5.9, z: FIELD_LENGTH / 2 + 4.8, targetX: -FIELD_WIDTH * 0.34, targetZ: -FIELD_LENGTH * 0.33 }
-] as const;
-
-const FLOODLIGHT_BEAM_ANGLE = Math.PI / 2.85;
-const FLOODLIGHT_VISUAL_RADIUS = 13.4;
-const FLOODLIGHT_PALETTE = [0xeaf4ff, 0xfff0d4, 0xdcefff, 0xf7f2ff] as const;
-
-interface StadiumFloodlight {
-  light: THREE.SpotLight;
-  cone: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshBasicMaterial>;
-  lampMaterial: THREE.MeshBasicMaterial;
-  fixtureMaterial: THREE.MeshStandardMaterial;
-  target: THREE.Object3D;
-  baseColor: THREE.Color;
-  flickerPhase: number;
-  flickerSpeed: number;
-  flickerDepth: number;
-  widthScale: number;
-  intensityBias: number;
-}
+const FLOODLIGHT_POINTS = DEFAULT_VISUAL_SETTINGS.floodlights.lights;
+const FLOODLIGHT_BEAM_ANGLE = THREE.MathUtils.degToRad(FLOODLIGHT_POINTS[0]?.angleDeg ?? 63.2);
+const FLOODLIGHT_VISUAL_RADIUS = FLOODLIGHT_POINTS[0]?.coneRadius ?? 13.4;
+const FLOODLIGHT_PALETTE = FLOODLIGHT_POINTS.map((light) => light.color);
 
 const floodLights: THREE.SpotLight[] = [];
-const stadiumFloodlights: StadiumFloodlight[] = [];
+const stadiumFloodlights: VisualFloodlightRuntime[] = [];
 const floodlightConeGeometry = new THREE.CylinderGeometry(0.24, FLOODLIGHT_VISUAL_RADIUS, 1, 36, 1, true);
 const floodlightUp = new THREE.Vector3(0, 1, 0);
 const floodlightDirection = new THREE.Vector3();
@@ -428,10 +414,10 @@ const floodlightDarkColor = new THREE.Color(0x6e8090);
 
 for (const [index, point] of FLOODLIGHT_POINTS.entries()) {
   const target = new THREE.Object3D();
-  target.position.set(point.targetX, 0.18, point.targetZ);
-  const baseColor = new THREE.Color(FLOODLIGHT_PALETTE[index % FLOODLIGHT_PALETTE.length]);
-  const flood = new THREE.SpotLight(baseColor, 0, 96, FLOODLIGHT_BEAM_ANGLE, 0.88, 1.05);
-  flood.position.set(point.x, 12.9, point.z);
+  target.position.set(point.targetX, point.targetY, point.targetZ);
+  const baseColor = new THREE.Color(point.color);
+  const flood = new THREE.SpotLight(baseColor, 0, point.distance, THREE.MathUtils.degToRad(point.angleDeg), point.penumbra, point.decay);
+  flood.position.set(point.x, point.y, point.z);
   flood.target = target;
   flood.castShadow = true;
   flood.shadow.mapSize.set(768, 768);
@@ -472,16 +458,17 @@ for (const [index, point] of FLOODLIGHT_POINTS.entries()) {
     target,
     baseColor,
     flickerPhase: index * 1.73 + 0.41,
-    flickerSpeed: 3.4 + index * 0.37,
-    flickerDepth: 0.07 + index * 0.018,
-    widthScale: 0.95 + index * 0.035,
-    intensityBias: 0.94 + index * 0.045
+    flickerSpeed: point.flickerSpeed,
+    flickerDepth: point.flickerDepth,
+    widthScale: point.widthScale,
+    intensityBias: point.intensityBias,
+    coneBaseRadius: FLOODLIGHT_VISUAL_RADIUS
   });
 }
 document.documentElement.dataset.stadiumLights = String(stadiumFloodlights.length);
 document.documentElement.dataset.stadiumLightBeamAngle = THREE.MathUtils.radToDeg(FLOODLIGHT_BEAM_ANGLE).toFixed(1);
 document.documentElement.dataset.stadiumLightBeamRadius = FLOODLIGHT_VISUAL_RADIUS.toFixed(1);
-document.documentElement.dataset.stadiumLightPalette = FLOODLIGHT_PALETTE.map((color) => `#${color.toString(16).padStart(6, "0")}`).join(",");
+document.documentElement.dataset.stadiumLightPalette = FLOODLIGHT_PALETTE.join(",");
 
 function orientFloodlightCone(cone: THREE.Mesh, lampPosition: THREE.Vector3, targetPosition: THREE.Vector3): void {
   floodlightDirection.copy(lampPosition).sub(targetPosition);
@@ -492,6 +479,26 @@ function orientFloodlightCone(cone: THREE.Mesh, lampPosition: THREE.Vector3, tar
   cone.scale.set(1, length, 1);
   cone.quaternion.setFromUnitVectors(floodlightUp, floodlightDirection);
 }
+
+const visualRig: VisualRig = {
+  renderer,
+  scene,
+  hemi,
+  ambientFill,
+  courtyardBounce,
+  sun,
+  sunMesh,
+  sunGlow,
+  sunGlowMaterial,
+  moonMesh,
+  moonMaterial,
+  rimLight,
+  skyMaterial,
+  skyDome,
+  floodlights: stadiumFloodlights,
+  sunPath,
+  sunPathMaterial
+};
 
 const BALL_VARIANT_COLORS = [
   [0xf4f7fa, 0x111111],
@@ -509,23 +516,44 @@ const BALL_VARIANT_COLORS = [
 const fieldGroup = new THREE.Group();
 scene.add(fieldGroup);
 let courtyardEnvironmentRuntime: CourtyardEnvironmentRuntime | null = null;
+type LookdevMaterialKey = keyof VisualSettings["materials"];
+const lookdevMaterials = new Map<LookdevMaterialKey, Set<THREE.Material>>();
+let lastAppliedVisualSettings: VisualSettings | null = null;
+
+function registerLookdevMaterial<T extends THREE.Material>(key: LookdevMaterialKey, material: T): T {
+  const materials = lookdevMaterials.get(key) ?? new Set<THREE.Material>();
+  materials.add(material);
+  lookdevMaterials.set(key, materials);
+  return material;
+}
+
+function applyRegisteredVisualMaterials(visual: VisualSettings): void {
+  if (lastAppliedVisualSettings === visual) return;
+  for (const [key, materials] of lookdevMaterials.entries()) {
+    const settingsForKey = visual.materials[key];
+    for (const material of materials) applyLookdevMaterial(material, settingsForKey);
+  }
+  applyEnvironmentLookdevMaterials(visual);
+  lastAppliedVisualSettings = visual;
+}
+
 const movingCars: MovingCar[] = [];
 const goalNets: GoalNetVisual[] = [];
 const sidelineBalls: THREE.Group[] = [];
 const activeFree3dBalls: THREE.Object3D[] = [];
 const activeFree3dBallRoot = new THREE.Group();
 const free3dBallLoader = new GLTFLoader();
-const free3dBallMaterial = new THREE.MeshStandardMaterial({
+const free3dBallMaterial = registerLookdevMaterial("ball", new THREE.MeshStandardMaterial({
   color: 0xffffff,
   roughness: 0.56,
   metalness: 0.02,
   vertexColors: true
-});
+}));
 const weatherLayer = new WeatherVisualLayer({ scene, fieldWidth: FIELD_WIDTH, fieldLength: FIELD_LENGTH });
 
 const ballGeometry = new THREE.SphereGeometry(BALL_RADIUS, 32, 18);
 applyBallVertexColors(ballGeometry, 0);
-const ballMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0.03, vertexColors: true });
+const ballMaterial = registerLookdevMaterial("ball", new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0.03, vertexColors: true }));
 const ballMesh = new THREE.Mesh(
   ballGeometry,
   ballMaterial
@@ -566,7 +594,7 @@ const ACTION_TELEGRAPH: Record<KickKind, {
   hand: {
     color: 0xff9d42,
     opacity: 0.86,
-    scale: [1.8, 1.12, 2.2],
+    scale: [1.35, 1.02, 2.85],
     ballPulse: 0.72,
     cameraImpulse: 0.52,
     durationMs: 520
@@ -1228,9 +1256,10 @@ function persistAndApplySettings(): void {
 function applySettingsToRuntime(): void {
   const maxDpr: Record<QualityPreset, number> = { low: 1, balanced: 1.5, high: 2 };
   renderer.setPixelRatio(Math.max(0.5, Math.min(window.devicePixelRatio || 1, maxDpr[settings.graphics.qualityPreset]) * settings.graphics.resolutionScale));
-  renderer.shadowMap.enabled = settings.graphics.shadows;
-  sun.castShadow = settings.graphics.shadows;
-  for (const flood of floodLights) flood.castShadow = settings.graphics.shadows;
+  const visual = (renderedState ?? latestState)?.settings?.visual ?? DEFAULT_VISUAL_SETTINGS;
+  renderer.shadowMap.enabled = settings.graphics.shadows && visual.renderer.shadows;
+  sun.castShadow = renderer.shadowMap.enabled;
+  for (const flood of floodLights) flood.castShadow = renderer.shadowMap.enabled;
   audio.setVolumes(settings.audio);
   weatherLayer.setOptions({
     particlesEnabled: settings.graphics.weatherParticles && !settings.graphics.reduceEffects,
@@ -2084,13 +2113,13 @@ syncSettingsUi();
 function buildField(root: THREE.Group) {
   const turf = new THREE.Mesh(
     new THREE.BoxGeometry(FIELD_WIDTH, 0.12, FIELD_LENGTH),
-    new THREE.MeshStandardMaterial({ color: 0x19845f, roughness: 0.9 })
+    registerLookdevMaterial("field", new THREE.MeshStandardMaterial({ color: 0x19845f, roughness: 0.9 }))
   );
   turf.position.y = -0.06;
   turf.receiveShadow = true;
   root.add(turf);
 
-  const stripeMaterial = new THREE.MeshStandardMaterial({ color: 0x1d966c, roughness: 0.92 });
+  const stripeMaterial = registerLookdevMaterial("fieldStripe", new THREE.MeshStandardMaterial({ color: 0x1d966c, roughness: 0.92 }));
   for (let i = -3; i <= 3; i += 1) {
     const stripe = new THREE.Mesh(new THREE.BoxGeometry(FIELD_WIDTH, 0.01, FIELD_LENGTH / 9), stripeMaterial);
     stripe.position.set(0, 0.01, i * FIELD_LENGTH / 7);
@@ -2099,8 +2128,8 @@ function buildField(root: THREE.Group) {
   }
 
   const lineWidth = 0.095;
-  const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xf4fff6, transparent: true, opacity: 0.96 });
-  const secondaryLineMaterial = new THREE.MeshBasicMaterial({ color: 0xd9f7e4, transparent: true, opacity: 0.82 });
+  const lineMaterial = registerLookdevMaterial("marking", new THREE.MeshBasicMaterial({ color: 0xf4fff6, transparent: true, opacity: 0.96 }));
+  const secondaryLineMaterial = registerLookdevMaterial("markingSecondary", new THREE.MeshBasicMaterial({ color: 0xd9f7e4, transparent: true, opacity: 0.82 }));
   const addLine = (
     width: number,
     depth: number,
@@ -2127,11 +2156,11 @@ function buildField(root: THREE.Group) {
           return new THREE.Vector3(x + Math.cos(a) * radius, 0.071, z + Math.sin(a) * radius);
         })
       ),
-      new THREE.LineBasicMaterial({
+      registerLookdevMaterial(material === lineMaterial ? "marking" : "markingSecondary", new THREE.LineBasicMaterial({
         color: material === lineMaterial ? 0xf4fff6 : 0xd9f7e4,
         transparent: true,
         opacity: material === lineMaterial ? 0.96 : 0.82
-      })
+      }))
     );
     root.add(circle);
   };
@@ -2165,7 +2194,7 @@ function buildField(root: THREE.Group) {
 }
 
 function addStadiumFrame(root: THREE.Group) {
-  const asphaltMaterial = new THREE.MeshStandardMaterial({ color: 0x36413e, roughness: 0.96 });
+  const asphaltMaterial = registerLookdevMaterial("courtyard", new THREE.MeshStandardMaterial({ color: 0x36413e, roughness: 0.96 }));
   const courtyard = new THREE.Mesh(
     new THREE.BoxGeometry(FIELD_WIDTH + 20, 0.08, FIELD_LENGTH + 22),
     asphaltMaterial
@@ -2174,7 +2203,7 @@ function addStadiumFrame(root: THREE.Group) {
   courtyard.receiveShadow = true;
   root.add(courtyard);
 
-  const fenceMaterial = new THREE.MeshStandardMaterial({ color: 0x20342e, roughness: 0.72, metalness: 0.16 });
+  const fenceMaterial = registerLookdevMaterial("fence", new THREE.MeshStandardMaterial({ color: 0x20342e, roughness: 0.72, metalness: 0.16 }));
   for (const side of [-1, 1] as const) {
     const rail = new THREE.Mesh(new THREE.BoxGeometry(FIELD_WIDTH + 2.2, 0.32, 0.09), fenceMaterial);
     rail.position.set(0, 0.32, side * (FIELD_LENGTH / 2 + 1.25));
@@ -2221,11 +2250,11 @@ function addStadiumFrame(root: THREE.Group) {
 }
 
 function addFloodlightMasts(root: THREE.Group): void {
-  const mastMaterial = new THREE.MeshStandardMaterial({
+  const mastMaterial = registerLookdevMaterial("mast", new THREE.MeshStandardMaterial({
     color: 0xaebbc4,
     roughness: 0.36,
     metalness: 0.36
-  });
+  }));
   for (let index = 0; index < FLOODLIGHT_POINTS.length; index += 1) {
     const point = FLOODLIGHT_POINTS[index];
     const runtime = stadiumFloodlights[index];
@@ -2541,7 +2570,7 @@ function addBench(root: THREE.Group, x: number, z: number, rotation: number): vo
 }
 
 function addGoal(root: THREE.Group, side: -1 | 1) {
-  const material = new THREE.MeshStandardMaterial({ color: 0xf0f3ec, roughness: 0.38, metalness: 0.16 });
+  const material = registerLookdevMaterial("goalPost", new THREE.MeshStandardMaterial({ color: 0xf0f3ec, roughness: 0.38, metalness: 0.16 }));
   const z = side * (FIELD_LENGTH / 2);
   const postGeometry = new THREE.CylinderGeometry(0.17, 0.19, 2.28, 20);
   const barGeometry = new THREE.CylinderGeometry(0.16, 0.16, GOAL_WIDTH + 0.38, 20);
@@ -3060,10 +3089,11 @@ class PlayerVisual {
       const side = rightFootStrike ? 1 : -1;
       strikeLeg.rotation.x = -1.18 * kickArc;
       strikeLeg.rotation.z = -0.1 * side * kickArc;
-      strikeFoot.position.set(0.2 * side, 0.15, 0.48 + 0.48 * kickArc);
+      strikeLeg.position.z += 0.12 * kickArc;
+      strikeFoot.position.set(0.2 * side, 0.15, 0.58 + 0.6 * kickArc);
       strikeFoot.rotation.x = -0.52 * kickArc;
       counterArm.rotation.x = -0.65 * kickArc;
-      this.contactFlash.position.set(0.2 * side, 0.36, 0.76);
+      this.contactFlash.position.set(0.2 * side, 0.36, 0.94);
     } else if (snapshot.lastAction === "hand" || handPulse > 0) {
       const serverHandPulse = snapshot.lastAction === "hand" ? actionPulse : 0;
       const previewHandSide = snapshot.id === localJoin?.id && trackedHandPulse > serverHandPulse
@@ -3073,23 +3103,28 @@ class PlayerVisual {
       const strikeArm = rightHandStrike ? this.rightArm : this.leftArm;
       const counterArm = rightHandStrike ? this.leftArm : this.rightArm;
       const side = rightHandStrike ? 1 : -1;
-      strikeArm.rotation.x = -1.58 * handArc;
+      strikeArm.position.set(0.43 * side, 1.2 + 0.08 * handArc, 0.12 + 0.38 * handArc);
+      strikeArm.rotation.x = -1.72 * handArc;
+      strikeArm.rotation.y = 0.16 * side * handArc;
       strikeArm.rotation.z = -0.18 * side;
-      counterArm.rotation.x = 0.36 * handArc;
-      this.body.rotation.y = -0.16 * side * handArc;
-      this.chest.rotation.y = -0.16 * side * handArc;
-      this.contactFlash.position.set(0.34 * side, 1.38, 0.84);
+      counterArm.rotation.x = -0.32 * handArc;
+      counterArm.rotation.z = 0.18 * side;
+      this.body.rotation.y = -0.22 * side * handArc;
+      this.chest.rotation.y = -0.24 * side * handArc;
+      this.contactFlash.position.set(0.24 * side, 1.38, 1.02);
       this.handStrike.visible = handPulse > 0;
       this.handStrikeMaterial.opacity = handPulse * 0.9;
-      this.handStrike.position.set(0.34 * side, 1.46, 0.92);
-      this.handStrike.rotation.set(0.34, -0.08 * side, -1.18 * side + handArc * 0.95 * side);
-      this.handStrike.scale.setScalar(1.0 + (1 - handPulse) * 0.72);
+      this.handStrike.position.set(0.22 * side, 1.46, 1.1);
+      this.handStrike.rotation.set(0.18, -0.12 * side, -1.1 * side + handArc * 0.82 * side);
+      this.handStrike.scale.setScalar(1.12 + (1 - handPulse) * 0.92);
     } else if (snapshot.lastAction === "head") {
-      this.head.rotation.x = -0.72 * kickArc;
-      this.hair.rotation.x = -0.72 * kickArc;
-      this.head.position.z = 0.28 * kickArc;
-      this.hair.position.z = 0.28 * kickArc;
-      this.contactFlash.position.set(0, 1.64, 0.76);
+      this.body.rotation.x = -0.12 * kickArc;
+      this.chest.rotation.x = -0.16 * kickArc;
+      this.head.rotation.x = -0.86 * kickArc;
+      this.hair.rotation.x = -0.86 * kickArc;
+      this.head.position.z = 0.38 * kickArc;
+      this.hair.position.z = 0.38 * kickArc;
+      this.contactFlash.position.set(0, 1.64, 0.94);
     } else if (snapshot.lastAction === "body") {
       this.body.rotation.x = -0.28 * kickArc;
       this.chest.rotation.x = -0.28 * kickArc;
@@ -4283,122 +4318,37 @@ function updateLighting(elapsedSeconds: number) {
   const runtimeSettings = lightingState?.settings;
   const cycleSeconds = Math.max(1, runtimeSettings?.dayCycleSeconds ?? DAY_CYCLE_SECONDS);
   const startSeconds = runtimeSettings?.dayStartSeconds ?? DAY_START_SECONDS;
-  const sunMultiplier = runtimeSettings?.sunIntensity ?? 1;
-  const moonMultiplier = runtimeSettings?.moonIntensity ?? 1;
-  const ambientMultiplier = runtimeSettings?.ambientIntensity ?? 1;
-  const floodlightMultiplier = runtimeSettings?.floodlightIntensity ?? 1;
-  const exposureMultiplier = runtimeSettings?.toneMappingExposure ?? 1;
   const serverDayTime = lightingState?.dayTimeSeconds;
   const fallbackCycleSeconds = qaDayCycleSeconds === null ? elapsedSeconds : qaDayCycleSeconds + elapsedSeconds;
   const fallbackDayTime = startSeconds + fallbackCycleSeconds / cycleSeconds * 24 * 60 * 60;
   const daySeconds = serverDayTime ?? fallbackDayTime;
   const dayTime = THREE.MathUtils.euclideanModulo(daySeconds, 24 * 60 * 60);
-  const solarCycle = dayTime / (24 * 60 * 60);
-  const angle = (solarCycle - 0.25) * Math.PI * 2;
-  const sunHeight = Math.sin(angle);
-  const sunrise = THREE.MathUtils.smoothstep(dayTime, DAWN_START_SECONDS, DAYLIGHT_START_SECONDS);
-  const sunsetFade = 1 - THREE.MathUtils.smoothstep(dayTime, DUSK_START_SECONDS, NIGHT_START_SECONDS);
-  const daylight = Math.max(0, Math.min(sunrise, sunsetFade));
-  const nightAmount = 1 - daylight;
-  const floodlightPower = THREE.MathUtils.smoothstep(nightAmount, 0.18, 0.82);
-  const sunset = Math.max(0, 1 - Math.abs(sunHeight) * 5.2) * (1 - Math.abs(daylight - 0.5));
-  const skyRadius = 46;
-  sun.position.set(Math.cos(angle) * skyRadius, Math.max(1.2, sunHeight * skyRadius), Math.sin(angle + 0.42) * 28);
-  sun.target.position.set(0, 0, 0);
-  sunMesh.position.set(Math.cos(angle) * 70, 12 + sunHeight * 42, Math.sin(angle + 0.42) * 42);
-  sunGlow.position.copy(sunMesh.position);
-  const moonAngle = angle + Math.PI;
-  moonMesh.position.set(Math.cos(moonAngle) * 70, 12 + Math.sin(moonAngle) * 42, Math.sin(moonAngle + 0.42) * 42);
-  sunColor.copy(dayColor).lerp(sunsetColor, sunset).lerp(nightColor, 1 - daylight);
-  skyColor.copy(nightColor).lerp(dayColor, daylight).lerp(sunsetColor, sunset * 0.36);
-  const weather = lightingState?.weather;
-  const precipitationIntensity = weather?.kind === "rain" || weather?.kind === "snow" ? weather.intensity : 0;
-  const snowIntensity = weather?.kind === "snow" ? weather.intensity : 0;
-  fogColor.copy(fogNightColor).lerp(fogDayColor, daylight).lerp(sunsetColor, sunset * 0.18).lerp(snowFogColor, snowIntensity * 0.1);
-  sun.color.copy(sunColor);
-  sun.intensity = Math.max(0, 1.05 + daylight * 4.15 + sunset * 1.05 - precipitationIntensity * 0.38) * sunMultiplier;
-  hemi.intensity = Math.max(0, 1.05 + daylight * 2.1 - precipitationIntensity * 0.16) * ambientMultiplier;
-  ambientFill.color.copy(fogColor);
-  ambientFill.intensity = (0.34 + daylight * 0.58 + (1 - daylight) * 0.12 + snowIntensity * 0.02) * ambientMultiplier;
-  bounceColor.set(0x9fc7b3).lerp(sunsetColor, sunset * 0.32).lerp(nightColor, (1 - daylight) * 0.22);
-  courtyardBounce.color.copy(bounceColor);
-  courtyardBounce.intensity = (0.48 + daylight * 1.12 + sunset * 0.42 + (1 - daylight) * 0.18) * ambientMultiplier;
-  rimLight.color.copy(fogColor);
-  rimLight.intensity = (0.28 + (1 - daylight) * 0.72 + sunset * 0.24) * ambientMultiplier;
-  let activeFloodlights = 0;
-  let visibleCones = 0;
-  let strongestFlickerDip = 0;
-  for (const [index, entry] of stadiumFloodlights.entries()) {
-    const effectiveFloodlightPower = floodlightPower * floodlightMultiplier;
-    const lightEnabled = effectiveFloodlightPower > 0.035;
-    const coneEnabled = effectiveFloodlightPower > 0.055 && !settings.graphics.reduceEffects;
-    const flickerWave = Math.sin(elapsedSeconds * entry.flickerSpeed + entry.flickerPhase);
-    const rareFlickerGate = THREE.MathUtils.smoothstep(Math.sin(elapsedSeconds * 0.31 + entry.flickerPhase * 0.7), 0.82, 0.98);
-    const microWaver = 0.985 + Math.sin(elapsedSeconds * (1.2 + index * 0.17) + entry.flickerPhase) * 0.015;
-    const flickerDip = lightEnabled ? rareFlickerGate * entry.flickerDepth * (0.55 + Math.max(0, flickerWave) * 0.45) : 0;
-    const flicker = THREE.MathUtils.clamp(microWaver - flickerDip, 0.76, 1.04);
-    strongestFlickerDip = Math.max(strongestFlickerDip, flickerDip);
-    floodlightRuntimeColor.copy(entry.baseColor).lerp(dayColor, daylight * 0.1);
-    entry.light.visible = lightEnabled;
-    entry.light.intensity = lightEnabled ? effectiveFloodlightPower * (3.1 + precipitationIntensity * 0.28) * entry.intensityBias * flicker : 0;
-    entry.light.angle = FLOODLIGHT_BEAM_ANGLE;
-    entry.light.color.copy(floodlightRuntimeColor);
-    entry.lampMaterial.color.copy(lightEnabled ? floodlightRuntimeColor : floodlightDarkColor);
-    entry.lampMaterial.opacity = 0.58 + effectiveFloodlightPower * 0.42;
-    entry.cone.visible = coneEnabled;
-    entry.cone.scale.x = entry.widthScale;
-    entry.cone.scale.z = entry.widthScale;
-    entry.cone.material.color.copy(floodlightRuntimeColor);
-    entry.cone.material.opacity = coneEnabled ? effectiveFloodlightPower * (0.095 + precipitationIntensity * 0.035) * flicker : 0;
-    if (lightEnabled) activeFloodlights += 1;
-    if (coneEnabled) visibleCones += 1;
-  }
-  renderer.toneMappingExposure = Math.max(0.05, 1.12 + daylight * 0.9 + sunset * 0.18 - precipitationIntensity * 0.16) * exposureMultiplier;
-  scene.background = skyColor;
-  skyMaterial.color.copy(skyColor).lerp(fogColor, 0.18);
-  if (scene.fog) {
-    const fog = scene.fog as THREE.Fog;
-    fog.color.copy(fogColor);
-    fog.near = 32 + daylight * 18;
-    fog.far = 86 + daylight * 34 - snowIntensity * 8;
-  }
-  (sunMesh.material as THREE.MeshBasicMaterial).color.copy(sunColor);
-  sunMesh.scale.setScalar(0.82 + daylight * 0.34 + sunset * 0.28);
-  sunMesh.visible = daylight > 0.05 || sunset > 0.03;
-  sunGlow.visible = sunMesh.visible;
-  sunGlowMaterial.color.copy(sunColor);
-  sunGlowMaterial.opacity = (0.12 + daylight * 0.34 + sunset * 0.3) * sunMultiplier * (sunMesh.visible ? 1 : 0);
-  moonMesh.visible = daylight < 0.7;
-  moonMaterial.opacity = THREE.MathUtils.clamp(((1 - daylight) * 0.78 + 0.08) * moonMultiplier, 0, 0.86);
-  sunPathMaterial.opacity = 0;
-  sunPath.visible = false;
-  document.documentElement.dataset.dayCycleSeconds = THREE.MathUtils.euclideanModulo((solarCycle - 0.25) * cycleSeconds, cycleSeconds).toFixed(2);
+  const visual = runtimeSettings?.visual ?? DEFAULT_VISUAL_SETTINGS;
+  applyRegisteredVisualMaterials(visual);
+  const lighting = applyVisualLighting(visualRig, {
+    visual,
+    dayTimeSeconds: dayTime,
+    elapsedSeconds,
+    weather: lightingState?.weather ?? null,
+    reduceEffects: settings.graphics.reduceEffects,
+    shadowsEnabled: settings.graphics.shadows,
+    multipliers: {
+      sunIntensity: runtimeSettings?.sunIntensity ?? 1,
+      moonIntensity: runtimeSettings?.moonIntensity ?? 1,
+      ambientIntensity: runtimeSettings?.ambientIntensity ?? 1,
+      floodlightIntensity: runtimeSettings?.floodlightIntensity ?? 1,
+      toneMappingExposure: runtimeSettings?.toneMappingExposure ?? 1
+    },
+    dataset: document.documentElement.dataset
+  });
+  document.documentElement.dataset.dayCycleSeconds = THREE.MathUtils.euclideanModulo((lighting.solarCycle - 0.25) * cycleSeconds, cycleSeconds).toFixed(2);
   document.documentElement.dataset.dayTimeSeconds = dayTime.toFixed(1);
   document.documentElement.dataset.dayCycleSource = serverDayTime === undefined ? "fallback-animated" : "server";
   document.documentElement.dataset.dayCycleLengthSeconds = String(cycleSeconds);
-  document.documentElement.dataset.daylight = daylight.toFixed(3);
   document.documentElement.dataset.darkHours = DARK_HOURS_LABEL;
   document.documentElement.dataset.twilightHours = TWILIGHT_HOURS_LABEL;
-  document.documentElement.dataset.stadiumLightPower = (floodlightPower * floodlightMultiplier).toFixed(3);
-  document.documentElement.dataset.stadiumLightsOn = String(activeFloodlights);
-  document.documentElement.dataset.stadiumLightCones = String(visibleCones);
-  document.documentElement.dataset.stadiumLightFlicker = strongestFlickerDip.toFixed(3);
-  document.documentElement.dataset.nightLighting = activeFloodlights > 0 ? "floodlight-masts-volumetric" : "sunlight";
-  document.documentElement.dataset.sunPathVisible = String(sunPath.visible);
-  document.documentElement.dataset.sunVisible = String(sunMesh.visible);
-  document.documentElement.dataset.moonVisible = String(moonMesh.visible);
   document.documentElement.dataset.sunFramed = "false";
   document.documentElement.dataset.moonFramed = "false";
-  document.documentElement.dataset.ambientFill = ambientFill.intensity.toFixed(3);
-  document.documentElement.dataset.courtyardBounce = courtyardBounce.intensity.toFixed(3);
-  document.documentElement.dataset.sunIntensityMultiplier = sunMultiplier.toFixed(3);
-  document.documentElement.dataset.moonIntensityMultiplier = moonMultiplier.toFixed(3);
-  document.documentElement.dataset.ambientIntensityMultiplier = ambientMultiplier.toFixed(3);
-  document.documentElement.dataset.floodlightIntensityMultiplier = floodlightMultiplier.toFixed(3);
-  document.documentElement.dataset.toneMappingExposureMultiplier = exposureMultiplier.toFixed(3);
-  document.documentElement.dataset.sunX = sun.position.x.toFixed(2);
-  document.documentElement.dataset.sunY = sun.position.y.toFixed(2);
-  document.documentElement.dataset.sunZ = sun.position.z.toFixed(2);
 }
 
 function updateCamera(delta: number) {
@@ -4449,10 +4399,16 @@ function updateCamera(delta: number) {
   const shake = settings.graphics.cameraShake ? cameraImpulse : 0;
   cameraLookTarget.copy(cameraSmoothedAnchor).add(cameraSmoothedLead);
   cameraLookTarget.y = 1.05;
+  const cameraDistance = THREE.MathUtils.clamp(
+    cameraState?.settings?.cameraDistance ?? DEFAULT_GAME_SETTINGS.cameraDistance,
+    8,
+    24
+  );
+  const cameraHeight = Math.max(7.2, cameraDistance * 0.82 + 1.7);
   cameraDesired.set(
     cameraSmoothedAnchor.x + cameraSmoothedLead.x * 0.32,
-    16.6 + Math.min(speed * 0.035, 0.55) + shake * 0.42,
-    cameraSmoothedAnchor.z - attackDirection * (17.4 + Math.min(speed * 0.055, 1.1) + shake * 0.28) + cameraSmoothedLead.z * 0.18
+    cameraHeight + Math.min(speed * 0.03, 0.45) + shake * 0.36,
+    cameraSmoothedAnchor.z - attackDirection * (cameraDistance + Math.min(speed * 0.045, 0.9) + shake * 0.22) + cameraSmoothedLead.z * 0.18
   );
 
   if (!cameraFollowInitialized) {
@@ -4471,6 +4427,8 @@ function updateCamera(delta: number) {
   document.documentElement.dataset.cameraAnchorSmoothing = "lerped-authoritative-player-offset-no-bone-follow";
   document.documentElement.dataset.cameraAnchorOffset = cameraSmoothedAnchor.distanceTo(cameraRawAnchor).toFixed(2);
   document.documentElement.dataset.cameraFollowSpeed = speed.toFixed(2);
+  document.documentElement.dataset.cameraDistance = cameraDistance.toFixed(2);
+  document.documentElement.dataset.cameraHeight = cameraHeight.toFixed(2);
 }
 
 function getPlayerOffscreenIndicator(player: PlayerSnapshot): HTMLElement {

@@ -5,7 +5,9 @@ import {
   FIELD_LENGTH,
   FIELD_WIDTH,
   PLAYER_RADIUS,
-  type ServerState
+  type ServerState,
+  type VisualColorMaterialSettings,
+  type VisualSettings
 } from "@itch-games/unsoccer-shared";
 import { bakeTexturelessPbr, type TexturelessPbrBakeResult } from "./textureless-pbr-converter";
 
@@ -76,6 +78,38 @@ const brightMetalMaterial = new THREE.MeshStandardMaterial({ color: 0xb8c5c7, ro
 const chalkMaterial = new THREE.MeshBasicMaterial({ color: 0xe7eee1, transparent: true, opacity: 0.5 });
 const puddleMaterial = new THREE.MeshBasicMaterial({ color: 0x5f90a0, transparent: true, opacity: 0.26 });
 const glowMaterial = new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: 0.74, toneMapped: false });
+
+function applyMaterialSettings(material: THREE.Material, settings: VisualColorMaterialSettings): void {
+  const target = material as THREE.Material & {
+    color?: THREE.Color;
+    roughness?: number;
+    metalness?: number;
+    opacity?: number;
+    transparent?: boolean;
+  };
+  target.color?.set(settings.color);
+  if (settings.roughness !== undefined && "roughness" in target) target.roughness = settings.roughness;
+  if (settings.metalness !== undefined && "metalness" in target) target.metalness = settings.metalness;
+  if (settings.opacity !== undefined && "opacity" in target) {
+    target.opacity = settings.opacity;
+    target.transparent = settings.opacity < 1;
+  }
+  material.needsUpdate = true;
+}
+
+export function applyEnvironmentLookdevMaterials(visual: VisualSettings): void {
+  applyMaterialSettings(surfaceMaterial, visual.materials.courtyard);
+  applyMaterialSettings(roadMaterial, visual.materials.road);
+  applyMaterialSettings(sidewalkMaterial, visual.materials.sidewalk);
+  applyMaterialSettings(curbMaterial, visual.materials.curb);
+  applyMaterialSettings(gardenMaterial, visual.materials.foliage);
+  applyMaterialSettings(leafMaterial, visual.materials.foliage);
+  applyMaterialSettings(metalMaterial, visual.materials.metal);
+  applyMaterialSettings(brightMetalMaterial, visual.materials.brightMetal);
+  applyMaterialSettings(chalkMaterial, visual.materials.markingSecondary);
+  applyMaterialSettings(planterMaterial, visual.materials.courtyard);
+  applyMaterialSettings(soilMaterial, visual.materials.courtyard);
+}
 
 let proceduralEnvironmentInstances = 0;
 let free3dEnvironmentInstances = 0;

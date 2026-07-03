@@ -7,10 +7,14 @@ writes COLOR_0 plus TEXCOORD_1 packed roughness/metalness into the public GLBs.
 
 from __future__ import annotations
 
+import argparse
 import json
 import math
 import pathlib
+import re
 import struct
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
@@ -20,6 +24,8 @@ from PIL import Image
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 RAW_ROOT = ROOT / "unsoccer" / "assets" / "models" / "characters" / "free3d" / "raw"
 PUBLIC_ROOT = ROOT / "unsoccer" / "client" / "public" / "assets" / "characters" / "free3d"
+PROVENANCE_PATH = ROOT / "unsoccer" / "assets" / "licenses" / "free3d-provenance.json"
+SOURCE_LOD_PREFERENCE = ("1k", "10k", "100k")
 
 COMPONENT_FLOAT = 5126
 ARRAY_BUFFER = 34962
@@ -44,6 +50,117 @@ COMPONENT_FORMATS = {
 class Glb:
     json_doc: dict[str, Any]
     bin_chunk: bytearray
+
+
+def clean_url(url: str) -> str:
+    parts = urllib.parse.urlsplit(url)
+    path = urllib.parse.quote(urllib.parse.unquote(parts.path), safe="/")
+    return urllib.parse.urlunsplit((parts.scheme, parts.netloc, path, parts.query, parts.fragment))
+
+
+def read_remote_json(url: str) -> dict[str, Any]:
+    with urllib.request.urlopen(clean_url(url), timeout=60) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def remote_file_url(inventory_url: str, relative_path: str) -> str:
+    parts = urllib.parse.urlsplit(clean_url(inventory_url))
+    base_path = parts.path.rsplit("/", 1)[0]
+    path = f"{base_path}/{urllib.parse.quote(relative_path, safe='/')}"
+    return urllib.parse.urlunsplit((parts.scheme, parts.netloc, path, "", ""))
+
+
+def pick_inventory_path(paths: list[str], guid: str, patterns: list[str]) -> str | None:
+    candidates = [path for path in paths if all(re.search(pattern, path.lower()) for pattern in patterns)]
+
+    def score(path: str) -> tuple[int, int, str]:
+        lower = path.lower()
+        for index, lod in enumerate(SOURCE_LOD_PREFERENCE):
+            if f"uploads_files_{guid}_{lod}/" in lower:
+                return (index, len(path), path)
+        return (len(SOURCE_LOD_PREFERENCE), len(path), path)
+
+    candidates.sort(key=score)
+    return candidates[0] if candidates else None
+
+
+def inventory_lod(path: str | None, guid: str) -> str | None:
+    if path is None:
+        return None
+    lower = path.lower()
+    for lod in SOURCE_LOD_PREFERENCE:
+        if f"uploads_files_{guid}_{lod}/" in lower:
+            return lod
+    return None
+
+
+def download_if_missing(url: str, path: pathlib.Path, force: bool = False) -> None:
+    if not force and path.exists() and path.stat().st_size > 0:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with urllib.request.urlopen(url, timeout=120) as response:
+        path.write_bytes(response.read())
+
+
+def provenance_by_guid() -> dict[str, dict[str, Any]]:
+    provenance = json.loads(PROVENANCE_PATH.read_text(encoding="utf-8"))
+    return {
+        str(asset["guid"]): asset
+        for asset in provenance.get("characterAssets", [])
+        if asset.get("guid") and asset.get("inventoryUrl")
+    }
+
+
+def ensure_raw_character_assets(guid: str, provenance: dict[str, dict[str, Any]]) -> None:
+    raw_dir = RAW_ROOT / f"{guid}-textured-rig"
+    required = {
+        "rigged_unity.glb": raw_dir / "rigged_unity.glb",
+        "albedo.png": raw_dir / "albedo.png",
+    }
+    manifest_path = raw_dir / f"{guid}-bake-source.json"
+    if manifest_path.exists() and all(path.exists() and path.stat().st_size > 0 for path in required.values()):
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if manifest.get("sourceLod") == SOURCE_LOD_PREFERENCE[0]:
+                return
+        except json.JSONDecodeError:
+            pass
+
+    source = provenance.get(guid)
+    if source is None:
+        raise FileNotFoundError(f"{guid}: missing raw assets and provenance inventory URL")
+
+    inventory_url = str(source["inventoryUrl"])
+    inventory = read_remote_json(inventory_url)
+    paths = [str(path) for path in inventory.get("paths", [])]
+    selected = {
+        "rigged_unity.glb": pick_inventory_path(paths, guid, [r"rigged_unity\.glb$"]),
+        "albedo.png": pick_inventory_path(paths, guid, [r"texture\.png$"])
+        or pick_inventory_path(paths, guid, [r"(basecolor|albedo|diffuse).*\.png$"]),
+        "orm.png": pick_inventory_path(paths, guid, [r"orm\.png$"]),
+    }
+    missing = [name for name, remote_path in selected.items() if name != "orm.png" and remote_path is None]
+    if missing:
+        raise FileNotFoundError(f"{guid}: inventory is missing {', '.join(missing)}")
+
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    (raw_dir / f"{guid}-paths.json").write_text(json.dumps(inventory, indent=2) + "\n", encoding="utf-8")
+    for name, remote_path in selected.items():
+        if remote_path is None:
+            continue
+        download_if_missing(remote_file_url(inventory_url, remote_path), raw_dir / name, force=True)
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "sourceLod": inventory_lod(selected["rigged_unity.glb"], guid),
+                "sourceLodPreference": list(SOURCE_LOD_PREFERENCE),
+                "remotePaths": selected,
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 def align4(value: int) -> int:
@@ -142,7 +259,7 @@ class Sampler:
         u = uv[0] % 1.0
         v = uv[1] % 1.0
         x = u * (self.width - 1)
-        y = (1.0 - v) * (self.height - 1)
+        y = v * (self.height - 1)
         x0 = int(math.floor(x))
         y0 = int(math.floor(y))
         x1 = min(x0 + 1, self.width - 1)
@@ -223,16 +340,18 @@ def strip_material_textures(gltf: dict[str, Any], avg_roughness: float, avg_meta
         }
 
 
-def bake_character(guid: str) -> dict[str, Any]:
+def bake_character(guid: str, provenance: dict[str, dict[str, Any]]) -> dict[str, Any]:
     raw_dir = RAW_ROOT / f"{guid}-textured-rig"
     public_dir = PUBLIC_ROOT / guid
+    source_glb_path = raw_dir / "rigged_unity.glb"
     glb_path = public_dir / "rigged_unity.glb"
-    if not raw_dir.exists() or not glb_path.exists():
-        raise FileNotFoundError(f"Missing raw/public character assets for {guid}")
+    ensure_raw_character_assets(guid, provenance)
+    if not glb_path.exists():
+        raise FileNotFoundError(f"Missing public character GLB for {guid}")
     albedo = Sampler(raw_dir / "albedo.png", srgb=True)
     orm_path = raw_dir / "orm.png"
     orm = Sampler(orm_path, srgb=False) if orm_path.exists() else None
-    glb = read_glb(glb_path)
+    glb = read_glb(source_glb_path)
     roughness_values: list[float] = []
     metalness_values: list[float] = []
     color_accessors = 0
@@ -283,12 +402,19 @@ def bake_character(guid: str) -> dict[str, Any]:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("guids", nargs="*", help="Bake only the listed Free3D GUIDs. Defaults to the whole roster.")
+    args = parser.parse_args()
+    selected_guids = set(args.guids)
     roster_path = PUBLIC_ROOT / "roster.json"
     roster = json.loads(roster_path.read_text(encoding="utf-8"))
+    provenance = provenance_by_guid()
     results = []
     for asset in roster.get("assets", []):
         guid = str(asset["guid"])
-        result = bake_character(guid)
+        if selected_guids and guid not in selected_guids:
+            continue
+        result = bake_character(guid, provenance)
         asset["texturePolicy"] = "baked-textureless-vertex-pbr-no-runtime-images"
         asset["vertexColorAccessors"] = result["colorAccessors"]
         asset["runtimeTextureCount"] = 0

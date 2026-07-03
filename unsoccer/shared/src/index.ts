@@ -372,6 +372,130 @@ export const CHARACTER_ROSTER = [
   "6294728"
 ] as const;
 
+export interface VisualColorMaterialSettings {
+  color: string;
+  roughness?: number;
+  metalness?: number;
+  opacity?: number;
+}
+
+export interface VisualFloodlightSettings {
+  x: number;
+  y: number;
+  z: number;
+  targetX: number;
+  targetY: number;
+  targetZ: number;
+  color: string;
+  angleDeg: number;
+  distance: number;
+  penumbra: number;
+  decay: number;
+  coneRadius: number;
+  coneOpacity: number;
+  flickerDepth: number;
+  flickerSpeed: number;
+  widthScale: number;
+  intensityBias: number;
+}
+
+export interface VisualSettings {
+  renderer: {
+    exposureBase: number;
+    exposureDay: number;
+    exposureSunset: number;
+    precipitationExposurePenalty: number;
+    shadows: boolean;
+  };
+  sky: {
+    dayColor: string;
+    sunsetColor: string;
+    nightColor: string;
+    fogDayColor: string;
+    fogNightColor: string;
+    snowFogColor: string;
+    domeFogMix: number;
+    fogNearBase: number;
+    fogNearDay: number;
+    fogFarBase: number;
+    fogFarDay: number;
+    fogSnowPenalty: number;
+  };
+  sun: {
+    intensityBase: number;
+    intensityDay: number;
+    intensitySunset: number;
+    precipitationPenalty: number;
+    orbitRadius: number;
+    visualOrbitRadius: number;
+    visualHeight: number;
+    markerScaleBase: number;
+    markerScaleDay: number;
+    markerScaleSunset: number;
+    glowOpacityBase: number;
+    glowOpacityDay: number;
+    glowOpacitySunset: number;
+  };
+  moon: {
+    color: string;
+    opacityBase: number;
+    opacityNight: number;
+  };
+  ambient: {
+    hemiSkyColor: string;
+    hemiGroundColor: string;
+    hemiBase: number;
+    hemiDay: number;
+    hemiPrecipitationPenalty: number;
+    fillBase: number;
+    fillDay: number;
+    fillNight: number;
+    fillSnow: number;
+    bounceColor: string;
+    bounceBase: number;
+    bounceDay: number;
+    bounceSunset: number;
+    bounceNight: number;
+    rimColor: string;
+    rimBase: number;
+    rimNight: number;
+    rimSunset: number;
+  };
+  floodlights: {
+    powerNightStart: number;
+    powerNightEnd: number;
+    intensityBase: number;
+    precipitationBoost: number;
+    lightThreshold: number;
+    coneThreshold: number;
+    lights: VisualFloodlightSettings[];
+  };
+  materials: {
+    field: VisualColorMaterialSettings;
+    fieldStripe: VisualColorMaterialSettings;
+    marking: VisualColorMaterialSettings;
+    markingSecondary: VisualColorMaterialSettings;
+    goalPost: VisualColorMaterialSettings;
+    mast: VisualColorMaterialSettings;
+    courtyard: VisualColorMaterialSettings;
+    fence: VisualColorMaterialSettings;
+    road: VisualColorMaterialSettings;
+    sidewalk: VisualColorMaterialSettings;
+    curb: VisualColorMaterialSettings;
+    foliage: VisualColorMaterialSettings;
+    metal: VisualColorMaterialSettings;
+    brightMetal: VisualColorMaterialSettings;
+    fallbackPlayerBlue: VisualColorMaterialSettings;
+    fallbackPlayerOrange: VisualColorMaterialSettings;
+    ball: VisualColorMaterialSettings;
+  };
+  weather: {
+    rainLightPenalty: number;
+    snowFogBoost: number;
+    conePrecipitationBoost: number;
+  };
+}
+
 export interface GameSettings {
   fieldWidth: number;
   fieldLength: number;
@@ -388,6 +512,8 @@ export interface GameSettings {
   ambientIntensity: number;
   floodlightIntensity: number;
   toneMappingExposure: number;
+  cameraDistance: number;
+  visual: VisualSettings;
   weatherChangeMinMs: number;
   weatherChangeMaxMs: number;
   weatherDawnWeight: number;
@@ -496,7 +622,7 @@ export interface GameSettings {
   botJumpChance: number;
 }
 
-export type GameSettingInput = "number" | "range" | "checkbox";
+export type GameSettingInput = "number" | "range" | "checkbox" | "json";
 
 export interface GameSettingSchemaItem {
   key: keyof GameSettings;
@@ -509,6 +635,108 @@ export interface GameSettingSchemaItem {
   step?: number;
   restartPhysics?: boolean;
 }
+
+export const DEFAULT_VISUAL_SETTINGS: VisualSettings = {
+  renderer: {
+    exposureBase: 1.12,
+    exposureDay: 0.9,
+    exposureSunset: 0.18,
+    precipitationExposurePenalty: 0.16,
+    shadows: true
+  },
+  sky: {
+    dayColor: "#8fd7ff",
+    sunsetColor: "#ff9b5a",
+    nightColor: "#07110f",
+    fogDayColor: "#b7ede0",
+    fogNightColor: "#07110f",
+    snowFogColor: "#d9f3ff",
+    domeFogMix: 0.18,
+    fogNearBase: 32,
+    fogNearDay: 18,
+    fogFarBase: 86,
+    fogFarDay: 34,
+    fogSnowPenalty: 8
+  },
+  sun: {
+    intensityBase: 1.05,
+    intensityDay: 4.15,
+    intensitySunset: 1.05,
+    precipitationPenalty: 0.38,
+    orbitRadius: 46,
+    visualOrbitRadius: 70,
+    visualHeight: 42,
+    markerScaleBase: 0.82,
+    markerScaleDay: 0.34,
+    markerScaleSunset: 0.28,
+    glowOpacityBase: 0.12,
+    glowOpacityDay: 0.34,
+    glowOpacitySunset: 0.3
+  },
+  moon: {
+    color: "#bfd6ff",
+    opacityBase: 0.08,
+    opacityNight: 0.78
+  },
+  ambient: {
+    hemiSkyColor: "#d8fff2",
+    hemiGroundColor: "#172822",
+    hemiBase: 1.05,
+    hemiDay: 2.1,
+    hemiPrecipitationPenalty: 0.16,
+    fillBase: 0.34,
+    fillDay: 0.58,
+    fillNight: 0.12,
+    fillSnow: 0.02,
+    bounceColor: "#9fc7b3",
+    bounceBase: 0.48,
+    bounceDay: 1.12,
+    bounceSunset: 0.42,
+    bounceNight: 0.18,
+    rimColor: "#8bbcff",
+    rimBase: 0.28,
+    rimNight: 0.72,
+    rimSunset: 0.24
+  },
+  floodlights: {
+    powerNightStart: 0.18,
+    powerNightEnd: 0.82,
+    intensityBase: 3.1,
+    precipitationBoost: 0.28,
+    lightThreshold: 0.035,
+    coneThreshold: 0.055,
+    lights: [
+      { x: -29.9, y: 12.9, z: -40.8, targetX: 16.32, targetY: 0.18, targetZ: 23.76, color: "#eaf4ff", angleDeg: 63.2, distance: 96, penumbra: 0.88, decay: 1.05, coneRadius: 13.4, coneOpacity: 0.095, flickerDepth: 0.07, flickerSpeed: 3.4, widthScale: 0.95, intensityBias: 0.94 },
+      { x: 29.9, y: 12.9, z: -40.8, targetX: -16.32, targetY: 0.18, targetZ: 23.76, color: "#fff0d4", angleDeg: 63.2, distance: 96, penumbra: 0.88, decay: 1.05, coneRadius: 13.4, coneOpacity: 0.095, flickerDepth: 0.088, flickerSpeed: 3.77, widthScale: 0.985, intensityBias: 0.985 },
+      { x: -29.9, y: 12.9, z: 40.8, targetX: 16.32, targetY: 0.18, targetZ: -23.76, color: "#dcefff", angleDeg: 63.2, distance: 96, penumbra: 0.88, decay: 1.05, coneRadius: 13.4, coneOpacity: 0.095, flickerDepth: 0.106, flickerSpeed: 4.14, widthScale: 1.02, intensityBias: 1.03 },
+      { x: 29.9, y: 12.9, z: 40.8, targetX: -16.32, targetY: 0.18, targetZ: -23.76, color: "#f7f2ff", angleDeg: 63.2, distance: 96, penumbra: 0.88, decay: 1.05, coneRadius: 13.4, coneOpacity: 0.095, flickerDepth: 0.124, flickerSpeed: 4.51, widthScale: 1.055, intensityBias: 1.075 }
+    ]
+  },
+  materials: {
+    field: { color: "#19845f", roughness: 0.9 },
+    fieldStripe: { color: "#1d966c", roughness: 0.92 },
+    marking: { color: "#f4fff6", opacity: 0.96 },
+    markingSecondary: { color: "#d9f7e4", opacity: 0.82 },
+    goalPost: { color: "#f0f3ec", roughness: 0.38, metalness: 0.16 },
+    mast: { color: "#aebbc4", roughness: 0.36, metalness: 0.36 },
+    courtyard: { color: "#36413e", roughness: 0.96 },
+    fence: { color: "#20342e", roughness: 0.72, metalness: 0.16 },
+    road: { color: "#202927", roughness: 0.94 },
+    sidewalk: { color: "#606f68", roughness: 0.9 },
+    curb: { color: "#d8dfd7", roughness: 0.72 },
+    foliage: { color: "#3d8c58", roughness: 0.92 },
+    metal: { color: "#28302f", roughness: 0.62, metalness: 0.22 },
+    brightMetal: { color: "#b8c5c7", roughness: 0.38, metalness: 0.34 },
+    fallbackPlayerBlue: { color: "#bfe5ff", roughness: 0.5 },
+    fallbackPlayerOrange: { color: "#ffd37a", roughness: 0.5 },
+    ball: { color: "#ffffff", roughness: 0.5, metalness: 0.03 }
+  },
+  weather: {
+    rainLightPenalty: 0.38,
+    snowFogBoost: 0.1,
+    conePrecipitationBoost: 0.035
+  }
+};
 
 export const DEFAULT_GAME_SETTINGS: GameSettings = {
   fieldWidth: FIELD_WIDTH,
@@ -526,6 +754,8 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   ambientIntensity: 1,
   floodlightIntensity: 1,
   toneMappingExposure: 1,
+  cameraDistance: 12.4,
+  visual: DEFAULT_VISUAL_SETTINGS,
   weatherChangeMinMs: 60000,
   weatherChangeMaxMs: 120000,
   weatherDawnWeight: 3,
@@ -650,6 +880,8 @@ export const GAME_SETTINGS_SCHEMA: GameSettingSchemaItem[] = [
   { key: "ambientIntensity", group: "Мир", label: "Фоновый свет", description: "Множитель рассеянного света, небесной заливки и отраженного света двора.", input: "range", min: 0.1, max: 3, step: 0.01 },
   { key: "floodlightIntensity", group: "Мир", label: "Мощность прожекторов", description: "Множитель ночных прожекторов и объемных световых конусов.", input: "range", min: 0, max: 4, step: 0.01 },
   { key: "toneMappingExposure", group: "Мир", label: "Экспозиция камеры", description: "Множитель экспозиции tone mapping в рендерере.", input: "range", min: 0.35, max: 2.4, step: 0.01 },
+  { key: "cameraDistance", group: "Camera", label: "Player camera distance", description: "Gameplay follow camera distance from the anchored player. Edited through /viz/ and saved to game-settings.json.", input: "range", min: 8, max: 24, step: 0.1 },
+  { key: "visual", group: "Visual", label: "Lookdev JSON", description: "Full lookdev block edited through /viz/.", input: "json" },
   { key: "weatherChangeMinMs", group: "Мир", label: "Мин. интервал погоды", description: "Минимум миллисекунд до следующей смены погоды.", input: "number", min: 10000, max: 600000, step: 1000 },
   { key: "weatherChangeMaxMs", group: "Мир", label: "Макс. интервал погоды", description: "Максимум миллисекунд до следующей смены погоды.", input: "number", min: 10000, max: 900000, step: 1000 },
   { key: "weatherDawnWeight", group: "Мир", label: "Вес рассветной погоды", description: "Относительная вероятность сухой рассветной погоды при ротации.", input: "range", min: 0, max: 24, step: 1 },
@@ -758,12 +990,209 @@ export const GAME_SETTINGS_SCHEMA: GameSettingSchemaItem[] = [
   { key: "botJumpChance", group: "Боты", label: "Шанс прыжка бота", description: "Шанс за тик, который бот использует для ситуативных прыжков.", input: "range", min: 0, max: 0.25, step: 0.001 }
 ];
 
+function recordSource(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function normalizedFinite(value: unknown, fallback: number, min: number, max: number, decimals = 3): number {
+  const numberValue = Number(value);
+  const safeValue = Number.isFinite(numberValue) ? numberValue : fallback;
+  return Number(clamp(safeValue, min, max).toFixed(decimals));
+}
+
+function normalizedBool(value: unknown, fallback: boolean): boolean {
+  return value === undefined ? fallback : Boolean(value);
+}
+
+function normalizedColor(value: unknown, fallback: string): string {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return `#${clamp(Math.round(value), 0, 0xffffff).toString(16).padStart(6, "0")}`;
+  }
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  const threeDigit = /^#?([0-9a-f]{3})$/i.exec(trimmed);
+  if (threeDigit) {
+    const [, hex] = threeDigit;
+    return `#${hex.split("").map((char) => `${char}${char}`).join("").toLowerCase()}`;
+  }
+  const sixDigit = /^#?([0-9a-f]{6})$/i.exec(trimmed);
+  return sixDigit ? `#${sixDigit[1].toLowerCase()}` : fallback;
+}
+
+function normalizedMaterial(value: unknown, fallback: VisualColorMaterialSettings): VisualColorMaterialSettings {
+  const source = recordSource(value);
+  const result: VisualColorMaterialSettings = {
+    color: normalizedColor(source.color, fallback.color)
+  };
+  if (source.roughness !== undefined || fallback.roughness !== undefined) {
+    result.roughness = normalizedFinite(source.roughness, fallback.roughness ?? 0.65, 0, 1, 3);
+  }
+  if (source.metalness !== undefined || fallback.metalness !== undefined) {
+    result.metalness = normalizedFinite(source.metalness, fallback.metalness ?? 0, 0, 1, 3);
+  }
+  if (source.opacity !== undefined || fallback.opacity !== undefined) {
+    result.opacity = normalizedFinite(source.opacity, fallback.opacity ?? 1, 0, 1, 3);
+  }
+  return result;
+}
+
+function normalizedFloodlight(value: unknown, fallback: VisualFloodlightSettings): VisualFloodlightSettings {
+  const source = recordSource(value);
+  return {
+    x: normalizedFinite(source.x, fallback.x, -500, 500, 3),
+    y: normalizedFinite(source.y, fallback.y, 0.1, 200, 3),
+    z: normalizedFinite(source.z, fallback.z, -500, 500, 3),
+    targetX: normalizedFinite(source.targetX, fallback.targetX, -500, 500, 3),
+    targetY: normalizedFinite(source.targetY, fallback.targetY, -100, 200, 3),
+    targetZ: normalizedFinite(source.targetZ, fallback.targetZ, -500, 500, 3),
+    color: normalizedColor(source.color, fallback.color),
+    angleDeg: normalizedFinite(source.angleDeg, fallback.angleDeg, 1, 89, 3),
+    distance: normalizedFinite(source.distance, fallback.distance, 1, 500, 3),
+    penumbra: normalizedFinite(source.penumbra, fallback.penumbra, 0, 1, 3),
+    decay: normalizedFinite(source.decay, fallback.decay, 0, 4, 3),
+    coneRadius: normalizedFinite(source.coneRadius, fallback.coneRadius, 0.1, 100, 3),
+    coneOpacity: normalizedFinite(source.coneOpacity, fallback.coneOpacity, 0, 1, 3),
+    flickerDepth: normalizedFinite(source.flickerDepth, fallback.flickerDepth, 0, 1, 3),
+    flickerSpeed: normalizedFinite(source.flickerSpeed, fallback.flickerSpeed, 0, 20, 3),
+    widthScale: normalizedFinite(source.widthScale, fallback.widthScale, 0.05, 8, 3),
+    intensityBias: normalizedFinite(source.intensityBias, fallback.intensityBias, 0, 4, 3)
+  };
+}
+
+export function normalizeVisualSettingsPatch(value: unknown, fallback: VisualSettings = DEFAULT_VISUAL_SETTINGS): VisualSettings {
+  const source = recordSource(value);
+  const renderer = recordSource(source.renderer);
+  const sky = recordSource(source.sky);
+  const sun = recordSource(source.sun);
+  const moon = recordSource(source.moon);
+  const ambient = recordSource(source.ambient);
+  const floodlights = recordSource(source.floodlights);
+  const materials = recordSource(source.materials);
+  const weather = recordSource(source.weather);
+  const fallbackLights = fallback.floodlights.lights.length > 0 ? fallback.floodlights.lights : DEFAULT_VISUAL_SETTINGS.floodlights.lights;
+  const sourceLights = Array.isArray(floodlights.lights) ? floodlights.lights : [];
+  const requestedLightCount = sourceLights.length > 0 ? sourceLights.length : fallbackLights.length;
+  const lightCount = Math.max(1, Math.min(12, requestedLightCount));
+  const normalizedLights = Array.from({ length: lightCount }, (_, index) => {
+    const fallbackLight = fallbackLights[index] ?? fallbackLights[0] ?? DEFAULT_VISUAL_SETTINGS.floodlights.lights[0];
+    return normalizedFloodlight(sourceLights[index], fallbackLight);
+  });
+  const fogNearBase = normalizedFinite(sky.fogNearBase, fallback.sky.fogNearBase, 0, 1000, 3);
+  const fogNearDay = normalizedFinite(sky.fogNearDay, fallback.sky.fogNearDay, -1000, 1000, 3);
+  const fogFarBase = normalizedFinite(sky.fogFarBase, fallback.sky.fogFarBase, 1, 2000, 3);
+  const fogFarDay = normalizedFinite(sky.fogFarDay, fallback.sky.fogFarDay, -1000, 2000, 3);
+
+  return {
+    renderer: {
+      exposureBase: normalizedFinite(renderer.exposureBase, fallback.renderer.exposureBase, 0.1, 5, 3),
+      exposureDay: normalizedFinite(renderer.exposureDay, fallback.renderer.exposureDay, 0, 3, 3),
+      exposureSunset: normalizedFinite(renderer.exposureSunset, fallback.renderer.exposureSunset, 0, 3, 3),
+      precipitationExposurePenalty: normalizedFinite(renderer.precipitationExposurePenalty, fallback.renderer.precipitationExposurePenalty, 0, 2, 3),
+      shadows: normalizedBool(renderer.shadows, fallback.renderer.shadows)
+    },
+    sky: {
+      dayColor: normalizedColor(sky.dayColor, fallback.sky.dayColor),
+      sunsetColor: normalizedColor(sky.sunsetColor, fallback.sky.sunsetColor),
+      nightColor: normalizedColor(sky.nightColor, fallback.sky.nightColor),
+      fogDayColor: normalizedColor(sky.fogDayColor, fallback.sky.fogDayColor),
+      fogNightColor: normalizedColor(sky.fogNightColor, fallback.sky.fogNightColor),
+      snowFogColor: normalizedColor(sky.snowFogColor, fallback.sky.snowFogColor),
+      domeFogMix: normalizedFinite(sky.domeFogMix, fallback.sky.domeFogMix, 0, 1, 3),
+      fogNearBase,
+      fogNearDay,
+      fogFarBase: Math.max(fogNearBase + 1, fogFarBase),
+      fogFarDay,
+      fogSnowPenalty: normalizedFinite(sky.fogSnowPenalty, fallback.sky.fogSnowPenalty, -500, 500, 3)
+    },
+    sun: {
+      intensityBase: normalizedFinite(sun.intensityBase, fallback.sun.intensityBase, 0, 20, 3),
+      intensityDay: normalizedFinite(sun.intensityDay, fallback.sun.intensityDay, 0, 20, 3),
+      intensitySunset: normalizedFinite(sun.intensitySunset, fallback.sun.intensitySunset, 0, 20, 3),
+      precipitationPenalty: normalizedFinite(sun.precipitationPenalty, fallback.sun.precipitationPenalty, 0, 5, 3),
+      orbitRadius: normalizedFinite(sun.orbitRadius, fallback.sun.orbitRadius, 1, 500, 3),
+      visualOrbitRadius: normalizedFinite(sun.visualOrbitRadius, fallback.sun.visualOrbitRadius, 1, 500, 3),
+      visualHeight: normalizedFinite(sun.visualHeight, fallback.sun.visualHeight, -200, 500, 3),
+      markerScaleBase: normalizedFinite(sun.markerScaleBase, fallback.sun.markerScaleBase, 0.01, 50, 3),
+      markerScaleDay: normalizedFinite(sun.markerScaleDay, fallback.sun.markerScaleDay, 0, 50, 3),
+      markerScaleSunset: normalizedFinite(sun.markerScaleSunset, fallback.sun.markerScaleSunset, 0, 50, 3),
+      glowOpacityBase: normalizedFinite(sun.glowOpacityBase, fallback.sun.glowOpacityBase, 0, 1, 3),
+      glowOpacityDay: normalizedFinite(sun.glowOpacityDay, fallback.sun.glowOpacityDay, 0, 1, 3),
+      glowOpacitySunset: normalizedFinite(sun.glowOpacitySunset, fallback.sun.glowOpacitySunset, 0, 1, 3)
+    },
+    moon: {
+      color: normalizedColor(moon.color, fallback.moon.color),
+      opacityBase: normalizedFinite(moon.opacityBase, fallback.moon.opacityBase, 0, 1, 3),
+      opacityNight: normalizedFinite(moon.opacityNight, fallback.moon.opacityNight, 0, 1, 3)
+    },
+    ambient: {
+      hemiSkyColor: normalizedColor(ambient.hemiSkyColor, fallback.ambient.hemiSkyColor),
+      hemiGroundColor: normalizedColor(ambient.hemiGroundColor, fallback.ambient.hemiGroundColor),
+      hemiBase: normalizedFinite(ambient.hemiBase, fallback.ambient.hemiBase, 0, 10, 3),
+      hemiDay: normalizedFinite(ambient.hemiDay, fallback.ambient.hemiDay, 0, 10, 3),
+      hemiPrecipitationPenalty: normalizedFinite(ambient.hemiPrecipitationPenalty, fallback.ambient.hemiPrecipitationPenalty, 0, 5, 3),
+      fillBase: normalizedFinite(ambient.fillBase, fallback.ambient.fillBase, 0, 10, 3),
+      fillDay: normalizedFinite(ambient.fillDay, fallback.ambient.fillDay, 0, 10, 3),
+      fillNight: normalizedFinite(ambient.fillNight, fallback.ambient.fillNight, 0, 10, 3),
+      fillSnow: normalizedFinite(ambient.fillSnow, fallback.ambient.fillSnow, 0, 10, 3),
+      bounceColor: normalizedColor(ambient.bounceColor, fallback.ambient.bounceColor),
+      bounceBase: normalizedFinite(ambient.bounceBase, fallback.ambient.bounceBase, 0, 10, 3),
+      bounceDay: normalizedFinite(ambient.bounceDay, fallback.ambient.bounceDay, 0, 10, 3),
+      bounceSunset: normalizedFinite(ambient.bounceSunset, fallback.ambient.bounceSunset, 0, 10, 3),
+      bounceNight: normalizedFinite(ambient.bounceNight, fallback.ambient.bounceNight, 0, 10, 3),
+      rimColor: normalizedColor(ambient.rimColor, fallback.ambient.rimColor),
+      rimBase: normalizedFinite(ambient.rimBase, fallback.ambient.rimBase, 0, 10, 3),
+      rimNight: normalizedFinite(ambient.rimNight, fallback.ambient.rimNight, 0, 10, 3),
+      rimSunset: normalizedFinite(ambient.rimSunset, fallback.ambient.rimSunset, 0, 10, 3)
+    },
+    floodlights: {
+      powerNightStart: normalizedFinite(floodlights.powerNightStart, fallback.floodlights.powerNightStart, 0, 1, 3),
+      powerNightEnd: normalizedFinite(floodlights.powerNightEnd, fallback.floodlights.powerNightEnd, 0, 1, 3),
+      intensityBase: normalizedFinite(floodlights.intensityBase, fallback.floodlights.intensityBase, 0, 20, 3),
+      precipitationBoost: normalizedFinite(floodlights.precipitationBoost, fallback.floodlights.precipitationBoost, 0, 10, 3),
+      lightThreshold: normalizedFinite(floodlights.lightThreshold, fallback.floodlights.lightThreshold, 0, 1, 3),
+      coneThreshold: normalizedFinite(floodlights.coneThreshold, fallback.floodlights.coneThreshold, 0, 1, 3),
+      lights: normalizedLights
+    },
+    materials: {
+      field: normalizedMaterial(materials.field, fallback.materials.field),
+      fieldStripe: normalizedMaterial(materials.fieldStripe, fallback.materials.fieldStripe),
+      marking: normalizedMaterial(materials.marking, fallback.materials.marking),
+      markingSecondary: normalizedMaterial(materials.markingSecondary, fallback.materials.markingSecondary),
+      goalPost: normalizedMaterial(materials.goalPost, fallback.materials.goalPost),
+      mast: normalizedMaterial(materials.mast, fallback.materials.mast),
+      courtyard: normalizedMaterial(materials.courtyard, fallback.materials.courtyard),
+      fence: normalizedMaterial(materials.fence, fallback.materials.fence),
+      road: normalizedMaterial(materials.road, fallback.materials.road),
+      sidewalk: normalizedMaterial(materials.sidewalk, fallback.materials.sidewalk),
+      curb: normalizedMaterial(materials.curb, fallback.materials.curb),
+      foliage: normalizedMaterial(materials.foliage, fallback.materials.foliage),
+      metal: normalizedMaterial(materials.metal, fallback.materials.metal),
+      brightMetal: normalizedMaterial(materials.brightMetal, fallback.materials.brightMetal),
+      fallbackPlayerBlue: normalizedMaterial(materials.fallbackPlayerBlue, fallback.materials.fallbackPlayerBlue),
+      fallbackPlayerOrange: normalizedMaterial(materials.fallbackPlayerOrange, fallback.materials.fallbackPlayerOrange),
+      ball: normalizedMaterial(materials.ball, fallback.materials.ball)
+    },
+    weather: {
+      rainLightPenalty: normalizedFinite(weather.rainLightPenalty, fallback.weather.rainLightPenalty, 0, 5, 3),
+      snowFogBoost: normalizedFinite(weather.snowFogBoost, fallback.weather.snowFogBoost, 0, 5, 3),
+      conePrecipitationBoost: normalizedFinite(weather.conePrecipitationBoost, fallback.weather.conePrecipitationBoost, 0, 5, 3)
+    }
+  };
+}
+
 export function normalizeGameSettingsPatch(value: unknown, fallback: GameSettings = DEFAULT_GAME_SETTINGS): GameSettings {
-  const source = typeof value === "object" && value !== null ? value as Partial<Record<keyof GameSettings, unknown>> : {};
-  const result = { ...fallback };
+  const source = recordSource(value) as Partial<Record<keyof GameSettings, unknown>>;
+  const result: GameSettings = {
+    ...fallback,
+    visual: normalizeVisualSettingsPatch(source.visual, fallback.visual)
+  };
   for (const item of GAME_SETTINGS_SCHEMA) {
     const raw = source[item.key];
     if (raw === undefined) continue;
+    if (item.input === "json") {
+      if (item.key === "visual") result.visual = normalizeVisualSettingsPatch(raw, result.visual);
+      continue;
+    }
     if (item.input === "checkbox") {
       result[item.key] = Boolean(raw) as never;
       continue;

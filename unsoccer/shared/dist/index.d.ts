@@ -343,6 +343,127 @@ export interface ServerInfo {
 }
 export declare const DEFAULT_INPUT: InputState;
 export declare const CHARACTER_ROSTER: readonly ["6288738", "6299851", "6243756", "6270571", "6324128", "6244727", "6304269", "6298522", "6255142", "6294728"];
+export interface VisualColorMaterialSettings {
+    color: string;
+    roughness?: number;
+    metalness?: number;
+    opacity?: number;
+}
+export interface VisualFloodlightSettings {
+    x: number;
+    y: number;
+    z: number;
+    targetX: number;
+    targetY: number;
+    targetZ: number;
+    color: string;
+    angleDeg: number;
+    distance: number;
+    penumbra: number;
+    decay: number;
+    coneRadius: number;
+    coneOpacity: number;
+    flickerDepth: number;
+    flickerSpeed: number;
+    widthScale: number;
+    intensityBias: number;
+}
+export interface VisualSettings {
+    renderer: {
+        exposureBase: number;
+        exposureDay: number;
+        exposureSunset: number;
+        precipitationExposurePenalty: number;
+        shadows: boolean;
+    };
+    sky: {
+        dayColor: string;
+        sunsetColor: string;
+        nightColor: string;
+        fogDayColor: string;
+        fogNightColor: string;
+        snowFogColor: string;
+        domeFogMix: number;
+        fogNearBase: number;
+        fogNearDay: number;
+        fogFarBase: number;
+        fogFarDay: number;
+        fogSnowPenalty: number;
+    };
+    sun: {
+        intensityBase: number;
+        intensityDay: number;
+        intensitySunset: number;
+        precipitationPenalty: number;
+        orbitRadius: number;
+        visualOrbitRadius: number;
+        visualHeight: number;
+        markerScaleBase: number;
+        markerScaleDay: number;
+        markerScaleSunset: number;
+        glowOpacityBase: number;
+        glowOpacityDay: number;
+        glowOpacitySunset: number;
+    };
+    moon: {
+        color: string;
+        opacityBase: number;
+        opacityNight: number;
+    };
+    ambient: {
+        hemiSkyColor: string;
+        hemiGroundColor: string;
+        hemiBase: number;
+        hemiDay: number;
+        hemiPrecipitationPenalty: number;
+        fillBase: number;
+        fillDay: number;
+        fillNight: number;
+        fillSnow: number;
+        bounceColor: string;
+        bounceBase: number;
+        bounceDay: number;
+        bounceSunset: number;
+        bounceNight: number;
+        rimColor: string;
+        rimBase: number;
+        rimNight: number;
+        rimSunset: number;
+    };
+    floodlights: {
+        powerNightStart: number;
+        powerNightEnd: number;
+        intensityBase: number;
+        precipitationBoost: number;
+        lightThreshold: number;
+        coneThreshold: number;
+        lights: VisualFloodlightSettings[];
+    };
+    materials: {
+        field: VisualColorMaterialSettings;
+        fieldStripe: VisualColorMaterialSettings;
+        marking: VisualColorMaterialSettings;
+        markingSecondary: VisualColorMaterialSettings;
+        goalPost: VisualColorMaterialSettings;
+        mast: VisualColorMaterialSettings;
+        courtyard: VisualColorMaterialSettings;
+        fence: VisualColorMaterialSettings;
+        road: VisualColorMaterialSettings;
+        sidewalk: VisualColorMaterialSettings;
+        curb: VisualColorMaterialSettings;
+        foliage: VisualColorMaterialSettings;
+        metal: VisualColorMaterialSettings;
+        brightMetal: VisualColorMaterialSettings;
+        fallbackPlayerBlue: VisualColorMaterialSettings;
+        fallbackPlayerOrange: VisualColorMaterialSettings;
+        ball: VisualColorMaterialSettings;
+    };
+    weather: {
+        rainLightPenalty: number;
+        snowFogBoost: number;
+        conePrecipitationBoost: number;
+    };
+}
 export interface GameSettings {
     fieldWidth: number;
     fieldLength: number;
@@ -359,6 +480,8 @@ export interface GameSettings {
     ambientIntensity: number;
     floodlightIntensity: number;
     toneMappingExposure: number;
+    cameraDistance: number;
+    visual: VisualSettings;
     weatherChangeMinMs: number;
     weatherChangeMaxMs: number;
     weatherDawnWeight: number;
@@ -466,7 +589,7 @@ export interface GameSettings {
     botHeadIntervalMs: number;
     botJumpChance: number;
 }
-export type GameSettingInput = "number" | "range" | "checkbox";
+export type GameSettingInput = "number" | "range" | "checkbox" | "json";
 export interface GameSettingSchemaItem {
     key: keyof GameSettings;
     group: string;
@@ -478,8 +601,10 @@ export interface GameSettingSchemaItem {
     step?: number;
     restartPhysics?: boolean;
 }
+export declare const DEFAULT_VISUAL_SETTINGS: VisualSettings;
 export declare const DEFAULT_GAME_SETTINGS: GameSettings;
 export declare const GAME_SETTINGS_SCHEMA: GameSettingSchemaItem[];
+export declare function normalizeVisualSettingsPatch(value: unknown, fallback?: VisualSettings): VisualSettings;
 export declare function normalizeGameSettingsPatch(value: unknown, fallback?: GameSettings): GameSettings;
 export declare function teamName(team: TeamId | null): string;
 export declare function clamp(value: number, min: number, max: number): number;

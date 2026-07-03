@@ -1,5 +1,185 @@
 # Changelog
 
+## unsoccer v0.0.052
+
+- Fix point-blank/overlap player hits so a visible no-ball RMB/LMB strike also
+  applies one-hit stamina damage and ragdoll knockback instead of becoming a
+  harmless animation.
+- Extend acceptance with stricter active bot roster checks: bot ids, roles,
+  finite positions, playable-area bounds, non-test human join backfill, and
+  default bot match stability are now release-gated.
+- Cover LMB+Shift possession shots explicitly, keeping Shift as the strong-shot
+  modifier while preserving the stamina contract that only Shift movement and
+  incoming damage drain stamina.
+
+## unsoccer v0.0.051
+
+- Let default-aggression bots start visible close-range fights again while the
+  anti-collapse guard pauses new bot brawls once enough players are already
+  exhausted or ragdolled.
+- Move bot combat aggression threshold and collapse-guard limits into
+  `game-settings.json` and the runtime settings schema so the admin UI can tune
+  them.
+- Extend acceptance with a default-aggression bot brawl fixture proving one-hit
+  stamina knockout, ragdoll, stable bot ids, active bot fill, and no fill
+  suppression.
+
+## unsoccer v0.0.050
+
+- Make `/api/leave` remove WebSocket players as well as HTTP fallback players,
+  closing the channel, rebalancing roles, and immediately backfilling the freed
+  active slot with a bot.
+- Send a browser `pagehide` leave beacon for the current joined player on both
+  WebSocket and HTTP transports, so reloads/closed tabs do not leave stale human
+  slots suppressing bots.
+- Shorten the default WebSocket stale-slot timeout to 12 seconds and extend
+  acceptance with a WebSocket leave/backfill fixture.
+- Widen airborne LMB dash-kick swept player-hit reach so jump attacks more
+  reliably knock down the target they dash toward.
+- Prevent exhausted standing players from capturing or keeping ball possession,
+  while allowing high-aggression bots to finish exhausted opponents into ragdoll
+  without breaking bot fill.
+- Keep default bot-only play focused on football: normal bot combat pressure now
+  starts at aggression 0.55+, so the default 0.50 setup can score without
+  stamina/ragdoll collapse.
+
+## unsoccer v0.0.049
+
+- Lock the stamina/combat release gate harder: acceptance now asserts that
+  friendly fire, one-hit player knockout, zero jump stamina cost, and zero
+  attacker hit stamina cost are active before the player-hit fixtures run.
+- Add a non-test local server smoke inside acceptance so default local play
+  proves `testMode=false`, bot runtime enabled, unsuppressed bot fill, and a
+  full active bot roster before a build is called ready.
+- Extend empty-space strike coverage so head whiffs are also proven free: they
+  do not spend stamina, block recovery, trigger passive body contact, or emit
+  fake kick audio when nothing is hit.
+
+## unsoccer v0.0.048
+
+- Keep exhausted zero-stamina players in slow recovery/walk mode: jump,
+  possession shots, foot kicks, hand hits, head hits, held LMB charge, and
+  buffered combat inputs are consumed without firing until stamina recovers.
+- Make off-ball player hits work at overlap/point-blank range instead of
+  skipping targets with near-zero horizontal distance.
+- Reuse displaced bots from a dormant runtime pool when humans leave, and
+  expose bot reuse, dormant pool size, repair count, and invalid active bot
+  diagnostics through `/api/health`.
+- Keep team indicator rings visible during exhaustion/ragdoll by pulsing
+  opacity and scale, and publish rig QA datasets from the local player instead
+  of whichever character updated last.
+
+## unsoccer v0.0.047
+
+- Stabilize the skinned character controller by resetting the procedural IK
+  overlay to the bind pose before each animation frame, preventing punch/kick/
+  ragdoll bone rotations from accumulating over time.
+- Smooth visual ragdoll roots instead of snapping every server snapshot, while
+  keeping server-authoritative ragdoll state and no local prediction override.
+- Add browser QA counters for active/visible ragdolls, recent strikes, bot
+  stamina ranges, bot sprint/exhaustion, visible rigged bots, and rig-level
+  ragdoll/strike visibility.
+- Extend `/api/health` with active human/test slot counts and stale HTTP/
+  WebSocket client counts so bot-fill suppression is diagnosable.
+
+## unsoccer v0.0.046
+
+- Fix test-mode bot tuning persistence so `/api/test/bots` keeps runtime game
+  settings synchronized with the file watcher instead of letting a previous
+  `/api/bot-settings` target roll bot fill back down.
+- Verified the current stamina/combat contract still passes: Shift is the only
+  outgoing stamina drain, jumps/whiffs are free, and one-hit player damage
+  ragdolls targets with knockback.
+- Browser QA on local `5202/8812` confirms one human plus nine visible bots
+  with no hidden active players and a ready full stamina meter.
+
+## unsoccer v0.0.045
+
+- Keep bot combat aligned with the current stamina economy: bot attacks are
+  free whenever the bot is not exhausted or ragdolling, while stamina still
+  drains only from Shift sprint and incoming player-hit damage.
+- Add acceptance coverage for low-stamina bot fighting, one-hit ragdoll, and a
+  stable full bot roster through combat recovery.
+
+## unsoccer v0.0.044
+
+- Keep bot fill self-healing during the server tick, so bot runtimes, active
+  bot roles, and physics bodies are rebalanced even if a nonstandard state path
+  skips the usual join/leave/settings rebalance.
+- Make possessed balls collide with other players: a carried ball now drops
+  ownership and rebounds from a blocker instead of passing through while it is
+  attached to the owner.
+- Harden acceptance around gameplay dependencies: bot combat must apply the
+  same one-hit ragdoll knockout as human combat, and carried-ball blocker
+  collision is covered as a regression.
+
+## unsoccer v0.0.043
+
+- Make off-ball fights more reliable: RMB/head inputs are consumed only after
+  a successful strike or visible action, so cooldown timing no longer eats the
+  next punch before it can animate or apply damage.
+- Treat airborne LMB as a swept dash kick: when it misses the ball, the dash
+  reach is included in player-hit targeting so jump-kicks can knock down
+  players at the intended forward distance.
+- Keep the stamina economy locked: Shift drains stamina gradually, incoming
+  hits fully drain the target into ragdoll, and jump/attack attempts still do
+  not spend attacker stamina.
+- Full acceptance passed for bot fill, stable bot roster, possession shots,
+  friendly-fire knockout, stamina rules, player-ball collision, and airborne
+  dash kick.
+
+## unsoccer v0.0.041
+
+- Move the HTTP fallback stale-player timeout into `game-settings.json` /
+  `GameSettings` / admin schema as `httpClientStaleMs` with a 12s default, so
+  closed or frozen HTTP fallback tabs release active slots back to bots faster.
+- Expose the active HTTP stale timeout through `/api/health` and extend
+  acceptance to prove quick stale-player cleanup immediately restores the full
+  bot lineup.
+- Keep stamina/combat rules locked: stamina drains only from Shift sprint and
+  incoming full-hit damage; jumps, attacks, and whiffs do not spend attacker
+  stamina.
+
+## unsoccer v0.0.040
+
+- Expose bot runtime diagnostics in `/api/health`, `/api/game-settings`, and
+  `/api/bot-settings`: total bots, active bots, target fill, runtime-enabled
+  flag, human clients, and test-mode state are now visible without guessing.
+- Add client QA datasets for snapshot players, active players, active bots,
+  visible bots, hidden active players, and snapshot server version so browser
+  testing can separate a dead/wrong local server from a render issue.
+- Keep the stamina/combat rule intact and add a server guard so already-ragdoll
+  targets cannot be repeatedly knocked by new strikes before they recover.
+
+## unsoccer v0.0.039
+
+- Register WebSocket state handlers before sending join so fast local servers
+  cannot race the first authoritative state snapshot.
+- Add a WebSocket state watchdog and a throttled render-loop fallback, keeping
+  bots, roster, stamina HUD, and player actors visible even when the in-app
+  browser throttles `requestAnimationFrame`.
+- Keep the stamina/combat rule locked to the current design: Shift drains
+  stamina gradually, incoming player hits fully drain stamina and ragdoll, while
+  jumps and whiffed strikes do not spend stamina.
+
+## unsoccer v0.0.038
+
+- Upgrade mobile controls from static D-pad buttons to a draggable virtual
+  movement pad so one finger can steer and hit diagonals.
+- Keep mobile action buttons wired into the same gameplay input path for
+  sprint, jump, foot kick charge, hand hit, and head hit.
+- Expose mobile input diagnostics through `data-mobile-last-directions`,
+  `data-mobile-last-action`, and resolved input datasets for browser QA.
+
+## unsoccer v0.0.037
+
+- Harden bot-fill counting so inactive or spectator non-bot runtimes cannot
+  suppress the expected active bot lineup.
+- Add acceptance coverage proving jump and empty-space strikes do not spend
+  stamina or block stamina recovery.
+- Keep the stamina economy rule: only Shift sprint and incoming player-hit
+  damage drain stamina by default.
+
 ## unsoccer v0.0.030
 
 - Make active ball strikes more user-friendly by giving foot/hand/head actions

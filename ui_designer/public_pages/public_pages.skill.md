@@ -42,6 +42,30 @@ Use this file for UI Designer work inside
   publication follow-up notes.
 - `unsoccer-ui-network-hud-stability-v0.0.010.md`: UI Designer note for the
   v0.0.010 network HUD fixed-column/tabular-numeral stability patch.
+- `unsoccer-yandex-games-assets/`: generated Yandex Games media pack for
+  Ragdoll Soccer II, including icon, cover, showcase cover, gameplay MP4/GIF,
+  screenshots, and a pack manifest. Raw browser source captures are local
+  scratch evidence and are ignored.
+- `unsoccer-yandex-games-upload-handoff-v0.0.052.md`: current Yandex Games
+  application 547090 upload handoff, archive/media mapping, draft state,
+  Moscow mirror state, and remaining manual file-upload blocker.
+- `unsoccer-yandex-games-upload-handoff-v0.0.033.md`: previous Yandex Games
+  v0.0.033 upload handoff preserved as historical evidence.
+- `unsoccer-vkplay-upload-handoff-v0.0.052.md`: current VK Play Developers
+  create-project/upload handoff for Ragdoll Soccer II v0.0.052, including form
+  values, local upload pack mapping, hashes, and external action blockers.
+- `unsoccer-vkplay-release-gate.md`: permanent VK Play release/update gate for
+  project 48793. Use it before every VK Play publish or iframe version
+  increment.
+- `prepare-vkplay-upload-pack.mjs`: repeatable VK Play staging-pack generator.
+  Run after `python tools/package_itch.py unsoccer` for each new UnSoccer
+  release; it verifies the archive version/weight/assets and writes
+  `dist/vkplay-upload-9572-{version}/`.
+- `verify-yandex-upload-pack.mjs`: read-only Yandex Games staging-pack verifier.
+  It checks pinned SHA-256 for every numbered upload file, archive
+  root/index/version/weight/assets, PNG/GIF dimensions, MP4 codec/pixel
+  format/duration, and lightweight file-size limits before manual Console
+  upload.
 
 ## Rules
 
@@ -52,3 +76,5 @@ Use this file for UI Designer work inside
   `../../skill.xml`, and the relevant folder skill.
 - External itch.io edits must be recorded here with date, copy, screenshots, and
   publication notes.
+- VK Play updates must pass `unsoccer-vkplay-release-gate.md` before the
+  dashboard iframe URL is saved, incremented, published, or submitted.

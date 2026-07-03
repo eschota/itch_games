@@ -67,7 +67,9 @@ Use this file for work inside `/itch_games/ai_chat`.
   `AI_CHAT_WEBHOOK_SECRET`; never commit it.
 - Keep `/api/deploy-health` read-only and secret-free. It may expose file
   existence, dist asset names, local health status, and systemd active state for
-  deployment diagnosis, but it must not expose environment variables or tokens.
+  deployment diagnosis. It may expose secret-free deploy relay status, but it
+  must not expose environment variables, tokens, webhook secrets, or request
+  bodies.
 - Treat any Vite-built `./assets/*.js` or `./assets/*.css` entry in UnSoccer
   dist HTML as built output; do not couple health readiness to a specific chunk
   basename such as `index-*`.
@@ -83,6 +85,13 @@ Use this file for work inside `/itch_games/ai_chat`.
 - Telegram must call `/ai_chat/api/telegram-webhook` with
   `X-Telegram-Bot-Api-Secret-Token`; do not use polling when the webhook is
   active.
-- Keep `itch-games-autodeploy.timer` disabled after webhook deploy is active.
+- Keep the legacy primary `itch-games-autodeploy.timer` disabled after webhook
+  deploy is active. Keep the Moscow-specific
+  `itch-games-autodeploy-moscow.timer` enabled while GitHub-side Moscow hook
+  creation is blocked or until the primary-to-Moscow relay is proven live.
+- The Moscow mirror uses the same Node chat/webhook service shape at
+  `https://moscow-io-games.mecharulez.com/ai_chat/`, but its deploy script is
+  `/itch_games/ai_chat/deploy/itch-games-autodeploy-moscow.sh` and its runtime
+  root is `/itch_games`.
 - When changing this service, post start/change/result messages to the live chat
   once the service is available.

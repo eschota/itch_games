@@ -40,6 +40,7 @@ Use this root skill when changing, packaging, validating, or publishing the
     `ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md`,
     `ui_designer/public_pages/verify-yandex-upload-pack.mjs`
   - UnSoccer VK Play handoff:
+    `ui_designer/public_pages/unsoccer-vkplay-release-gate.md`,
     `ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md`,
     `ui_designer/public_pages/prepare-vkplay-upload-pack.mjs`
   - UnSoccer UI/settings runtime evidence:
@@ -184,6 +185,11 @@ Use this root skill when changing, packaging, validating, or publishing the
   `node ui_designer/public_pages/verify-yandex-upload-pack.mjs --mode=live`
   passes with pinned SHA-256 for the numbered files and the Console draft has
   the archive/media files selected and saved.
+- VK Play publication/update for UnSoccer is incomplete until
+  `ui_designer/public_pages/unsoccer-vkplay-release-gate.md` passes: the local
+  VK Play pack is regenerated, primary and Moscow live health both serve the
+  target version, and the VK Play iframe URL uses
+  `https://moscow-io-games.mecharulez.com/unsoccer/?source=vkplay&version={GAME_VERSION}`.
 - Track cross-game external publication status in
   `ui_designer/public_pages/itch-publication-ledger.md`; per-game checklists
   remain the operational steps for each page.

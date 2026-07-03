@@ -22,6 +22,7 @@
     <child path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="unsoccer-yandex-games-upload-handoff-current" />
     <child path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md" role="unsoccer-yandex-games-upload-handoff-v0.0.033-archive" />
     <child path="ui_designer/public_pages/verify-yandex-upload-pack.mjs" role="unsoccer-yandex-games-upload-pack-verifier" />
+    <child path="ui_designer/public_pages/unsoccer-vkplay-release-gate.md" role="unsoccer-vkplay-release-gate" />
     <child path="ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md" role="unsoccer-vkplay-upload-handoff-current" />
     <child path="ui_designer/public_pages/prepare-vkplay-upload-pack.mjs" role="unsoccer-vkplay-upload-pack-generator" />
     <child path="ui_designer/public_pages/unsoccer-ui-settings-redesign-v0.0.008.md" role="unsoccer-ui-settings-brief-implemented-v0.0.009" />
@@ -132,6 +133,7 @@
           <node path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md" role="yandex-games-upload-handoff" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="yandex-games-upload-handoff-current" owner="UI Designer" />
           <node path="ui_designer/public_pages/verify-yandex-upload-pack.mjs" role="yandex-games-upload-pack-verifier" owner="UI Designer" />
+          <node path="ui_designer/public_pages/unsoccer-vkplay-release-gate.md" role="vkplay-release-gate" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md" role="vkplay-upload-handoff-current" owner="UI Designer" />
           <node path="ui_designer/public_pages/prepare-vkplay-upload-pack.mjs" role="vkplay-upload-pack-generator" owner="UI Designer" />
         </node>
@@ -241,6 +243,7 @@
       <artifact path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md" role="unsoccer-yandex-games-upload-handoff" />
       <artifact path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="unsoccer-yandex-games-upload-handoff-current" />
       <artifact path="ui_designer/public_pages/verify-yandex-upload-pack.mjs" role="unsoccer-yandex-games-upload-pack-verifier" />
+      <artifact path="ui_designer/public_pages/unsoccer-vkplay-release-gate.md" role="unsoccer-vkplay-release-gate" />
       <artifact path="ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md" role="unsoccer-vkplay-upload-handoff-current" />
       <artifact path="ui_designer/public_pages/prepare-vkplay-upload-pack.mjs" role="unsoccer-vkplay-upload-pack-generator" />
     </workspace>
@@ -379,6 +382,7 @@
     <surface path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md" role="unsoccer-yandex-games-upload-handoff" />
     <surface path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="unsoccer-yandex-games-upload-handoff-current" />
     <surface path="ui_designer/public_pages/verify-yandex-upload-pack.mjs" role="unsoccer-yandex-games-upload-pack-verifier" />
+    <surface path="ui_designer/public_pages/unsoccer-vkplay-release-gate.md" role="unsoccer-vkplay-release-gate" />
     <surface path="ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md" role="unsoccer-vkplay-upload-handoff-current" />
     <surface path="ui_designer/public_pages/prepare-vkplay-upload-pack.mjs" role="unsoccer-vkplay-upload-pack-generator" />
     <surface path="ui_designer/public_pages/unsoccer-ui-settings-redesign-v0.0.008.md" role="unsoccer-ui-settings-design-and-implementation-status" />

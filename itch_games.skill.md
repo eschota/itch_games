@@ -200,8 +200,12 @@ Use this file for work inside `/itch_games`.
 
 ## Versioning
 
-- Current release: `v0.0.033`.
-- `unsoccer` release: `v0.0.033`.
+- Current release: `v0.0.052`.
+- `unsoccer` release: `v0.0.052`.
+- `unsoccer` v0.0.052 keeps stamina/combat/bot behavior locked: point-blank
+  no-ball hits apply damage/ragdoll, stamina drains only from Shift and incoming
+  damage, bot ids/roles/finite positions stay stable, and LMB+Shift possession
+  shots are release-gated.
 - Game releases start at `v0.0.001` and every behavior change increments the
   version.
 - The visible bottom-left badge, `package.json.gameVersion`, README, and skill

@@ -24,6 +24,11 @@ this browser game.
 - [ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.json](ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.json)
 - [ui_designer/public_pages/unsoccer-ui-final-local-gate-v0.0.010-rerun.json](ui_designer/public_pages/unsoccer-ui-final-local-gate-v0.0.010-rerun.json)
 - [ui_designer/public_pages/unsoccer-ui-network-hud-stability-v0.0.010.md](ui_designer/public_pages/unsoccer-ui-network-hud-stability-v0.0.010.md)
+- [ui_designer/public_pages/unsoccer-yandex-games-assets](ui_designer/public_pages/unsoccer-yandex-games-assets)
+- [ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md](ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md)
+- [ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md](ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md)
+- [ui_designer/public_pages/unsoccer-vkplay-release-gate.md](ui_designer/public_pages/unsoccer-vkplay-release-gate.md)
+- [ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md](ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md)
 
 ## Core Mandate
 

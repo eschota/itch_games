@@ -8,9 +8,30 @@ unsoccer/shared/dist/
 Thumbs.db
 *.log
 .dev-server.pid
+.codex_tmp/
+=ro&immutable=1
 ai_chat/data/
 __pycache__/
 *.pyc
 tester/checks/**/chrome-profile*/
 tester/checks/**/chrome-user-data*/
 art_director/checks/**/chrome-*profile*/
+
+# Local role QA evidence, scratch captures, and generated source frames are not
+# release inputs. Keep curated evidence docs/assets tracked explicitly when
+# needed, but do not let dated scratch folders pile up in git status.
+orchestrator/checks/
+art_director/checks/2026-07-02-*/
+programmer/checks/2026-07-02-*/
+tester/checks/2026-07-02-*/
+tester/checks/2026-07-03-*/
+sound_designer/checks/2026-07-02-*/
+sound_designer/raw/
+ui_designer/public_pages/unsoccer-yandex-games-assets/source/
+
+# Raw Free3D/AutoRig downloads are heavy provenance/build inputs; runtime uses
+# optimized textureless assets under unsoccer/client/public and dist.
+unsoccer/assets/models/characters/autorig/raw/
+unsoccer/assets/models/characters/free3d/raw/*-textured-rig/
+unsoccer/assets/models/characters/free3d/raw/*-all-animations*.glb
+unsoccer/assets/models/environment/free3d/raw/

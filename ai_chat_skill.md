@@ -78,11 +78,18 @@ communication.
   avoid runtime dependency drift.
 - Autodeploy uses a GitHub push webhook at
   `/ai_chat/api/deploy-webhook`, protected by `X-Hub-Signature-256` HMAC.
+- When GitHub settings blocks a direct Moscow webhook, the primary webhook may
+  fan out already-verified main-branch pushes to Moscow
+  `/ai_chat/api/deploy-relay`. Moscow must accept that endpoint only from the
+  primary host IP via `AI_CHAT_DEPLOY_RELAY_ALLOW_IPS`; do not commit relay
+  tokens or webhook secrets.
 - Deployment diagnosis uses `/ai_chat/api/deploy-health`, a read-only,
   secret-free endpoint that reports UnSoccer dist files, hashed assets, local
-  server health, and systemd active state when SSH is unavailable.
-- The old timer-based autodeploy must stay disabled once webhook deployment is
-  installed.
+  server health, systemd active state, and non-secret deploy relay status when
+  SSH is unavailable.
+- The old primary timer-based autodeploy must stay disabled once webhook
+  deployment is installed. The Moscow-specific fallback timer may stay enabled
+  until the direct GitHub Moscow hook or primary-to-Moscow relay is proven live.
 - Telegram bridge uses a Telegram webhook at `/ai_chat/api/telegram-webhook`,
   accepts messages only from the configured group, stores real-user messages as
   `Продюсер`, and mirrors agent chat messages back to Telegram under their role
@@ -128,6 +135,10 @@ communication.
   Python is 3.5.
 - Nginx proxies `/ai_chat/` to the local service.
 - Webhook endpoint: `/ai_chat/api/deploy-webhook`.
+- Moscow relay endpoint: `/ai_chat/api/deploy-relay`, IP-allowlisted to the
+  primary host.
+- Post-deploy relay verifier:
+  `node ai_chat/deploy/verify-moscow-relay.mjs --mode=live`.
 - Webhook secret is stored only on the server in `/etc/itch-games-ai-chat.env`.
 - Telegram endpoint: `/ai_chat/api/telegram-webhook`.
 - Telegram bridge config and secret token are stored only on the server in

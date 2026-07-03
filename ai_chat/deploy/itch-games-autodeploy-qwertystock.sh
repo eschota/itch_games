@@ -52,15 +52,36 @@ echo "unsoccer expected weight: ${expected_weight}"
 
 restart_unsoccer() {
   stage "$1"
-  sudo -n systemctl enable itch-games-unsoccer-server.service
-  sudo -n systemctl stop itch-games-unsoccer-server.service || true
-  sudo -n pkill -f '/home/generic/itch_games/unsoccer/server/dist/index.js' || true
-  sudo -n systemctl start itch-games-unsoccer-server.service
+  if sudo -n systemctl enable itch-games-unsoccer-server.service; then
+    sudo -n systemctl stop itch-games-unsoccer-server.service || true
+    sudo -n pkill -f '/home/generic/itch_games/unsoccer/server/dist/index.js' || true
+    sudo -n systemctl start itch-games-unsoccer-server.service || true
+  else
+    echo "sudo systemctl is unavailable; falling back to direct UnSoccer process restart"
+  fi
   sleep 2
   api_health="$(curl -fsS http://127.0.0.1:8787/api/health || true)"
   if ! grep -q "\"version\":\"${expected_version}\"" <<< "$api_health"; then
-    sudo -n systemctl restart itch-games-unsoccer-server.service
+    sudo -n systemctl restart itch-games-unsoccer-server.service || true
     sleep 3
+    api_health="$(curl -fsS http://127.0.0.1:8787/api/health || true)"
+  fi
+  if ! grep -q "\"version\":\"${expected_version}\"" <<< "$api_health"; then
+    echo "systemd restart did not expose ${expected_version}; using direct process fallback"
+    pids="$(ps -eo pid=,args= | awk '/[n]ode .*\/home\/generic\/itch_games\/unsoccer\/server\/dist\/index\.js/ {print $1}' || true)"
+    if [ -n "$pids" ]; then
+      for pid in $pids; do
+        kill -TERM "$pid" 2>/dev/null || true
+      done
+      sleep 2
+      for pid in $pids; do
+        kill -KILL "$pid" 2>/dev/null || true
+      done
+    fi
+    if ! curl -fsS http://127.0.0.1:8787/api/health >/tmp/itch-games-unsoccer-health.json 2>/dev/null || ! grep -q "\"version\":\"${expected_version}\"" /tmp/itch-games-unsoccer-health.json; then
+      nohup env NODE_ENV=production UNSOCCER_PORT=8787 /usr/bin/node /home/generic/itch_games/unsoccer/server/dist/index.js >/tmp/itch-games-unsoccer-fallback.log 2>&1 &
+      sleep 3
+    fi
     api_health="$(curl -fsS http://127.0.0.1:8787/api/health)"
   fi
   printf '%s\n' "$api_health"

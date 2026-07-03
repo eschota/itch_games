@@ -137,6 +137,11 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
   the deploy script must restart UnSoccer immediately before later artifact or
   nginx checks so public HTML and API cannot remain split-version after a
   partial deploy.
+- The qwertystock deploy should prefer systemd for UnSoccer restart, but if
+  non-interactive sudo/systemd does not expose the expected API version, it may
+  kill the exact `/home/generic/itch_games/unsoccer/server/dist/index.js` node
+  process owned by the deploy user and start that entry directly as a temporary
+  fallback; the final health check must still require the expected version.
 - The webhook child process must not synchronously restart
   `itch-games-ai-chat.service` before it exits. Schedule a delayed chat restart
   after local health checks so the parent process can append deploy

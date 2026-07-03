@@ -146,6 +146,8 @@ export interface InputState {
     kickLeftHeld: boolean;
     kickLeftCharge: number;
     kickRight: number;
+    kickRightHeld: boolean;
+    kickRightCharge: number;
     head: number;
     jump: number;
     sprint: boolean;

@@ -104,6 +104,8 @@ export const DEFAULT_INPUT = {
     kickLeftHeld: false,
     kickLeftCharge: 0,
     kickRight: 0,
+    kickRightHeld: false,
+    kickRightCharge: 0,
     head: 0,
     jump: 0,
     sprint: false,

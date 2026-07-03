@@ -25,12 +25,12 @@
 
       .hud {
         position: fixed;
-        left: 16px;
-        top: 16px;
+        left: 10px;
+        top: 10px;
         display: grid;
-        gap: 8px;
-        width: min(520px, calc(100vw - 32px));
-        min-width: 260px;
+        gap: 6px;
+        width: min(260px, calc(100vw - 20px));
+        min-width: 210px;
         pointer-events: none;
         z-index: 2;
       }
@@ -39,7 +39,7 @@
         border: 1px solid rgba(207, 244, 221, 0.22);
         background: rgba(5, 13, 11, 0.72);
         border-radius: 8px;
-        padding: 10px 12px;
+        padding: 8px;
         box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
         backdrop-filter: blur(10px);
         box-sizing: border-box;
@@ -48,32 +48,33 @@
       .metrics {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 6px 12px;
-        font-size: 12px;
+        gap: 3px 7px;
+        font-size: 9px;
         color: rgba(234, 247, 239, 0.76);
       }
 
       .metrics strong {
         display: block;
         color: #ffffff;
-        font-size: 15px;
+        font-size: 11px;
+        line-height: 1.08;
         font-variant-numeric: tabular-nums;
         overflow-wrap: anywhere;
       }
 
       .character-row {
         display: grid;
-        grid-template-columns: 40px minmax(0, 1fr) 40px;
-        gap: 8px;
+        grid-template-columns: 30px minmax(0, 1fr) 30px;
+        gap: 5px;
         align-items: center;
-        margin-top: 10px;
+        margin-top: 6px;
         pointer-events: auto;
       }
 
       .character-title {
-        margin-top: 8px;
+        margin-top: 6px;
         color: rgba(234, 247, 239, 0.86);
-        font-size: 12px;
+        font-size: 10px;
         line-height: 1.35;
         max-width: 100%;
         overflow-wrap: anywhere;
@@ -83,25 +84,25 @@
       .converter-row {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
-        margin-top: 10px;
+        gap: 6px;
+        margin-top: 6px;
         pointer-events: auto;
       }
 
       .ao-control {
-        flex: 1 1 190px;
+        flex: 1 1 140px;
         display: grid;
-        grid-template-columns: auto minmax(88px, 1fr) 42px;
-        gap: 8px;
+        grid-template-columns: auto minmax(48px, 1fr) 30px;
+        gap: 5px;
         align-items: center;
-        min-height: 38px;
+        min-height: 32px;
         border: 1px solid rgba(207, 244, 221, 0.18);
         border-radius: 8px;
         background: rgba(17, 38, 31, 0.72);
-        padding: 0 10px;
+        padding: 0 8px;
         box-sizing: border-box;
         color: rgba(234, 247, 239, 0.82);
-        font-size: 12px;
+        font-size: 9px;
       }
 
       .ao-control input {
@@ -117,25 +118,25 @@
       }
 
       .mode-row select {
-        flex: 1 1 160px;
+        flex: 1 1 112px;
       }
 
       .gallery {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 6px;
-        max-height: min(34vh, 260px);
+        gap: 5px;
+        max-height: min(28vh, 210px);
         overflow: auto;
-        margin-top: 10px;
+        margin-top: 6px;
         padding-right: 2px;
         pointer-events: auto;
       }
 
       .gallery button {
         min-width: 0;
-        padding: 8px 9px;
+        padding: 6px 7px;
         text-align: left;
-        font-size: 12px;
+        font-size: 10px;
         line-height: 1.25;
         overflow-wrap: anywhere;
       }
@@ -152,28 +153,33 @@
         border-radius: 8px;
         background: rgba(17, 38, 31, 0.94);
         color: #f4fff8;
-        padding: 9px 10px;
+        padding: 6px 7px;
         font: inherit;
+        font-size: 11px;
       }
 
       .buttons {
         position: fixed;
-        left: 16px;
-        bottom: 16px;
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
+        left: auto;
+        right: 10px;
+        bottom: 10px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(58px, 88px));
+        gap: 6px;
+        max-width: 188px;
         z-index: 2;
       }
 
       button {
-        min-width: 64px;
+        min-width: 0;
         border: 1px solid rgba(207, 244, 221, 0.24);
         border-radius: 8px;
         background: rgba(17, 38, 31, 0.9);
         color: #f4fff8;
-        padding: 10px 12px;
+        padding: 7px 8px;
         font: inherit;
+        font-size: 11px;
+        line-height: 1.1;
         cursor: pointer;
       }
 
@@ -181,14 +187,38 @@
         background: rgba(41, 76, 62, 0.96);
       }
 
+      button[aria-pressed="true"],
+      button.is-active {
+        border-color: rgba(255, 209, 102, 0.78);
+        background: rgba(86, 64, 25, 0.96);
+        color: #fff8d7;
+      }
+
       .icon-button {
-        min-width: 40px;
-        width: 40px;
-        padding: 9px 0;
+        min-width: 30px;
+        width: 30px;
+        padding: 6px 0;
+      }
+
+      @media (max-width: 720px) {
+        .hud {
+          width: min(220px, calc(100vw - 20px));
+        }
+
+        .buttons {
+          grid-template-columns: repeat(2, minmax(50px, 76px));
+          max-width: 164px;
+        }
+
+        button {
+          font-size: 10px;
+          padding: 6px 7px;
+        }
       }
     </style>
-    <script type="module" crossorigin src="./assets/characterControllerTest---wWmzTT.js"></script>
-    <link rel="modulepreload" crossorigin href="./assets/character-controller-1KAO2FgZ.js">
+    <script type="module" crossorigin src="./assets/characterControllerTest-C-FIgP2X.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/index-C_RaqJpc.js">
+    <link rel="modulepreload" crossorigin href="./assets/character-controller-DHmoR3fv.js">
   </head>
   <body>
     <canvas id="character-test-canvas" tabindex="0"></canvas>
@@ -261,7 +291,7 @@
       <button id="btn-head" type="button">Head</button>
       <button id="btn-jump" type="button">Jump</button>
       <button id="btn-sprint-jump" type="button">Sprint Jump</button>
-      <button id="btn-ragdoll" type="button">Ragdoll</button>
+      <button id="btn-ragdoll" type="button" aria-pressed="false">Ragdoll: Off</button>
       <button id="btn-celebrate-1" type="button">Celebrate 1</button>
       <button id="btn-celebrate-2" type="button">Celebrate 2</button>
       <button id="btn-celebrate-3" type="button">Celebrate 3</button>

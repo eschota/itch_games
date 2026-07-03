@@ -18,7 +18,7 @@
       "texturePolicy": "baked-textureless-vertex-pbr-no-runtime-images",
       "vertexColorAccessors": 1,
       "runtimeTextureCount": 0,
-      "byteSize": 127516
+      "byteSize": 127512
     },
     {
       "guid": "6243756",
@@ -72,7 +72,7 @@
       "texturePolicy": "baked-textureless-vertex-pbr-no-runtime-images",
       "vertexColorAccessors": 1,
       "runtimeTextureCount": 0,
-      "byteSize": 124768
+      "byteSize": 124764
     },
     {
       "guid": "6244727",
@@ -144,7 +144,7 @@
       "texturePolicy": "baked-textureless-vertex-pbr-no-runtime-images",
       "vertexColorAccessors": 1,
       "runtimeTextureCount": 0,
-      "byteSize": 143012
+      "byteSize": 143016
     },
     {
       "guid": "6255142",

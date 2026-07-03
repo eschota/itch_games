@@ -17,7 +17,7 @@
     <child path="ui_designer/public_pages/unsoccer-public-pages.md" role="unsoccer-public-pages-brief" />
     <child path="ui_designer/public_pages/unsoccer-itch-page-copy.md" role="unsoccer-itch-copy" />
     <child path="ui_designer/public_pages/unsoccer-itch-publishing-checklist.md" role="unsoccer-itch-publish-checklist" />
-    <child path="ui_designer/public_pages/unsoccer-itch-publication-v0.0.052.md" role="unsoccer-itch-publication-v0.0.052-evidence" />
+    <child path="ui_designer/public_pages/unsoccer-itch-publication-v0.0.053.md" role="unsoccer-itch-publication-v0.0.053-evidence" />
     <child path="ui_designer/public_pages/unsoccer-itch-assets" role="unsoccer-itch-storefront-assets" />
     <child path="ui_designer/public_pages/unsoccer-yandex-games-assets" role="unsoccer-yandex-games-media-pack" />
     <child path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="unsoccer-yandex-games-upload-handoff-current" />
@@ -133,7 +133,7 @@
           <node path="ui_designer/public_pages/unsoccer-public-pages.md" role="public-page-brief" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-itch-page-copy.md" role="itch-page-copy" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-itch-publishing-checklist.md" role="itch-publish-checklist" owner="UI Designer" />
-          <node path="ui_designer/public_pages/unsoccer-itch-publication-v0.0.052.md" role="itch-publication-evidence" owner="UI Designer" />
+          <node path="ui_designer/public_pages/unsoccer-itch-publication-v0.0.053.md" role="itch-publication-evidence" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-itch-assets" role="itch-storefront-assets" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-yandex-games-assets" role="yandex-games-media-pack" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md" role="yandex-games-upload-handoff" owner="UI Designer" />
@@ -248,7 +248,7 @@
       <artifact path="ui_designer/public_pages/unsoccer-public-pages.md" role="unsoccer-public-page-source-of-truth" />
       <artifact path="ui_designer/public_pages/unsoccer-itch-page-copy.md" role="unsoccer-itch-copy" />
       <artifact path="ui_designer/public_pages/unsoccer-itch-publishing-checklist.md" role="unsoccer-itch-publish-checklist" />
-      <artifact path="ui_designer/public_pages/unsoccer-itch-publication-v0.0.052.md" role="unsoccer-itch-publication-v0.0.052-evidence" />
+      <artifact path="ui_designer/public_pages/unsoccer-itch-publication-v0.0.053.md" role="unsoccer-itch-publication-v0.0.053-evidence" />
       <artifact path="ui_designer/public_pages/unsoccer-itch-assets" role="unsoccer-itch-storefront-assets" />
       <artifact path="ui_designer/public_pages/unsoccer-yandex-games-assets" role="unsoccer-yandex-games-media-pack" />
       <artifact path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md" role="unsoccer-yandex-games-upload-handoff" />
@@ -393,7 +393,7 @@
     <surface path="ui_designer/public_pages/unsoccer-public-pages.md" role="unsoccer-itch-and-local-page-brief" />
     <surface path="ui_designer/public_pages/unsoccer-itch-page-copy.md" role="unsoccer-itch-page-copy" />
     <surface path="ui_designer/public_pages/unsoccer-itch-publishing-checklist.md" role="unsoccer-itch-publish-checklist" />
-    <surface path="ui_designer/public_pages/unsoccer-itch-publication-v0.0.052.md" role="unsoccer-itch-publication-evidence" />
+    <surface path="ui_designer/public_pages/unsoccer-itch-publication-v0.0.053.md" role="unsoccer-itch-publication-evidence" />
     <surface path="ui_designer/public_pages/unsoccer-itch-assets" role="unsoccer-itch-storefront-assets" />
     <surface path="ui_designer/public_pages/unsoccer-yandex-games-assets" role="unsoccer-yandex-games-media-pack" />
     <surface path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md" role="unsoccer-yandex-games-upload-handoff" />

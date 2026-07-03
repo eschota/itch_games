@@ -32,9 +32,9 @@ Use this file for UI Designer work inside
 - `unsoccer-itch-page-copy.md`: live itch.io copy source for Ragdoll Soccer II.
 - `unsoccer-itch-publishing-checklist.md`: operational publish checklist for
   the Ragdoll Soccer II itch.io page.
-- `unsoccer-itch-publication-v0.0.052.md`: live itch.io publication evidence
-  for Ragdoll Soccer II v0.0.052, including butler upload/build IDs, browser
-  smoke, and remaining media-upload blocker.
+- `unsoccer-itch-publication-v0.0.053.md`: live itch.io publication evidence
+  for Ragdoll Soccer II v0.0.053, including butler upload/build IDs, browser
+  smoke, and remaining description/media upload blockers.
 - `unsoccer-ui-settings-redesign-v0.0.008.md`: original UnSoccer UI/settings
   redesign brief; current status records the runtime implementation in
   `v0.0.009`.

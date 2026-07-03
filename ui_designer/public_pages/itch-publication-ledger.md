@@ -11,11 +11,11 @@ Checked from the working copy and public itch.io page on 2026-07-03.
 
 | Surface | Evidence | Status |
 | --- | --- | --- |
-| UnSoccer source/build target | `package.json` and `package.json.games.unsoccer.version` record `v0.0.053` | Current repo package target is `v0.0.053`; public itch.io is still the recorded `v0.0.052` upload until the next butler push |
+| UnSoccer source/build target | `package.json` and `package.json.games.unsoccer.version` record `v0.0.053` | Public itch.io upload now matches `v0.0.053` |
 | UnSoccer upload package | `dist/unsoccer-itch.zip` was rebuilt with the itch-host default-server patch | Uploaded through butler to `eschotagmailcom/ragdoll-soccer-ii:html5` |
-| UnSoccer itch build | Butler status reports channel `html5`, upload `#18187910`, build `#1768248 (from #1768237)`, version `v0.0.052` | Public build active |
+| UnSoccer itch build | Butler status reports channel `html5`, upload `#18187910`, build `#1768259 (from #1768248)`, version `v0.0.053` | Public build active |
 | Static HTML5 contract | Itch upload is a static browser client and defaults to the live authoritative multiplayer server when hosted from `html-classic.itch.zone` | Embed smoke joined over WebSocket |
-| External itch.io | `https://eschotagmailcom.itch.io/ragdoll-soccer-ii` returned HTTP 200 and showed `PUBLISHED` | Public page live |
+| External itch.io | `https://eschotagmailcom.itch.io/ragdoll-soccer-ii` returned HTTP 200 and showed `PUBLISHED` | Public page live; full description copy still needs manual restoration |
 
 ## Historical Production Evidence
 
@@ -63,40 +63,40 @@ Required final evidence:
 - Local production URL: `https://io-games.mecharulez.com/unsoccer/`.
 - Current repo-local publication target: `v0.0.053`.
 - Current external itch.io publication status: published and smoke-checked on
-  2026-07-03 as `v0.0.052`; `v0.0.053` still needs a new butler upload before
-  the public itch.io page can be claimed current.
+  2026-07-03 as `v0.0.053`.
 - Upload package: `dist/unsoccer-itch.zip`.
 - Page copy: `unsoccer-itch-page-copy.md`.
 - Publish checklist: `unsoccer-itch-publishing-checklist.md`.
-- Publication evidence: `unsoccer-itch-publication-v0.0.052.md`.
+- Publication evidence: `unsoccer-itch-publication-v0.0.053.md`.
 - Storefront assets: `unsoccer-itch-assets/`.
 - UI/settings redesign brief: `unsoccer-ui-settings-redesign-v0.0.008.md`.
 - UI/settings runtime evidence:
   `unsoccer-ui-final-local-gate-v0.0.010-rerun.json` and matching viewport
   screenshots.
-- Current browser release evidence: public itch iframe build `#1768248` showed
-  one canvas, visible `v0.0.052 / 40.05 MB`, player join, scoreboard, bot
+- Current browser release evidence: public itch iframe build `#1768259` showed
+  one canvas, visible `v0.0.053 / 40.05 MB`, player join, scoreboard, bot
   roster, and `websocket` transport.
 - External itch.io project URL:
   `https://eschotagmailcom.itch.io/ragdoll-soccer-ii`.
-- Publication status: public itch.io page is live. Cover/screenshot media still
-  need manual upload or an itch media API/session upload path.
+- Publication status: public itch.io page is live. Full description copy and
+  cover/screenshot media still need manual upload or an itch media API/session
+  upload path.
 
 Required final evidence:
 
 - Public itch.io URL: recorded.
-- Decided published version: `v0.0.052`; next repo upload target is
-  `v0.0.053`.
+- Decided published version: `v0.0.053`.
 - Uploaded zip filename/version: butler channel `html5`, upload `#18187910`,
-  build `#1768248`, version `v0.0.052`.
+  build `#1768259`, version `v0.0.053`.
 - Multiplayer server URL strategy: embedded production endpoint, documented
   `?server=` tester flow, or explicitly static-only prototype status. Current
   strategy is default production endpoint for itch-hosted builds.
-- Visible runtime badge shows `v0.0.052 / 40.05 MB` after the client module
+- Visible runtime badge shows `v0.0.053 / 40.05 MB` after the client module
   loads.
-- Exact live page copy matches `unsoccer-itch-page-copy.md` in substance.
+- Exact live page copy does not yet match `unsoccer-itch-page-copy.md`; full
+  description restoration is a manual blocker.
 - Screenshots/cover media: still pending manual upload.
-- Desktop embed smoke: recorded in `unsoccer-itch-publication-v0.0.052.md`.
+- Desktop embed smoke: recorded in `unsoccer-itch-publication-v0.0.053.md`.
 
 ## Rules
 

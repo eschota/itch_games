@@ -34,7 +34,7 @@ Use this root skill when changing, packaging, validating, or publishing the
   - UnSoccer itch copy/checklist/assets:
     `ui_designer/public_pages/unsoccer-itch-page-copy.md`,
     `ui_designer/public_pages/unsoccer-itch-publishing-checklist.md`,
-    `ui_designer/public_pages/unsoccer-itch-publication-v0.0.052.md`,
+    `ui_designer/public_pages/unsoccer-itch-publication-v0.0.053.md`,
     `ui_designer/public_pages/unsoccer-itch-assets/`
   - UnSoccer Yandex Games assets and upload handoff:
     `ui_designer/public_pages/unsoccer-yandex-games-assets/`,

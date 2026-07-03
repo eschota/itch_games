@@ -113,12 +113,13 @@ Project chat:
 
 - Public itch.io project id: `4740079`.
 - Butler target: `eschotagmailcom/ragdoll-soccer-ii:html5`.
-- Current uploaded build: upload `#18187910`, build `#1768248`, version
-  `v0.0.052`.
-- Next repo build target for upload is `v0.0.053`; upload it with butler before
-  claiming the public itch.io page is on `v0.0.053`.
+- Current uploaded build: upload `#18187910`, build `#1768259`, version
+  `v0.0.053`.
 - Current embed setting: 960 x 540, fullscreen enabled, mobile-friendly enabled,
   autostart disabled.
+- Live full description currently needs manual restoration from this file. The
+  in-app Browser could not persist itch Redactor `game[description]` through
+  automation, and the blocked `javascript:` path was not worked around.
 - Cover/screenshots still need manual media upload or an itch media API path;
   the current browser automation can edit text/settings but cannot choose local
   files in itch.io upload dialogs.

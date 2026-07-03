@@ -7,8 +7,8 @@ Use this before changing the external Ragdoll Soccer II itch.io page.
 - Public URL: `https://eschotagmailcom.itch.io/ragdoll-soccer-ii`.
 - Itch project id: `4740079`.
 - Butler target: `eschotagmailcom/ragdoll-soccer-ii:html5`.
-- Current upload/build: upload `#18187910`, build `#1768248`, user version
-  `v0.0.052`.
+- Current upload/build: upload `#18187910`, build `#1768259`, user version
+  `v0.0.053`.
 - Current page status: `Published`.
 - Current project type: `HTML`.
 - Current release status: `Prototype`.
@@ -41,6 +41,10 @@ $env:BUTLER_PATH="$env:LOCALAPPDATA\itch-games\butler\butler.exe"
 - Paste fields from `unsoccer-itch-page-copy.md`.
 - Keep project type `HTML`, release status `Prototype`, and genre `Sports`.
 - Keep the static-client/live-server note visible in the description.
+- Current blocker: full description copy must be manually restored from
+  `unsoccer-itch-page-copy.md`. Browser automation could open/fill Redactor
+  source mode, but itch did not persist `game[description]` through the
+  available controls.
 - Keep embed fullscreen enabled and autostart disabled.
 - Keep mobile-friendly enabled only while mobile HUD/touch controls remain
   covered by release QA.
@@ -64,7 +68,7 @@ $env:BUTLER_PATH="$env:LOCALAPPDATA\itch-games\butler\butler.exe"
 - Open the public page on desktop.
 - Press `Run match`.
 - Confirm the iframe URL uses the latest build id.
-- Confirm the iframe has one canvas and visible `v0.0.052 / 40.05 MB`.
+- Confirm the iframe has one canvas and visible `v0.0.053 / 40.05 MB`.
 - Confirm the transport is `websocket` or HTTP fallback against the production
   server, not a 403 from `html-classic.itch.zone`.
 - Check console warnings. FBXLoader skinning/unsupported-map warnings are known
@@ -76,11 +80,13 @@ Checked on 2026-07-03:
 
 - Public URL returned `HTTP 200`.
 - Butler status returned channel `html5`, upload `#18187910`,
-  build `#1768248 (from #1768237)`, version `v0.0.052`.
+  build `#1768259 (from #1768248)`, version `v0.0.053`.
 - Public page showed `PUBLISHED`.
 - Running the embed created iframe
-  `https://html-classic.itch.zone/html/18187910-1768248/index.html?...`.
-- Iframe contained one canvas and visible `v0.0.052 / 40.05 MB`.
+  `https://html-classic.itch.zone/html/18187910-1768259/index.html?...`.
+- Iframe contained one canvas and visible `v0.0.053 / 40.05 MB`.
 - Runtime joined as a player with transport `websocket`.
 - Previous build `#1768237` failed with `join: 403`; fixed by making
   itch-hosted builds default to the production server URL.
+- Public full description is still blocked and must be manually restored from
+  `unsoccer-itch-page-copy.md`.

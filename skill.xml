@@ -18,6 +18,12 @@
     <child path="ui_designer/public_pages/unsoccer-itch-page-copy.md" role="unsoccer-itch-copy" />
     <child path="ui_designer/public_pages/unsoccer-itch-publishing-checklist.md" role="unsoccer-itch-publish-checklist" />
     <child path="ui_designer/public_pages/unsoccer-itch-assets" role="unsoccer-itch-storefront-assets" />
+    <child path="ui_designer/public_pages/unsoccer-yandex-games-assets" role="unsoccer-yandex-games-media-pack" />
+    <child path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="unsoccer-yandex-games-upload-handoff-current" />
+    <child path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md" role="unsoccer-yandex-games-upload-handoff-v0.0.033-archive" />
+    <child path="ui_designer/public_pages/verify-yandex-upload-pack.mjs" role="unsoccer-yandex-games-upload-pack-verifier" />
+    <child path="ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md" role="unsoccer-vkplay-upload-handoff-current" />
+    <child path="ui_designer/public_pages/prepare-vkplay-upload-pack.mjs" role="unsoccer-vkplay-upload-pack-generator" />
     <child path="ui_designer/public_pages/unsoccer-ui-settings-redesign-v0.0.008.md" role="unsoccer-ui-settings-brief-implemented-v0.0.009" />
     <child path="ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.json" role="unsoccer-ui-v0.0.009-runtime-smoke-json" />
     <child path="ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.png" role="unsoccer-ui-v0.0.009-runtime-smoke-screenshot" />
@@ -43,7 +49,18 @@
     <child path="ai_chat_skill.md" role="ai-chat-root" />
     <child path="ai_chat/ai_chat.skill.md" role="ai-chat-workspace" />
     <child path="ai_chat/deploy/deploy.skill.md" role="ai-chat-deploy-folder-skill" />
+    <child path="ai_chat/deploy/itch-games-ai-chat-qwertystock.service" role="qwertystock-ai-chat-systemd-service" />
     <child path="ai_chat/deploy/itch-games-unsoccer-server-qwertystock.service" role="unsoccer-production-systemd-service" />
+    <child path="ai_chat/deploy/itch-games-autodeploy-qwertystock.sh" role="qwertystock-webhook-autodeploy-script" />
+    <child path="ai_chat/deploy/itch-games-io-games-qwertystock.conf" role="qwertystock-io-games-nginx-config" />
+    <child path="ai_chat/deploy/itch-games-ai-chat-moscow.service" role="moscow-ai-chat-systemd-service" />
+    <child path="ai_chat/deploy/itch-games-unsoccer-server-moscow.service" role="moscow-unsoccer-systemd-service" />
+    <child path="ai_chat/deploy/itch-games-autodeploy-moscow.sh" role="moscow-webhook-autodeploy-script" />
+    <child path="ai_chat/deploy/itch-games-autodeploy-moscow-if-changed.sh" role="moscow-pull-autodeploy-wrapper" />
+    <child path="ai_chat/deploy/itch-games-autodeploy-moscow.service" role="moscow-pull-autodeploy-systemd-service" />
+    <child path="ai_chat/deploy/itch-games-autodeploy-moscow.timer" role="moscow-pull-autodeploy-systemd-timer" />
+    <child path="ai_chat/deploy/itch-games-io-games-moscow.conf" role="moscow-io-games-nginx-config" />
+    <child path="ai_chat/deploy/verify-moscow-relay.mjs" role="moscow-relay-post-deploy-verifier" />
     <child path="skill.xml" role="machine-map" />
     <child path="index.html" role="games-catalog" />
     <child path="orbital-courier/index.html" role="current-game-entry" />
@@ -111,6 +128,12 @@
           <node path="ui_designer/public_pages/unsoccer-itch-page-copy.md" role="itch-page-copy" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-itch-publishing-checklist.md" role="itch-publish-checklist" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-itch-assets" role="itch-storefront-assets" owner="UI Designer" />
+          <node path="ui_designer/public_pages/unsoccer-yandex-games-assets" role="yandex-games-media-pack" owner="UI Designer" />
+          <node path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md" role="yandex-games-upload-handoff" owner="UI Designer" />
+          <node path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="yandex-games-upload-handoff-current" owner="UI Designer" />
+          <node path="ui_designer/public_pages/verify-yandex-upload-pack.mjs" role="yandex-games-upload-pack-verifier" owner="UI Designer" />
+          <node path="ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md" role="vkplay-upload-handoff-current" owner="UI Designer" />
+          <node path="ui_designer/public_pages/prepare-vkplay-upload-pack.mjs" role="vkplay-upload-pack-generator" owner="UI Designer" />
         </node>
       </node>
       <node path="art_director" skill="art_director/art_director.skill.md">
@@ -145,7 +168,7 @@
   <transport>
     <server alias="freestock-moscow" host="5.42.121.207" path="/itch_games" role="moscow-independent-mirror" />
     <server host="145.239.0.57" user="generic" port="22744" path="/home/generic/itch_games" role="qwertystock-target" />
-    <github repository="eschota/itch_games" visibility="public" />
+    <github repository="eschota/itch_games" visibility="public" settingsAccess="codex-in-app-browser" />
     <domain host="io-games.mecharulez.com" aiChatPath="/ai_chat/" unsoccerPath="/unsoccer/" unsoccerApiPath="/unsoccer/api/" unsoccerSocketPath="/unsoccer/socket/" />
     <domain host="moscow-io-games.mecharulez.com" dnsProvider="way.qwertystock_domain_api" dnsZone="mecharulez.com" dnsRecord="moscow-io-games A 5.42.121.207" aiChatPath="/ai_chat/" unsoccerPath="/unsoccer/" unsoccerApiPath="/unsoccer/api/" unsoccerSocketPath="/unsoccer/socket/" />
   </transport>
@@ -162,7 +185,9 @@
       <rule>Every role occasionally proposes concise actionable Idea messages for project development when a concrete opportunity appears, without spamming, repeating ideas, or exceeding one idea per substantial work block unless the Producer asks.</rule>
       <rule>Messages include date, self-declared role, current project version, branch, and commit when available.</rule>
       <rule>Commits from branches are shown in the separate service menu, not mixed into chat messages.</rule>
-      <rule>Autodeploy is triggered by a signed GitHub push webhook, not by a systemd timer.</rule>
+      <rule>When GitHub CLI or connector access is unavailable, repository settings and webhooks may be managed through the logged-in Codex in-app Browser session; browser-driven GitHub changes must be reported in /ai_chat and verified through webhook delivery evidence or production health.</rule>
+      <rule>Primary autodeploy is triggered by a signed GitHub push webhook. Moscow may also be triggered by the primary-to-Moscow deploy relay or by the Moscow fallback timer while GitHub-side hook creation is blocked.</rule>
+      <deployRelay source="https://io-games.mecharulez.com/ai_chat/api/deploy-webhook" target="https://moscow-io-games.mecharulez.com/ai_chat/api/deploy-relay" allowSourceIp="145.239.0.57" />
       <rule>Telegram bridge uses /ai_chat/api/telegram-webhook, accepts only the configured group, and relays real-user messages as Producer messages.</rule>
       <rule>Telegram bot token and chat id are stored only in the server environment file.</rule>
       <runtime host="qwertystock.com" entrypoint="ai_chat/server_node.js" reason="target system Python is 3.5" />
@@ -212,6 +237,12 @@
       <artifact path="ui_designer/public_pages/unsoccer-itch-page-copy.md" role="unsoccer-itch-copy" />
       <artifact path="ui_designer/public_pages/unsoccer-itch-publishing-checklist.md" role="unsoccer-itch-publish-checklist" />
       <artifact path="ui_designer/public_pages/unsoccer-itch-assets" role="unsoccer-itch-storefront-assets" />
+      <artifact path="ui_designer/public_pages/unsoccer-yandex-games-assets" role="unsoccer-yandex-games-media-pack" />
+      <artifact path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md" role="unsoccer-yandex-games-upload-handoff" />
+      <artifact path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="unsoccer-yandex-games-upload-handoff-current" />
+      <artifact path="ui_designer/public_pages/verify-yandex-upload-pack.mjs" role="unsoccer-yandex-games-upload-pack-verifier" />
+      <artifact path="ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md" role="unsoccer-vkplay-upload-handoff-current" />
+      <artifact path="ui_designer/public_pages/prepare-vkplay-upload-pack.mjs" role="unsoccer-vkplay-upload-pack-generator" />
     </workspace>
     <workspace name="game_designer" rootSkill="game_designer_skill.md" directorySkill="game_designer/game_designer.skill.md">
       <rule>Use game_designer/ for non-runtime ideas, systems, tuning, level notes, playtests, and briefs.</rule>
@@ -260,7 +291,7 @@
     <rule>Set ITCH_IO_TARGET=owner/game:channel to let the post-commit hook publish UnSoccer to itch.io after production is ready.</rule>
     <rule>Packaging fails if internal skill, role, agent coordination, deploy, or source-control docs leak into the public zip.</rule>
   </tooling>
-  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.033">
+  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.052">
     <client path="unsoccer/client" package="dist/unsoccer-itch.zip" productionPath="/unsoccer/" productionStatic="unsoccer/client/dist" />
     <server path="unsoccer/server" port="8787" health="/api/health" transport="plain-websocket-json" fallback="http-polling" productionApiPath="/unsoccer/api/" productionSocketPath="/unsoccer/socket/" />
     <shared path="unsoccer/shared" />
@@ -269,9 +300,9 @@
     <assetRules path="unsoccer/assets/licenses/free3d-provenance.json">
       <rule>Free3D authenticated downloads require FREE3D_API_TOKEN/F3D_API_TOKEN and exact format/lod/relativePath tuples.</rule>
       <rule>Tokenless Free3D LowPoly 1k assets may use exact public worker inventory paths.json relativePath entries with provenance.</rule>
-      <rule>Runtime assets must be local optimized GLB files with provenance before shipping.</rule>
-      <rule>Character runtime roster entries must include local WebP textures and FBX idle/walk/run/jump clips before their ids are added to shared/src/index.ts CHARACTER_ROSTER.</rule>
-      <rule>AutoRig task character entries may use local embedded-texture animations.glb plus local FBX preview clips when bundle.zip and direct animation downloads are locked; record that locked status in provenance.</rule>
+      <rule>Runtime 3D assets must be local optimized textureless GLB files with provenance before shipping: no image texture files in client/public/assets/{characters,environment,balls}, no GLB images/textures, no material texture references, and baked COLOR_0 vertex colors. Character GLBs must also include packed TEXCOORD_1 roughness/metalness. Deleting textures without baking vertex color is not acceptable.</rule>
+      <rule>Character runtime roster entries must include a local textureless GLB and FBX idle/walk/run/jump clips before their ids are added to shared/src/index.ts CHARACTER_ROSTER.</rule>
+      <rule>AutoRig task character entries must not ship embedded-texture animations.glb in the runtime roster until converted to textureless vertex/PBR assets; record locked bundle/download status in provenance.</rule>
       <rule>Environment runtime GLBs live under client/public/assets/environment/free3d/ with source provenance under assets/models/environment/free3d/provenance.json.</rule>
     </assetRules>
     <rule>First 4 connected clients are players; clients 5-32 are spectators/testers.</rule>
@@ -289,7 +320,7 @@
     <rule>v0.0.017 adds the local stamina HUD meter with state colors/labels, exposes local stamina datasets, and makes hand hits readable with a longer orange strike trail plus hand-action datasets.</rule>
     <rule>v0.0.017 character input/strike correction uses middle mouse button for head hits, prevents mouse wheel from triggering attacks, sends foot/hand ball impulses forward along player yaw from the limb-specific contact point, and alternates hand-hit visual/contact side without adding a new network KickKind.</rule>
     <rule>v0.0.018 keeps the camera anchored to the controlled player with smoothed velocity lead, removes ball-driven camera drift, and adds HUD offscreen arrows for the ball and other players.</rule>
-    <rule>v0.0.018 character roster extension expands the local runtime roster to 11 texture+animation characters, including 10 Free3D entries and one AutoRig task entry, and makes character-controller-test cycle them with arrow keys plus UI.</rule>
+    <rule>v0.0.035 textureless asset correction keeps the local runtime roster to 10 Free3D skinned characters with baked textureless vertex/PBR GLB plus FBX clips, removes the embedded-texture AutoRig entry from server assignment, and makes acceptance/package fail on runtime texture files, textured GLBs, or missing baked COLOR_0 on GLB primitives.</rule>
     <rule>v0.0.019 extends local-only goal nets into closed cages with back, roof, left-side, and right-side Verlet panels per goal while keeping net motion off the network.</rule>
     <rule>v0.0.020 halves the authoritative shared BALL_RADIUS from 0.48 to 0.24 so the server collider, visible client ball, Free3D ball scale, sideline rack, and acceptance fixtures stay in sync.</rule>
     <rule>v0.0.021 delays goal reset: 5 seconds of scoring-team celebration, then a 1-second server-authored ball return to kickoff before countdown; never teleport the ball to center immediately after a goal.</rule>
@@ -308,8 +339,19 @@
     <rule>v0.0.029 widens gameplay camera framing and adds close sideline pennant/bench strips so the dense v0.0.028 courtyard dressing is visible in normal play while the pitch remains clear.</rule>
     <rule>v0.0.030 makes striking more user-friendly: foot/hand/head ball hits have player-centered assist reach, LMB clicks buffer for a short contact window, active strike inputs suppress same-frame body bump, and body-only ball contact is smaller, softer, and less frequent.</rule>
     <rule>v0.0.031 adds server-authoritative bots that fill active player slots to four, give human/test clients active-slot priority, do not count as connectedClients, expose controller=bot snapshots, use the existing movement/combat/scoring rules, and can be tuned through /api/bot-settings plus the static bot tuning page.</rule>
-    <rule>v0.0.032 uses unsoccer/game-settings.json as the runtime tuning source, exposes GET/POST /api/game-settings plus POST /api/game-settings/reload, sends ServerState.settings/settingsRevision to clients, and ships unsoccer/client/public/game-admin.html as the compact schema-driven admin page while keeping game-settings.html as the larger legacy admin surface. New UnSoccer features with tunable gameplay/world/bot/audio/camera/lighting/prop/UI behavior must update GameSettings, DEFAULT_GAME_SETTINGS, GAME_SETTINGS_SCHEMA, game-settings.json, and the admin page contract in the same change.</rule>
+    <rule>v0.0.032 uses unsoccer/game-settings.json as the runtime tuning source, exposes GET/POST /api/game-settings plus POST /api/game-settings/reload, sends ServerState.settings/settingsRevision to clients, and ships unsoccer/client/public/game-admin.html as the compact schema-driven admin page while keeping game-settings.html as the larger legacy admin surface. New UnSoccer features with tunable gameplay/world/bot/audio/camera/lighting/prop/UI behavior must update GameSettings, DEFAULT_GAME_SETTINGS, GAME_SETTINGS_SCHEMA, game-settings.json, and the admin page contract in the same change. The settings admin is Russian-facing, GAME_SETTINGS_SCHEMA must cover every JSON/defaults key, and acceptance must prove per-key apply/readback through /api/game-settings.</rule>
     <rule>v0.0.033 adds player communication and personalization: a local-only 9-emotion mouse-wheel selector above the local player, replicated applied emotions in PlayerSnapshot.emotion, compact bottom-right chat, profile controls for nickname/skin/userPic across WebSocket and HTTP fallback, and server-authored body-side combat metadata where hand punches alternate right/left and LMB foot kicks use the current trailingFoot exposed through lastActionSide/trailingFoot/stancePhase.</rule>
+    <rule>v0.0.036+ stamina drains only from Shift sprint and incoming player-hit damage. Space jump, LMB/RMB attacks, and whiffs must never spend attacker stamina or block recovery; playerStaminaJumpCost/playerStaminaHitCost stay clamped to zero in settings.</rule>
+    <rule>v0.0.040 exposes bot runtime health through /api/health, /api/game-settings, /api/bot-settings, and browser QA datasets: active bot count, visible bot count, hidden active player count, runtime bot enablement, target fill, human clients, and test-mode state must be inspectable without guessing.</rule>
+    <rule>v0.0.041 moves HTTP fallback stale-player cleanup into runtime settings as httpClientStaleMs, exposes it through /api/health, and ragdolls zero-stamina non-ragdolled player-hit targets with hit knockback instead of letting them keep walking.</rule>
+    <rule>v0.0.042 adds websocketClientStaleMs to runtime settings and health, removes frozen WebSocket clients before bot fill, exposes desiredBotPlayers/nonBotActiveSlots/botFillSuppressionReason, and lets the client retry normal connection flow after WebSocket disconnect when auto-reconnect is enabled.</rule>
+    <rule>v0.0.043 makes off-ball fighting more reliable: RMB/head input counters are consumed only after an accepted strike or visible action, airborne LMB dash contributes swept player-hit reach when it misses the ball, and stamina still drains only from Shift plus incoming full-hit damage.</rule>
+    <rule>v0.0.044 makes bot fill self-heal during normal server ticks, requires bot combat to apply the same one-hit ragdoll knockout as human combat, and makes possessed balls drop ownership and rebound when they collide with another player.</rule>
+    <rule>v0.0.049 hardens the release gate for stamina, combat, and bots: acceptance must assert default friendly fire, one-hit knockout, zero jump cost, zero attacker hit cost, free head whiffs, and a separate non-test local server with testMode=false plus unsuppressed ten-bot fill.</rule>
+    <rule>v0.0.050 makes WebSocket leave/backfill explicit: browser pagehide sends /api/leave for WebSocket and HTTP players, /api/leave removes WebSocket players and closes their channel, and default websocketClientStaleMs is 12000 so stale human slots stop hiding bots quickly. Airborne LMB dash-kicks have wider swept player-hit reach for reliable jump knockouts. Exhausted standing players cannot own/capture the ball; high-aggression bots can finish exhausted opponents into ragdoll, while default bot combat pressure stays gated above the default aggression so bot-only football matches do not collapse.</rule>
+    <rule>v0.0.051 lets default-aggression bots visibly brawl again without breaking bot fill. botCombatAggressionThreshold, botCombatCollapseGuardRatio, and botCombatCollapseGuardMinDisabled live in game-settings.json and the admin schema, and acceptance proves one-hit bot knockout, stable bot ids, active bot fill, and no fill suppression.</rule>
+    <rule>v0.0.052 fixes point-blank no-ball strikes so overlap-range LMB/RMB contacts apply the same one-hit stamina knockout and ragdoll knockback as visible strikes. Acceptance also validates active bot ids, roles, finite playable-area positions, non-test human join backfill, and LMB+Shift possession shots with Shift remaining a strong-shot modifier.</rule>
+    <rule>Local browser play servers for UnSoccer must run without UNSOCCER_TEST_MODE; that flag is only for isolated acceptance and prevents normal default bot fill unless /api/test/bots enables it.</rule>
     <rule>tools/unsoccer_acceptance.mjs derives the expected version from package.json.games.unsoccer.version and checks HTTP fallback join/input/state.</rule>
     <rule>npm run package:unsoccer rebuilds before writing dist/unsoccer-itch.zip so stale dist output cannot become the release package.</rule>
   </game>
@@ -333,6 +375,12 @@
     <surface path="ui_designer/public_pages/unsoccer-itch-page-copy.md" role="unsoccer-itch-page-copy" />
     <surface path="ui_designer/public_pages/unsoccer-itch-publishing-checklist.md" role="unsoccer-itch-publish-checklist" />
     <surface path="ui_designer/public_pages/unsoccer-itch-assets" role="unsoccer-itch-storefront-assets" />
+    <surface path="ui_designer/public_pages/unsoccer-yandex-games-assets" role="unsoccer-yandex-games-media-pack" />
+    <surface path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md" role="unsoccer-yandex-games-upload-handoff" />
+    <surface path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="unsoccer-yandex-games-upload-handoff-current" />
+    <surface path="ui_designer/public_pages/verify-yandex-upload-pack.mjs" role="unsoccer-yandex-games-upload-pack-verifier" />
+    <surface path="ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md" role="unsoccer-vkplay-upload-handoff-current" />
+    <surface path="ui_designer/public_pages/prepare-vkplay-upload-pack.mjs" role="unsoccer-vkplay-upload-pack-generator" />
     <surface path="ui_designer/public_pages/unsoccer-ui-settings-redesign-v0.0.008.md" role="unsoccer-ui-settings-design-and-implementation-status" />
     <surface path="ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.json" role="unsoccer-ui-runtime-smoke-evidence" />
     <surface path="ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.png" role="unsoccer-ui-runtime-smoke-screenshot" />
@@ -343,7 +391,7 @@
     <rule>Orbital Courier itch upload must include vendored Three.js and must not require cdn.jsdelivr.net at runtime.</rule>
     <rule>External itch.io pages remain incomplete until the public URL, uploaded zip, exact live copy, screenshots, publication date, and version match are recorded under ui_designer/public_pages/.</rule>
   </publicSurfaces>
-  <versioning initial="v0.0.001" current="v0.0.033">
+  <versioning initial="v0.0.001" current="v0.0.052">
     <rule>Every created game starts at v0.0.001.</rule>
     <rule>Every shipped bump increments the version.</rule>
     <rule>The current version is visible in the bottom-left corner.</rule>

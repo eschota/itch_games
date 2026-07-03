@@ -1,211 +1,187 @@
 {
-  "version": "v0.0.018",
-  "mode": "mixed-free3d-autorig-local-skinned-textured-fbx-clips-11-character-controller-ik",
+  "version": "v0.0.036",
+  "mode": "free3d-local-skinned-baked-textureless-vertex-pbr-fbx-clips-10-character-controller-ik",
   "assets": [
     {
       "guid": "6299851",
       "title": "Male Soccer Player Character Rigged and Animated",
       "src": "assets/characters/free3d/6299851/rigged_unity.glb",
-      "mode": "skinned-mixamo-compatible-textured-fbx-clips",
+      "mode": "skinned-mixamo-compatible-textureless-vertex-pbr-fbx-clips",
       "heightMeters": 1.75,
       "scale": 1,
-      "textures": {
-        "albedo": "assets/characters/free3d/6299851/albedo.webp",
-        "normal": "assets/characters/free3d/6299851/normal.webp",
-        "orm": "assets/characters/free3d/6299851/orm.webp"
-      },
       "clips": {
         "idle": "assets/characters/free3d/6299851/idle.fbx",
         "walk": "assets/characters/free3d/6299851/walking.fbx",
         "run": "assets/characters/free3d/6299851/running.fbx",
         "jump": "assets/characters/free3d/6299851/jumping.fbx"
-      }
+      },
+      "texturePolicy": "baked-textureless-vertex-pbr-no-runtime-images",
+      "vertexColorAccessors": 1,
+      "runtimeTextureCount": 0,
+      "byteSize": 127516
     },
     {
       "guid": "6243756",
       "title": "Wise Owl Character Model Rigged and Animated with Textured Details",
       "src": "assets/characters/free3d/6243756/rigged_unity.glb",
-      "mode": "skinned-mixamo-compatible-textured-fbx-clips",
+      "mode": "skinned-mixamo-compatible-textureless-vertex-pbr-fbx-clips",
       "heightMeters": 1.75,
       "scale": 1,
-      "textures": {
-        "albedo": "assets/characters/free3d/6243756/albedo.webp",
-        "normal": "assets/characters/free3d/6243756/normal.webp",
-        "orm": "assets/characters/free3d/6243756/orm.webp"
-      },
       "clips": {
         "idle": "assets/characters/free3d/6243756/idle.fbx",
         "walk": "assets/characters/free3d/6243756/walking.fbx",
         "run": "assets/characters/free3d/6243756/running.fbx",
         "jump": "assets/characters/free3d/6243756/jumping.fbx"
-      }
+      },
+      "texturePolicy": "baked-textureless-vertex-pbr-no-runtime-images",
+      "vertexColorAccessors": 1,
+      "runtimeTextureCount": 0,
+      "byteSize": 163216
     },
     {
       "guid": "6270571",
       "title": "Sherlock Lion Rigged and Animated D Character Model",
       "src": "assets/characters/free3d/6270571/rigged_unity.glb",
-      "mode": "skinned-mixamo-compatible-textured-fbx-clips",
+      "mode": "skinned-mixamo-compatible-textureless-vertex-pbr-fbx-clips",
       "heightMeters": 1.75,
       "scale": 1,
-      "textures": {
-        "albedo": "assets/characters/free3d/6270571/albedo.webp",
-        "normal": "assets/characters/free3d/6270571/normal.webp",
-        "orm": "assets/characters/free3d/6270571/orm.webp"
-      },
       "clips": {
         "idle": "assets/characters/free3d/6270571/idle.fbx",
         "walk": "assets/characters/free3d/6270571/walking.fbx",
         "run": "assets/characters/free3d/6270571/running.fbx",
         "jump": "assets/characters/free3d/6270571/jumping.fbx"
-      }
+      },
+      "texturePolicy": "baked-textureless-vertex-pbr-no-runtime-images",
+      "vertexColorAccessors": 1,
+      "runtimeTextureCount": 0,
+      "byteSize": 125724
     },
     {
       "guid": "6324128",
       "title": "Animated Cute Panda Character Model Rigged and Animated",
       "src": "assets/characters/free3d/6324128/rigged_unity.glb",
-      "mode": "skinned-mixamo-compatible-textured-fbx-clips",
+      "mode": "skinned-mixamo-compatible-textureless-vertex-pbr-fbx-clips",
       "heightMeters": 1.75,
       "scale": 1,
-      "textures": {
-        "albedo": "assets/characters/free3d/6324128/albedo.webp",
-        "normal": "assets/characters/free3d/6324128/normal.webp",
-        "orm": "assets/characters/free3d/6324128/orm.webp"
-      },
       "clips": {
         "idle": "assets/characters/free3d/6324128/idle.fbx",
         "walk": "assets/characters/free3d/6324128/walking.fbx",
         "run": "assets/characters/free3d/6324128/running.fbx",
         "jump": "assets/characters/free3d/6324128/jumping.fbx"
-      }
+      },
+      "texturePolicy": "baked-textureless-vertex-pbr-no-runtime-images",
+      "vertexColorAccessors": 1,
+      "runtimeTextureCount": 0,
+      "byteSize": 124768
     },
     {
       "guid": "6244727",
       "title": "Stealthy Cyber Ninja Character Model  Rigged and Animated",
       "src": "assets/characters/free3d/6244727/rigged_unity.glb",
-      "mode": "skinned-mixamo-compatible-textured-fbx-clips",
+      "mode": "skinned-mixamo-compatible-textureless-vertex-pbr-fbx-clips",
       "heightMeters": 1.75,
       "scale": 1,
-      "textures": {
-        "albedo": "assets/characters/free3d/6244727/albedo.webp",
-        "normal": "assets/characters/free3d/6244727/normal.webp",
-        "orm": "assets/characters/free3d/6244727/orm.webp"
-      },
       "clips": {
         "idle": "assets/characters/free3d/6244727/idle.fbx",
         "walk": "assets/characters/free3d/6244727/walking.fbx",
         "run": "assets/characters/free3d/6244727/running.fbx",
         "jump": "assets/characters/free3d/6244727/jumping.fbx"
-      }
+      },
+      "texturePolicy": "baked-textureless-vertex-pbr-no-runtime-images",
+      "vertexColorAccessors": 1,
+      "runtimeTextureCount": 0,
+      "byteSize": 134064
     },
     {
       "guid": "6288738",
       "title": "Chibi Character Rigged and Animated with Colorful Jacket and Boots",
       "src": "assets/characters/free3d/6288738/rigged_unity.glb",
-      "mode": "skinned-mixamo-compatible-textured-fbx-clips",
+      "mode": "skinned-mixamo-compatible-textureless-vertex-pbr-fbx-clips",
       "heightMeters": 1.75,
       "scale": 1,
-      "textures": {
-        "albedo": "assets/characters/free3d/6288738/albedo.webp",
-        "normal": "assets/characters/free3d/6288738/normal.webp",
-        "orm": "assets/characters/free3d/6288738/orm.webp"
-      },
       "clips": {
         "idle": "assets/characters/free3d/6288738/idle.fbx",
         "walk": "assets/characters/free3d/6288738/walking.fbx",
         "run": "assets/characters/free3d/6288738/running.fbx",
         "jump": "assets/characters/free3d/6288738/jumping.fbx"
-      }
+      },
+      "texturePolicy": "baked-textureless-vertex-pbr-no-runtime-images",
+      "vertexColorAccessors": 1,
+      "runtimeTextureCount": 0,
+      "byteSize": 135328
     },
     {
       "guid": "6304269",
       "title": "Warrior Character Rigged and Animated with Armor and Mohawk",
       "src": "assets/characters/free3d/6304269/rigged_unity.glb",
-      "mode": "skinned-mixamo-compatible-textured-fbx-clips",
+      "mode": "skinned-mixamo-compatible-textureless-vertex-pbr-fbx-clips",
       "heightMeters": 1.75,
       "scale": 1,
-      "textures": {
-        "albedo": "assets/characters/free3d/6304269/albedo.webp",
-        "normal": "assets/characters/free3d/6304269/normal.webp",
-        "orm": "assets/characters/free3d/6304269/orm.webp"
-      },
       "clips": {
         "idle": "assets/characters/free3d/6304269/idle.fbx",
         "walk": "assets/characters/free3d/6304269/walking.fbx",
         "run": "assets/characters/free3d/6304269/running.fbx",
         "jump": "assets/characters/free3d/6304269/jumping.fbx"
-      }
+      },
+      "texturePolicy": "baked-textureless-vertex-pbr-no-runtime-images",
+      "vertexColorAccessors": 1,
+      "runtimeTextureCount": 0,
+      "byteSize": 132484
     },
     {
       "guid": "6298522",
       "title": "Ski Enthusiast Character Rigged and Animated for Games",
       "src": "assets/characters/free3d/6298522/rigged_unity.glb",
-      "mode": "skinned-mixamo-compatible-textured-fbx-clips",
+      "mode": "skinned-mixamo-compatible-textureless-vertex-pbr-fbx-clips",
       "heightMeters": 1.75,
       "scale": 1,
-      "textures": {
-        "albedo": "assets/characters/free3d/6298522/albedo.webp",
-        "normal": "assets/characters/free3d/6298522/normal.webp",
-        "orm": "assets/characters/free3d/6298522/orm.webp"
-      },
       "clips": {
         "idle": "assets/characters/free3d/6298522/idle.fbx",
         "walk": "assets/characters/free3d/6298522/walking.fbx",
         "run": "assets/characters/free3d/6298522/running.fbx",
         "jump": "assets/characters/free3d/6298522/jumping.fbx"
-      }
+      },
+      "texturePolicy": "baked-textureless-vertex-pbr-no-runtime-images",
+      "vertexColorAccessors": 1,
+      "runtimeTextureCount": 0,
+      "byteSize": 143012
     },
     {
       "guid": "6255142",
       "title": "Animated Pop Star Character Model Rigged and Animated",
       "src": "assets/characters/free3d/6255142/rigged_unity.glb",
-      "mode": "skinned-mixamo-compatible-textured-fbx-clips",
+      "mode": "skinned-mixamo-compatible-textureless-vertex-pbr-fbx-clips",
       "heightMeters": 1.75,
       "scale": 1,
-      "textures": {
-        "albedo": "assets/characters/free3d/6255142/albedo.webp",
-        "normal": "assets/characters/free3d/6255142/normal.webp",
-        "orm": "assets/characters/free3d/6255142/orm.webp"
-      },
       "clips": {
         "idle": "assets/characters/free3d/6255142/idle.fbx",
         "walk": "assets/characters/free3d/6255142/walking.fbx",
         "run": "assets/characters/free3d/6255142/running.fbx",
         "jump": "assets/characters/free3d/6255142/jumping.fbx"
-      }
+      },
+      "texturePolicy": "baked-textureless-vertex-pbr-no-runtime-images",
+      "vertexColorAccessors": 1,
+      "runtimeTextureCount": 0,
+      "byteSize": 154968
     },
     {
       "guid": "6294728",
       "title": "Colorful Clown Character Rigged and Animated for Games",
       "src": "assets/characters/free3d/6294728/rigged_unity.glb",
-      "mode": "skinned-mixamo-compatible-textured-fbx-clips",
+      "mode": "skinned-mixamo-compatible-textureless-vertex-pbr-fbx-clips",
       "heightMeters": 1.75,
       "scale": 1,
-      "textures": {
-        "albedo": "assets/characters/free3d/6294728/albedo.webp",
-        "normal": "assets/characters/free3d/6294728/normal.webp",
-        "orm": "assets/characters/free3d/6294728/orm.webp"
-      },
       "clips": {
         "idle": "assets/characters/free3d/6294728/idle.fbx",
         "walk": "assets/characters/free3d/6294728/walking.fbx",
         "run": "assets/characters/free3d/6294728/running.fbx",
         "jump": "assets/characters/free3d/6294728/jumping.fbx"
-      }
-    },
-    {
-      "guid": "666dc6f4-0cc4-4714-a7cf-39cfb6655fe8",
-      "title": "Pomni Censored Rigged Character",
-      "src": "assets/characters/autorig/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/animations.glb",
-      "mode": "autorig-embedded-textured-glb-fbx-preview-clips",
-      "heightMeters": 1.75,
-      "scale": 1,
-      "textureCount": 44,
-      "clips": {
-        "idle": "assets/characters/autorig/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/idle.fbx",
-        "walk": "assets/characters/autorig/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/walking.fbx",
-        "run": "assets/characters/autorig/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/running.fbx",
-        "jump": "assets/characters/autorig/666dc6f4-0cc4-4714-a7cf-39cfb6655fe8/jumping.fbx"
-      }
+      },
+      "texturePolicy": "baked-textureless-vertex-pbr-no-runtime-images",
+      "vertexColorAccessors": 1,
+      "runtimeTextureCount": 0,
+      "byteSize": 138368
     }
-  ]
+  ],
+  "texturePolicy": "Runtime character GLBs include baked COLOR_0 and TEXCOORD_1 PBR data and ship zero image textures."
 }

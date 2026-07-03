@@ -19,6 +19,14 @@ const BALL_RADIUS = DEFAULT_GAME_SETTINGS.ballRadius;
 const BALL_DENSITY = DEFAULT_GAME_SETTINGS.ballDensity;
 const BALL_RESTITUTION = DEFAULT_GAME_SETTINGS.ballRestitution;
 const PLAYER_HEIGHT = DEFAULT_GAME_SETTINGS.playerHeight;
+const PLAYER_RADIUS = DEFAULT_GAME_SETTINGS.playerRadius;
+const PLAYER_BALL_SAFE_RADIUS = PLAYER_RADIUS + BALL_RADIUS + DEFAULT_GAME_SETTINGS.playerBallCollisionSkin;
+const PLAYER_STAMINA_MAX = DEFAULT_GAME_SETTINGS.playerStaminaMax;
+const BALL_POSSESSION_CARRY_DISTANCE = DEFAULT_GAME_SETTINGS.ballPossessionCarryDistance;
+const BALL_POSSESSION_LOW_SHOT_SPEED = DEFAULT_GAME_SETTINGS.ballPossessionLowShotSpeed;
+const BALL_POSSESSION_UPPER_SHOT_LIFT = DEFAULT_GAME_SETTINGS.ballPossessionUpperShotLift;
+const BALL_POSSESSION_STRONG_MULTIPLIER = DEFAULT_GAME_SETTINGS.ballPossessionStrongMultiplier;
+const KICK_COOLDOWN_MS = DEFAULT_GAME_SETTINGS.kickCooldownMs;
 const DAY_CYCLE_SECONDS = DEFAULT_GAME_SETTINGS.dayCycleSeconds;
 const DAY_START_SECONDS = DEFAULT_GAME_SETTINGS.dayStartSeconds;
 const POST_GOAL_CELEBRATION_MS = DEFAULT_GAME_SETTINGS.postGoalCelebrationMs;
@@ -38,10 +46,90 @@ const CHARACTER_ROSTER = [
   "6304269",
   "6298522",
   "6255142",
-  "6294728",
-  "666dc6f4-0cc4-4714-a7cf-39cfb6655fe8"
+  "6294728"
 ];
 const CHARACTER_ROSTER_SET = new Set(CHARACTER_ROSTER);
+const TEXTURELESS_RUNTIME_ASSET_DIRS = [
+  path.join(ROOT, "unsoccer", "client", "public", "assets", "characters"),
+  path.join(ROOT, "unsoccer", "client", "public", "assets", "environment"),
+  path.join(ROOT, "unsoccer", "client", "public", "assets", "balls")
+];
+const BLOCKED_TEXTURE_FILE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp", ".ktx2", ".basis"]);
+
+function listFilesRecursive(root) {
+  if (!fs.existsSync(root)) return [];
+  return fs.readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
+    const fullPath = path.join(root, entry.name);
+    if (entry.isDirectory()) return listFilesRecursive(fullPath);
+    return entry.isFile() ? [fullPath] : [];
+  });
+}
+
+function readGlbJson(filePath) {
+  const data = fs.readFileSync(filePath);
+  assert.equal(data.toString("utf8", 0, 4), "glTF", `${filePath} should be GLB`);
+  let offset = 12;
+  while (offset < data.length) {
+    const length = data.readUInt32LE(offset);
+    const type = data.toString("utf8", offset + 4, offset + 8);
+    offset += 8;
+    if (type === "JSON") return JSON.parse(data.toString("utf8", offset, offset + length));
+    offset += length;
+  }
+  throw new Error(`${filePath} is missing GLB JSON chunk`);
+}
+
+function materialHasTextureReference(material) {
+  return Boolean(
+    material?.pbrMetallicRoughness?.baseColorTexture ||
+    material?.pbrMetallicRoughness?.metallicRoughnessTexture ||
+    material?.normalTexture ||
+    material?.occlusionTexture ||
+    material?.emissiveTexture
+  );
+}
+
+function glbVertexPbrProblems(gltf, filePath) {
+  const requiresPackedPbr = filePath.includes(`${path.sep}assets${path.sep}characters${path.sep}`);
+  const problems = [];
+  for (const mesh of gltf.meshes || []) {
+    for (const primitive of mesh.primitives || []) {
+      if (primitive?.attributes?.POSITION === undefined) continue;
+      if (primitive.attributes.COLOR_0 === undefined) {
+        problems.push("missing-COLOR_0");
+      }
+      if (requiresPackedPbr && primitive.attributes.TEXCOORD_1 === undefined) {
+        problems.push("missing-TEXCOORD_1");
+      }
+    }
+  }
+  return [...new Set(problems)];
+}
+
+function assertTexturelessRuntimeAssets() {
+  const files = TEXTURELESS_RUNTIME_ASSET_DIRS.flatMap(listFilesRecursive);
+  const blockedFiles = files.filter((filePath) => BLOCKED_TEXTURE_FILE_EXTENSIONS.has(path.extname(filePath).toLowerCase()));
+  assert.deepEqual(blockedFiles, [], "runtime 3D asset folders must not ship image texture files");
+
+  const badGlbs = [];
+  for (const filePath of files.filter((entry) => entry.toLowerCase().endsWith(".glb"))) {
+    const gltf = readGlbJson(filePath);
+    const hasImages = (gltf.images || []).length > 0;
+    const hasTextures = (gltf.textures || []).length > 0;
+    const hasMaterialMaps = (gltf.materials || []).some(materialHasTextureReference);
+    const vertexPbrProblems = glbVertexPbrProblems(gltf, filePath);
+    if (hasImages || hasTextures || hasMaterialMaps || vertexPbrProblems.length > 0) {
+      badGlbs.push({
+        file: path.relative(ROOT, filePath),
+        images: (gltf.images || []).length,
+        textures: (gltf.textures || []).length,
+        materialMaps: hasMaterialMaps,
+        vertexPbrProblems
+      });
+    }
+  }
+  assert.deepEqual(badGlbs, [], "runtime GLB assets must be textureless vertex/PBR assets with baked COLOR_0");
+}
 
 async function freePort() {
   return new Promise((resolve, reject) => {
@@ -130,6 +218,38 @@ function activePlayersByController(state, controller) {
   return activePlayers(state).filter((player) => player.controller === controller);
 }
 
+function botCollapseGuardLimit(settings = DEFAULT_GAME_SETTINGS, activeCount = MAX_ACTIVE_PLAYERS) {
+  return Math.max(
+    settings.botCombatCollapseGuardMinDisabled,
+    Math.floor(activeCount * settings.botCombatCollapseGuardRatio)
+  );
+}
+
+function assertActiveBotRoster(state, expectedIds, label, expectedCount = expectedIds.length) {
+  const activeBots = activePlayersByController(state, "bot");
+  assert.equal(activeBots.length, expectedCount, `${label}: active bot count should stay ${expectedCount}`);
+  if (expectedIds.length) {
+    assert.deepEqual(
+      activeBots.map((player) => player.id).sort(),
+      [...expectedIds].sort(),
+      `${label}: active bot ids should stay stable`
+    );
+  }
+  for (const bot of activeBots) {
+    assert.equal(bot.role, "player", `${label}: ${bot.id} should stay in player role`);
+    assert.ok(Number.isFinite(bot.position.x) && Number.isFinite(bot.position.y) && Number.isFinite(bot.position.z), `${label}: ${bot.id} position should stay finite`);
+    assert.ok(
+      Math.abs(bot.position.x) <= FIELD_WIDTH / 2 + 4,
+      `${label}: ${bot.id} should stay near the playable width, x=${bot.position.x}`
+    );
+    assert.ok(
+      Math.abs(bot.position.z) <= FIELD_LENGTH / 2 + GOAL_DEPTH + 4,
+      `${label}: ${bot.id} should stay near the playable length, z=${bot.position.z}`
+    );
+    assert.ok(bot.position.y >= PLAYER_HEIGHT / 2 - 0.05 && bot.position.y <= PLAYER_HEIGHT / 2 + 2.4, `${label}: ${bot.id} should stay at a visible player height, y=${bot.position.y}`);
+  }
+}
+
 function maxAudioEventId(state) {
   const ids = (state.audioEvents || []).map((event) => event.id || 0);
   return ids.length ? Math.max(...ids) : 0;
@@ -143,6 +263,19 @@ function assertAudioEvent(state, afterId, predicate, label) {
   const event = newerAudioEvents(state, afterId).find(predicate);
   assert.ok(event, `${label} audio event should exist`);
   return event;
+}
+
+function assertCoreCombatSettings(settings, label) {
+  assert.equal(settings.friendlyFireEnabled, true, `${label}: friendly fire should be enabled by default`);
+  assert.equal(settings.playerHitFullKnockoutEnabled, true, `${label}: one-hit player knockout should be enabled by default`);
+  assert.equal(settings.playerStaminaJumpCost, 0, `${label}: jump should not spend stamina`);
+  assert.equal(settings.playerStaminaHitCost, 0, `${label}: attacker hits should not spend stamina`);
+  assert.ok(
+    settings.botAggression >= settings.botCombatAggressionThreshold,
+    `${label}: default bot aggression should allow visible bot fights`
+  );
+  assert.ok(settings.botCombatCollapseGuardMinDisabled >= 1, `${label}: bot collapse guard should allow at least one knockout`);
+  assert.ok(settings.botCombatCollapseGuardRatio > 0, `${label}: bot collapse guard ratio should be positive`);
 }
 
 function webSocketUrl(baseUrl) {
@@ -201,6 +334,74 @@ async function joinWebSocketAndReadState(baseUrl, name, extraJoinData = {}) {
       reject(new Error("websocket join failed"));
     });
   });
+}
+
+async function assertProductionDefaultBotHealth() {
+  const port = await freePort();
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const settingsDir = fs.mkdtempSync(path.join(os.tmpdir(), "unsoccer-prod-settings-"));
+  const settingsFile = path.join(settingsDir, "game-settings.json");
+  fs.writeFileSync(settingsFile, `${JSON.stringify(DEFAULT_GAME_SETTINGS, null, 2)}\n`, "utf8");
+  const stdoutLines = [];
+  const stderrLines = [];
+  let exitCode = null;
+  const child = spawn(process.execPath, ["unsoccer/server/dist/index.js"], {
+    cwd: ROOT,
+    env: {
+      ...process.env,
+      UNSOCCER_PORT: String(port),
+      UNSOCCER_LOCAL_ICE: "1",
+      UNSOCCER_GAME_SETTINGS_FILE: settingsFile,
+      UNSOCCER_TEST_MODE: ""
+    },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
+  child.stdout.on("data", (chunk) => stdoutLines.push(String(chunk).trim()));
+  child.stderr.on("data", (chunk) => stderrLines.push(String(chunk).trim()));
+  child.once("exit", (code) => {
+    exitCode = code;
+  });
+
+  try {
+    const health = await waitForHealth(baseUrl, () => exitCode, stderrLines);
+    assert.equal(health.version, EXPECTED_GAME_VERSION, "non-test server should expose the current game version");
+    assert.equal(health.testMode, false, "local play smoke should run without UNSOCCER_TEST_MODE");
+    assert.equal(health.botsRuntimeEnabled, true, "non-test default server should have runtime bots enabled");
+    assert.equal(health.botFillSuppressionReason, "none", "non-test default server should not suppress bot fill");
+    assert.equal(health.desiredBotPlayers, MAX_ACTIVE_PLAYERS, "non-test default server should desire a full bot match");
+    assert.equal(health.activeBotPlayers, MAX_ACTIVE_PLAYERS, "non-test default server should spawn visible active bots");
+    assert.equal(health.activePlayers, MAX_ACTIVE_PLAYERS, "non-test default server should fill all active slots");
+    assert.equal(health.connectedClients, 0, "default bot fill should not consume connected client capacity");
+
+    const joinResponse = await fetch(`${baseUrl}/api/join`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "NonTestHuman" })
+    });
+    const joinPayload = await joinResponse.json();
+    assert.equal(joinResponse.ok, true, "non-test human join should succeed");
+    assert.equal(joinPayload.joined.version, EXPECTED_GAME_VERSION, "non-test human join should expose the current game version");
+    const stateResponse = await fetch(`${baseUrl}/api/state?clientId=${encodeURIComponent(joinPayload.joined.id)}`);
+    const statePayload = await stateResponse.json();
+    assert.equal(stateResponse.ok, true, "non-test state should be available for the joined human");
+    assert.equal(activePlayersByController(statePayload.state, "human").length, 1, "non-test human should occupy one active slot");
+    assertActiveBotRoster(
+      statePayload.state,
+      activePlayersByController(statePayload.state, "bot").map((player) => player.id),
+      "non-test human join bot fill",
+      MAX_ACTIVE_PLAYERS - 1
+    );
+    const joinedHealth = await (await fetch(`${baseUrl}/api/health`)).json();
+    assert.equal(joinedHealth.activeBotPlayers, MAX_ACTIVE_PLAYERS - 1, "non-test health should show bot backfill after human join");
+    assert.equal(joinedHealth.activePlayers, MAX_ACTIVE_PLAYERS, "non-test human plus bots should keep the active roster full");
+    assert.equal(joinedHealth.botFillSuppressionReason, "none", "non-test human join should not suppress bot fill");
+  } finally {
+    await stopServer(child);
+    fs.rmSync(settingsDir, { recursive: true, force: true });
+  }
 }
 
 async function assertWebSocketChatEmotion(baseUrl) {
@@ -288,6 +489,110 @@ async function assertHttpFallback(api) {
   await api("POST", "/api/leave", { clientId: join.joined.id });
   state = (await api("GET", "/api/test/state")).state;
   assert.ok(!state.players.some((player) => player.id === join.joined.id), "http fallback leave should remove player");
+}
+
+async function assertWebSocketLeaveApiBackfillsBots(api, baseUrl) {
+  await api("POST", "/api/test/bots", {
+    enabled: true,
+    settings: deterministicBotSettings({ targetActivePlayers: MAX_ACTIVE_PLAYERS })
+  });
+  let state = (await api("GET", "/api/test/state")).state;
+  assert.equal(activePlayersByController(state, "bot").length, MAX_ACTIVE_PLAYERS, "websocket leave fixture should start with full bot fill");
+
+  const ws = new WebSocket(webSocketUrl(baseUrl));
+  let joined = null;
+  try {
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error("websocket leave join timed out"));
+      }, 3500);
+      ws.addEventListener("open", () => {
+        ws.send(JSON.stringify({ event: "join", data: { name: "WsLeave" } }));
+      });
+      ws.addEventListener("message", (event) => {
+        const message = JSON.parse(String(event.data));
+        if (message.event !== "joined") return;
+        joined = message.data;
+        clearTimeout(timer);
+        resolve();
+      });
+      ws.addEventListener("error", () => {
+        clearTimeout(timer);
+        reject(new Error("websocket leave join failed"));
+      });
+    });
+    assert.ok(joined?.id, "websocket leave fixture should receive joined id");
+    state = (await api("GET", "/api/test/state")).state;
+    assert.ok(state.players.some((player) => player.id === joined.id && player.controller === "human"), "websocket join should occupy one human slot");
+    assert.equal(activePlayersByController(state, "bot").length, MAX_ACTIVE_PLAYERS - 1, "websocket human should temporarily displace one bot");
+
+    await api("POST", "/api/leave", { clientId: joined.id });
+    state = (await api("GET", "/api/test/state")).state;
+    assert.ok(!state.players.some((player) => player.id === joined.id), "websocket leave API should remove websocket player immediately");
+    assert.equal(activePlayersByController(state, "bot").length, MAX_ACTIVE_PLAYERS, "websocket leave API should immediately backfill the bot slot");
+    const health = await api("GET", "/api/health");
+    assert.equal(health.activeBotPlayers, MAX_ACTIVE_PLAYERS, "health should show full bot fill after websocket leave");
+    assert.equal(health.botFillSuppressionReason, "none", "websocket leave should not leave bot fill suppressed");
+  } finally {
+    ws.close();
+  }
+}
+
+async function assertHttpFingerprintAndPlayerGoals(api) {
+  await api("POST", "/api/test/players", { count: 0 });
+  await api("POST", "/api/test/reset", {});
+  await api("POST", "/api/test/bots", { enabled: false });
+
+  const clientFingerprint = "acceptance-player-goals-fingerprint";
+  const join = await api("POST", "/api/join", {
+    name: "GoalOwner",
+    clientFingerprint,
+    profile: {
+      nickname: "GoalOwner",
+      skinId: CHARACTER_ROSTER[0],
+      userPic: "GO"
+    }
+  });
+  const playerId = join.joined.id;
+  assert.equal(playerAt(join.state, join.joined.index).goals, 0, "new player should start with zero personal goals");
+
+  await api("POST", "/api/test/reset", {});
+  await api("POST", `/api/test/player/${join.joined.index}`, {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    velocity: { x: 0, y: 0, z: 0 },
+    yaw: 0,
+    input: inputState({ kickLeft: 1 })
+  });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 0.95 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  await api("POST", "/api/test/tick", { frames: 2 });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: FIELD_LENGTH / 2 - 0.05 },
+    velocity: { x: 0, y: 0, z: 10 }
+  });
+  let state = (await api("POST", "/api/test/tick", { frames: 8 })).state;
+  assert.equal(state.score.blue, 1, "blue score should increment after owned kick crosses orange goal");
+  let player = state.players.find((candidate) => candidate.id === playerId);
+  assert.ok(player, "scoring player should remain in state");
+  assert.equal(player.goals, 1, "scoring player should receive a personal goal");
+
+  await api("POST", "/api/leave", { clientId: playerId });
+  const rejoin = await api("POST", "/api/join", {
+    name: "GoalOwner",
+    clientFingerprint,
+    profile: {
+      nickname: "GoalOwner",
+      skinId: CHARACTER_ROSTER[0],
+      userPic: "GO"
+    }
+  });
+  assert.equal(rejoin.joined.id, playerId, "same browser fingerprint should restore player id");
+  player = rejoin.state.players.find((candidate) => candidate.id === playerId);
+  assert.ok(player, "fingerprint-restored player should be visible after rejoin");
+  assert.equal(player.goals, 1, "same browser fingerprint should preserve personal goal count");
+  await api("POST", "/api/leave", { clientId: playerId });
 }
 
 async function assertCommunicationProfileAndCombatSides(api, baseUrl) {
@@ -420,6 +725,28 @@ async function assertGameSettingsApi(api, baseUrl, settingsFile) {
   assert.equal(initial.settings.maxActivePlayers, DEFAULT_GAME_SETTINGS.maxActivePlayers, "settings should load active player limit from JSON");
   assert.equal(initial.state.settingsRevision, initial.revision, "state should expose the active settings revision");
   assert.equal(initial.state.settings.playerSpeed, initial.settings.playerSpeed, "state should carry active runtime settings to clients");
+  assert.equal(
+    initial.schema.find((item) => item.key === "playerStaminaJumpCost")?.max,
+    0,
+    "admin schema should keep jump stamina cost locked to zero"
+  );
+  assert.equal(
+    initial.schema.find((item) => item.key === "playerStaminaHitCost")?.max,
+    0,
+    "admin schema should keep attacker hit stamina cost locked to zero"
+  );
+  assert.ok(
+    initial.schema.some((item) => item.key === "botCombatAggressionThreshold"),
+    "admin schema should expose bot combat aggression threshold"
+  );
+  assert.ok(
+    initial.schema.some((item) => item.key === "botCombatCollapseGuardRatio"),
+    "admin schema should expose bot combat collapse guard ratio"
+  );
+  assert.ok(
+    initial.schema.some((item) => item.key === "botCombatCollapseGuardMinDisabled"),
+    "admin schema should expose bot combat collapse guard minimum"
+  );
 
   await api("POST", "/api/test/players", { count: 0 });
   for (const item of initial.schema) {
@@ -431,6 +758,16 @@ async function assertGameSettingsApi(api, baseUrl, settingsFile) {
     assertSettingValue(readBack.settings[key], testValue, `game settings GET should read back ${key}`);
   }
 
+  await api("POST", "/api/game-settings", { settings: DEFAULT_GAME_SETTINGS });
+
+  let staminaCostPayload = await api("POST", "/api/game-settings", {
+    settings: {
+      playerStaminaJumpCost: 50,
+      playerStaminaHitCost: 50
+    }
+  });
+  assert.equal(staminaCostPayload.settings.playerStaminaJumpCost, 0, "game settings should clamp jump stamina cost to zero");
+  assert.equal(staminaCostPayload.settings.playerStaminaHitCost, 0, "game settings should clamp attacker hit stamina cost to zero");
   await api("POST", "/api/game-settings", { settings: DEFAULT_GAME_SETTINGS });
 
   let payload = await api("POST", "/api/game-settings", {
@@ -550,6 +887,9 @@ async function assertBotsFillAndDisplace(api) {
 
   const joinOne = await api("POST", "/api/join", { name: "Human One" });
   state = joinOne.state;
+  const afterJoinOneBotIds = new Set(activePlayersByController(state, "bot").map((player) => player.id));
+  const displacedByJoinOne = [...firstBotIds].filter((id) => !afterJoinOneBotIds.has(id));
+  assert.equal(displacedByJoinOne.length, 1, "one human join should displace exactly one bot into the dormant pool");
   assert.equal(activePlayers(state).length, MAX_ACTIVE_PLAYERS, "one human plus bots should still fill ten active slots");
   assert.equal(activePlayersByController(state, "human").length, 1, "one joined human should be active");
   assert.equal(activePlayersByController(state, "bot").length, MAX_ACTIVE_PLAYERS - 1, "one joined human should remove one bot");
@@ -561,24 +901,69 @@ async function assertBotsFillAndDisplace(api) {
   let health = await api("GET", "/api/health");
   assert.equal(health.connectedClients, 1, "bots should not consume connected client capacity");
   assert.equal(health.activePlayers, MAX_ACTIVE_PLAYERS, "health activePlayers should include bots filling the match");
+  assert.equal(health.humanClients, 1, "health should expose human client count separately from bots");
+  assert.equal(health.botPlayers, MAX_ACTIVE_PLAYERS - 1, "health should expose total bot runtimes");
+  assert.equal(health.activeBotPlayers, MAX_ACTIVE_PLAYERS - 1, "health should expose active bot count");
+  assert.equal(health.dormantBotPlayers, 1, "health should expose one displaced dormant bot after one human joins");
+  assert.equal(health.invalidActiveBotPlayers, 0, "health should report no active bot body mismatches");
+  assert.equal(health.desiredBotPlayers, MAX_ACTIVE_PLAYERS - 1, "health should expose desired bot count after one human joins");
+  assert.equal(health.nonBotActiveSlots, 1, "health should expose non-bot active slot pressure");
+  assert.equal(health.botFillSuppressionReason, "none", "health should explain that bot fill is not suppressed");
+  assert.equal(health.botsRuntimeEnabled, true, "health should expose bot runtime enablement");
+  assert.equal(health.botTargetActivePlayers, MAX_ACTIVE_PLAYERS, "health should expose target bot fill");
+  assert.equal(health.httpClientStaleMs, DEFAULT_GAME_SETTINGS.httpClientStaleMs, "health should expose the active HTTP stale timeout");
+  assert.equal(health.websocketClientStaleMs, DEFAULT_GAME_SETTINGS.websocketClientStaleMs, "health should expose the active WebSocket stale timeout");
+  assert.equal(health.testMode, true, "acceptance server should expose test-mode state");
 
   const joinTwo = await api("POST", "/api/join", { name: "Human Two" });
   state = joinTwo.state;
+  const afterJoinTwoBotIds = new Set(activePlayersByController(state, "bot").map((player) => player.id));
+  const displacedByJoinTwo = [...afterJoinOneBotIds].filter((id) => !afterJoinTwoBotIds.has(id));
+  assert.equal(displacedByJoinTwo.length, 1, "second human join should displace one more bot");
   assert.equal(activePlayers(state).length, MAX_ACTIVE_PLAYERS, "two humans plus bots should still fill ten active slots");
   assert.equal(activePlayersByController(state, "human").length, 2, "two joined humans should be active");
   assert.equal(activePlayersByController(state, "bot").length, MAX_ACTIVE_PLAYERS - 2, "two joined humans should leave eight active bots");
   health = await api("GET", "/api/health");
   assert.equal(health.connectedClients, 2, "health connectedClients should count humans only");
+  assert.equal(health.activeBotPlayers, MAX_ACTIVE_PLAYERS - 2, "health activeBotPlayers should follow human displacement");
 
   await api("POST", "/api/leave", { clientId: joinOne.joined.id });
   state = (await api("GET", "/api/test/state")).state;
+  const afterLeaveOneBotIds = new Set(activePlayersByController(state, "bot").map((player) => player.id));
   assert.equal(activePlayersByController(state, "human").length, 1, "leaving one human should remove that human");
   assert.equal(activePlayersByController(state, "bot").length, MAX_ACTIVE_PLAYERS - 1, "leaving one human should backfill one bot");
+  assert.ok(afterLeaveOneBotIds.has(displacedByJoinTwo[0]), "first leave should reuse the most recently displaced bot id");
 
   await api("POST", "/api/leave", { clientId: joinTwo.joined.id });
   state = (await api("GET", "/api/test/state")).state;
+  const afterLeaveTwoBotIds = new Set(activePlayersByController(state, "bot").map((player) => player.id));
   assert.equal(activePlayersByController(state, "human").length, 0, "all humans should be gone after leave");
   assert.equal(activePlayersByController(state, "bot").length, MAX_ACTIVE_PLAYERS, "bot-only fill should restore ten active bots");
+  assert.ok(afterLeaveTwoBotIds.has(displacedByJoinOne[0]), "second leave should reuse the remaining displaced bot id");
+  health = await api("GET", "/api/health");
+  assert.ok(health.botReuseCount >= 2, `bot reuse counter should record human leave backfill, got ${health.botReuseCount}`);
+  assert.equal(health.dormantBotPlayers, 0, "fully restored bot match should drain the dormant bot pool");
+  assert.equal(health.invalidActiveBotPlayers, 0, "fully restored bot match should keep active bot bodies valid");
+
+  await api("POST", "/api/bot-settings", {
+    settings: deterministicBotSettings({ targetActivePlayers: MAX_ACTIVE_PLAYERS })
+  });
+  await api("POST", "/api/game-settings", { settings: { httpClientStaleMs: 3000 } });
+  const staleJoin = await api("POST", "/api/join", { name: "Stale Human" });
+  state = staleJoin.state;
+  assert.equal(activePlayersByController(state, "human").length, 1, "stale fixture should start with one human");
+  assert.equal(activePlayersByController(state, "bot").length, MAX_ACTIVE_PLAYERS - 1, "human slot should still leave the rest of the match filled by bots");
+  state = (await api("POST", "/api/test/tick", { frames: 600 })).state;
+  assert.equal(activePlayersByController(state, "human").length, 0, "stale HTTP player should be removed without leaving a ghost slot");
+  assert.equal(activePlayersByController(state, "bot").length, MAX_ACTIVE_PLAYERS, "bots should immediately backfill after stale HTTP cleanup");
+  health = await api("GET", "/api/health");
+  assert.equal(health.connectedClients, 0, "stale HTTP cleanup should remove disconnected humans from connected client health");
+  assert.equal(health.desiredBotPlayers, MAX_ACTIVE_PLAYERS, "stale cleanup should make health desire a full bot match again");
+  assert.equal(health.nonBotActiveSlots, 0, "stale cleanup should remove non-bot active slot pressure");
+  assert.equal(health.botFillSuppressionReason, "none", "stale cleanup should leave bot fill unsuppressed");
+  assert.equal(health.httpClientStaleMs, 3000, "health should expose the shortened HTTP stale timeout used by the bot backfill guard");
+  assert.equal(health.websocketClientStaleMs, DEFAULT_GAME_SETTINGS.websocketClientStaleMs, "HTTP stale cleanup should preserve the WebSocket stale timeout setting");
+  await api("POST", "/api/game-settings", { settings: DEFAULT_GAME_SETTINGS });
 }
 
 async function assertBotsFight(api) {
@@ -604,7 +989,7 @@ async function assertBotsFight(api) {
   });
   await api("POST", "/api/test/player/1", {
     position: { x: 0.15, y: PLAYER_HEIGHT / 2, z: 1.05 },
-    stamina: 36,
+    stamina: PLAYER_STAMINA_MAX,
     yaw: Math.PI,
     input: inputState()
   });
@@ -623,10 +1008,8 @@ async function assertBotsFight(api) {
     [attacker.lastAction, target.lastAction].some((action) => ["hand", "left", "head"].includes(action)),
     "close opposing bots should use active combat actions"
   );
-  assert.ok(
-    attacker.stamina < 100 || target.stamina < 36 || attacker.ragdoll || target.ragdoll,
-    "bot combat should change stamina or ragdoll state"
-  );
+  assert.equal(target.stamina, 0, "bot combat should apply the same one-hit stamina knockout as human combat");
+  assert.equal(target.ragdoll, true, "bot combat should put the target into ragdoll on one-hit knockout");
   assertAudioEvent(
     state,
     beforeAudioId,
@@ -678,14 +1061,233 @@ async function assertSupportBotsPressureOpponents(api) {
     "non-primary support bot should actively fight an opponent threatening the ball"
   );
   assert.ok(
-    support.stamina < 100 || target.stamina < 100 || support.ragdoll || target.ragdoll,
-    "support pressure should spend stamina or damage the opponent through combat"
+    target.stamina < 100 || target.ragdoll,
+    "support pressure should damage or ragdoll the opponent through combat"
   );
   assertAudioEvent(
     state,
     beforeAudioId,
     (event) => event.kind === "kick" && ["hand", "left", "head"].includes(event.kick) && event.playerId === supportId,
     "support bot pressure combat"
+  );
+}
+
+async function assertAggressiveBotsPressureOffBall(api) {
+  let state = await enableBotMatch(api, {
+    targetActivePlayers: MAX_ACTIVE_PLAYERS,
+    aggression: 0.55,
+    fightDistance: 1.72,
+    supportReleaseDistance: 2.65,
+    handIntervalMs: 260,
+    kickIntervalMs: 240,
+    headIntervalMs: 360,
+    jumpChance: 0
+  });
+  const enforcerId = playerAt(state, 2).id;
+  const targetId = playerAt(state, 3).id;
+  await api("POST", "/api/test/ball", {
+    position: { x: 12, y: BALL_RADIUS + 0.04, z: 22 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  const placements = [
+    { index: 0, x: 11.2, z: 20.9, yaw: 0 },
+    { index: 1, x: -12, z: -20, yaw: Math.PI },
+    { index: 2, x: 0, z: 0, yaw: 0 },
+    { index: 3, x: 0.12, z: 1.08, yaw: Math.PI },
+    { index: 4, x: -9, z: -10, yaw: 0 },
+    { index: 5, x: 9, z: 10, yaw: Math.PI },
+    { index: 6, x: -11, z: -14, yaw: 0 },
+    { index: 7, x: 11, z: 14, yaw: Math.PI },
+    { index: 8, x: -13, z: -18, yaw: 0 },
+    { index: 9, x: 13, z: 18, yaw: Math.PI }
+  ];
+  for (const placement of placements) {
+    await api("POST", `/api/test/player/${placement.index}`, {
+      position: { x: placement.x, y: PLAYER_HEIGHT / 2, z: placement.z },
+      velocity: { x: 0, y: 0, z: 0 },
+      stamina: 100,
+      ragdoll: false,
+      grounded: true,
+      verticalVelocity: 0,
+      yaw: placement.yaw,
+      input: inputState()
+    });
+  }
+  state = (await api("GET", "/api/test/state")).state;
+  const beforeAudioId = maxAudioEventId(state);
+  state = (await api("POST", "/api/test/tick", { frames: 40 })).state;
+  const enforcer = state.players.find((player) => player.id === enforcerId);
+  const target = state.players.find((player) => player.id === targetId);
+  assert.ok(enforcer && target, "off-ball enforcer actors should remain in state");
+  assert.ok(
+    speed2({ x: state.ball.position.x - enforcer.position.x, z: state.ball.position.z - enforcer.position.z }) > 10,
+    "enforcer pressure fixture should keep the fighter far from the ball"
+  );
+  assert.ok(
+    ["hand", "left", "head"].includes(enforcer.lastAction),
+    "aggressive enforcer bot should fight a nearby opponent instead of chasing the distant ball"
+  );
+  assert.ok(
+    target.stamina < 100 || target.ragdoll,
+    "off-ball enforcer pressure should damage or ragdoll the opponent"
+  );
+  const enforcerAudioEvent = newerAudioEvents(state, beforeAudioId).find(
+    (event) => event.kind === "kick" && ["hand", "left", "head"].includes(event.kick) && event.playerId === enforcerId
+  ) || (state.audioEvents || []).find(
+    (event) => event.kind === "kick"
+      && ["hand", "left", "head"].includes(event.kick)
+      && event.playerId === enforcerId
+      && event.serverTime === enforcer.lastActionAt
+  );
+  assert.ok(enforcerAudioEvent, "off-ball enforcer combat audio event should exist");
+}
+
+async function assertLowStaminaBotCombatAndFill(api) {
+  let state = await enableBotMatch(api, {
+    targetActivePlayers: MAX_ACTIVE_PLAYERS,
+    aggression: 1,
+    fightDistance: 1.95,
+    handIntervalMs: 220,
+    kickIntervalMs: 220,
+    headIntervalMs: 360,
+    jumpChance: 0
+  });
+  const attackerId = playerAt(state, 0).id;
+  const targetId = playerAt(state, 1).id;
+  const initialBotIds = activePlayersByController(state, "bot").map((player) => player.id).sort();
+  await api("POST", "/api/test/ball", {
+    position: { x: 13, y: BALL_RADIUS + 0.04, z: 18 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  const placements = [
+    { index: 0, x: 0, z: 0, stamina: 5, yaw: 0 },
+    { index: 1, x: 0.14, z: 1.06, stamina: PLAYER_STAMINA_MAX, yaw: Math.PI },
+    { index: 2, x: -9, z: -10, stamina: PLAYER_STAMINA_MAX, yaw: 0 },
+    { index: 3, x: 9, z: 10, stamina: PLAYER_STAMINA_MAX, yaw: Math.PI },
+    { index: 4, x: -11, z: -14, stamina: PLAYER_STAMINA_MAX, yaw: 0 },
+    { index: 5, x: 11, z: 14, stamina: PLAYER_STAMINA_MAX, yaw: Math.PI },
+    { index: 6, x: -13, z: -18, stamina: PLAYER_STAMINA_MAX, yaw: 0 },
+    { index: 7, x: 13, z: 18, stamina: PLAYER_STAMINA_MAX, yaw: Math.PI },
+    { index: 8, x: -15, z: -21, stamina: PLAYER_STAMINA_MAX, yaw: 0 },
+    { index: 9, x: 15, z: 21, stamina: PLAYER_STAMINA_MAX, yaw: Math.PI }
+  ];
+  for (const placement of placements) {
+    await api("POST", `/api/test/player/${placement.index}`, {
+      position: { x: placement.x, y: PLAYER_HEIGHT / 2, z: placement.z },
+      stamina: placement.stamina,
+      ragdoll: false,
+      grounded: true,
+      verticalVelocity: 0,
+      yaw: placement.yaw,
+      input: inputState()
+    });
+  }
+  state = (await api("GET", "/api/test/state")).state;
+  const beforeAudioId = maxAudioEventId(state);
+  state = (await api("POST", "/api/test/tick", { frames: 12 })).state;
+  const attacker = state.players.find((player) => player.id === attackerId);
+  const target = state.players.find((player) => player.id === targetId);
+  assert.ok(attacker && target, "low-stamina bot combat actors should remain in state");
+  assert.ok(
+    ["hand", "left", "head"].includes(attacker.lastAction),
+    "low-stamina bot should still throw a free combat strike when not exhausted"
+  );
+  assert.ok(
+    attacker.stamina >= 5,
+    `low-stamina bot strike should not spend attacker stamina, got ${attacker.stamina}`
+  );
+  assert.equal(target.stamina, 0, "low-stamina bot strike should still fully knock out the target");
+  assert.equal(target.ragdoll, true, "low-stamina bot strike should ragdoll the target");
+  assertActiveBotRoster(state, initialBotIds, "bot combat immediate roster");
+  const lowStaminaCombatEvent = newerAudioEvents(state, beforeAudioId).find(
+    (event) => event.kind === "kick" && ["hand", "left", "head"].includes(event.kick) && event.playerId === attackerId
+  ) || (state.audioEvents || []).find(
+    (event) => event.kind === "kick"
+      && ["hand", "left", "head"].includes(event.kick)
+      && event.playerId === attackerId
+      && event.serverTime === attacker.lastActionAt
+  );
+  assert.ok(lowStaminaCombatEvent, "low-stamina bot combat audio event should exist");
+
+  state = (await api("POST", "/api/test/tick", { frames: 240 })).state;
+  const health = await api("GET", "/api/health");
+  assertActiveBotRoster(state, initialBotIds, "bot combat recovery roster");
+  assert.equal(health.activeBotPlayers, MAX_ACTIVE_PLAYERS, "health should still expose a full active bot roster");
+  assert.equal(health.botFillSuppressionReason, "none", "combat should not create bot-fill suppression");
+}
+
+async function assertBotsFinishExhaustedTargets(api) {
+  let state = await enableBotMatch(api, {
+    targetActivePlayers: 4,
+    aggression: 1,
+    fightDistance: 1.95,
+    handIntervalMs: 220,
+    kickIntervalMs: 220,
+    headIntervalMs: 360,
+    jumpChance: 0
+  });
+  const attackerId = playerAt(state, 0).id;
+  const targetId = playerAt(state, 1).id;
+  const initialBotIds = activePlayersByController(state, "bot").map((player) => player.id).sort();
+  await api("POST", "/api/test/ball", {
+    position: { x: 10, y: BALL_RADIUS + 0.04, z: 18 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: PLAYER_STAMINA_MAX,
+    ragdoll: false,
+    grounded: true,
+    verticalVelocity: 0,
+    yaw: 0,
+    input: inputState()
+  });
+  await api("POST", "/api/test/player/1", {
+    position: { x: 0.12, y: PLAYER_HEIGHT / 2, z: 1.05 },
+    velocity: { x: 0, y: 0, z: 0 },
+    stamina: 0,
+    ragdoll: false,
+    grounded: true,
+    verticalVelocity: 0,
+    yaw: Math.PI,
+    input: inputState()
+  });
+  for (const index of [2, 3]) {
+    await api("POST", `/api/test/player/${index}`, {
+      position: { x: index === 2 ? -9 : 9, y: PLAYER_HEIGHT / 2, z: -12 },
+      stamina: PLAYER_STAMINA_MAX,
+      ragdoll: false,
+      input: inputState()
+    });
+  }
+  state = (await api("GET", "/api/test/state")).state;
+  const beforeAudioId = maxAudioEventId(state);
+  const exhaustedTargetBefore = state.players.find((player) => player.id === targetId);
+  assert.ok(exhaustedTargetBefore?.exhausted, "bot finish fixture should start with an exhausted target");
+  assert.equal(exhaustedTargetBefore.ragdoll, false, "bot finish fixture should start before ragdoll");
+  state = (await api("POST", "/api/test/tick", { frames: 16 })).state;
+  const attacker = state.players.find((player) => player.id === attackerId);
+  const target = state.players.find((player) => player.id === targetId);
+  assert.ok(attacker && target, "bot exhausted-target actors should remain in state");
+  assert.ok(
+    ["hand", "left", "head"].includes(attacker.lastAction),
+    "bot should still attack an exhausted opponent until it is knocked into ragdoll"
+  );
+  assert.equal(target.stamina, 0, "exhausted target should remain fully drained after bot finish hit");
+  assert.equal(target.ragdoll, true, "bot should finish an exhausted standing target into ragdoll");
+  assert.deepEqual(
+    activePlayersByController(state, "bot").map((player) => player.id).sort(),
+    initialBotIds,
+    "bot finish hit should not remove or replace active bots"
+  );
+  const health = await api("GET", "/api/health");
+  assert.equal(health.activeBotPlayers, 4, "bot finish fixture should keep its requested active bot count");
+  assert.equal(health.botFillSuppressionReason, "none", "bot finish hit should not suppress bot fill");
+  assertAudioEvent(
+    state,
+    beforeAudioId,
+    (event) => event.kind === "kick" && ["hand", "left", "head"].includes(event.kick) && event.playerId === attackerId,
+    "bot exhausted-target finish"
   );
 }
 
@@ -703,27 +1305,110 @@ async function assertDefaultBotsProduceGoal(api) {
     enabled: true,
     settings: defaults
   })).state;
+  const initialBotIds = activePlayersByController(state, "bot").map((player) => player.id).sort();
+  assert.equal(initialBotIds.length, MAX_ACTIVE_PLAYERS, "default bot scenario should start with ten bot players");
+  assertActiveBotRoster(state, initialBotIds, "default bot match initial roster");
   const beforeAudioId = maxAudioEventId(state);
   for (let second = 0; second < 16; second += 1) {
     state = (await api("POST", "/api/test/tick", { frames: 60 })).state;
+    assertActiveBotRoster(state, initialBotIds, "default bot match simulated roster");
     if (state.score.blue + state.score.orange > 0) break;
   }
   assert.ok(state.score.blue + state.score.orange > 0, "default bot match should produce a first goal");
-  assert.equal(activePlayersByController(state, "bot").length, MAX_ACTIVE_PLAYERS, "default bot match should keep ten bot players active");
+  assertActiveBotRoster(state, initialBotIds, "default bot match final roster");
   assert.ok(
     activePlayersByController(state, "bot").every((player) => !/^bot\b/i.test(player.name)),
     "default bot match should expose player-like names"
   );
-  assert.equal(
-    activePlayers(state).filter((player) => player.ragdoll || player.exhausted).length,
-    0,
-    "default bot match should score without stamina exhaustion or ragdoll collapse"
+  assert.ok(
+    activePlayers(state).filter((player) => player.ragdoll || player.exhausted).length <= botCollapseGuardLimit(),
+    "default bot match should stay under the configured combat collapse guard"
   );
   assertAudioEvent(
     state,
     beforeAudioId,
     (event) => event.kind === "goal",
     "default bot match goal"
+  );
+}
+
+async function assertDefaultBotsCanBrawlWithoutRosterCollapse(api) {
+  let state = await enableBotMatch(api, {
+    targetActivePlayers: 4,
+    aggression: DEFAULT_GAME_SETTINGS.botAggression,
+    fightDistance: DEFAULT_GAME_SETTINGS.botFightDistance,
+    shootDistance: DEFAULT_GAME_SETTINGS.botShootDistance,
+    chaseDistance: DEFAULT_GAME_SETTINGS.botChaseDistance,
+    sprintDistance: DEFAULT_GAME_SETTINGS.botSprintDistance,
+    shotAlignmentMin: DEFAULT_GAME_SETTINGS.botShotAlignmentMin,
+    supportReleaseDistance: DEFAULT_GAME_SETTINGS.botSupportReleaseDistance,
+    handIntervalMs: 260,
+    kickIntervalMs: 240,
+    headIntervalMs: 360,
+    jumpChance: 0
+  });
+  const attackerId = playerAt(state, 0).id;
+  const targetId = playerAt(state, 1).id;
+  const initialBotIds = activePlayersByController(state, "bot").map((player) => player.id).sort();
+  await api("POST", "/api/test/ball", {
+    position: { x: 10, y: BALL_RADIUS + 0.04, z: 18 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: PLAYER_STAMINA_MAX,
+    ragdoll: false,
+    grounded: true,
+    verticalVelocity: 0,
+    yaw: 0,
+    input: inputState()
+  });
+  await api("POST", "/api/test/player/1", {
+    position: { x: 0.15, y: PLAYER_HEIGHT / 2, z: 1.05 },
+    stamina: PLAYER_STAMINA_MAX,
+    ragdoll: false,
+    grounded: true,
+    verticalVelocity: 0,
+    yaw: Math.PI,
+    input: inputState()
+  });
+  for (const index of [2, 3]) {
+    await api("POST", `/api/test/player/${index}`, {
+      position: { x: index === 2 ? -8 : 8, y: PLAYER_HEIGHT / 2, z: index === 2 ? -10 : 10 },
+      stamina: PLAYER_STAMINA_MAX,
+      ragdoll: false,
+      input: inputState()
+    });
+  }
+  state = (await api("GET", "/api/test/state")).state;
+  const beforeAudioId = maxAudioEventId(state);
+  state = (await api("POST", "/api/test/tick", { frames: 14 })).state;
+  const attacker = state.players.find((player) => player.id === attackerId);
+  const target = state.players.find((player) => player.id === targetId);
+  assert.ok(attacker && target, "default bot brawl actors should remain in state");
+  assert.ok(
+    ["hand", "left", "head"].includes(attacker.lastAction),
+    "default-aggression bot should use an active combat strike when an opponent blocks its route"
+  );
+  assert.ok(
+    attacker.stamina >= PLAYER_STAMINA_MAX - 8,
+    `default bot combat should not spend attacker stamina beyond incidental sprint drain, got ${attacker.stamina}`
+  );
+  assert.equal(target.stamina, 0, "default bot combat should fully drain target stamina");
+  assert.equal(target.ragdoll, true, "default bot combat should ragdoll the target");
+  assertActiveBotRoster(state, initialBotIds, "default bot combat roster");
+  assert.ok(
+    activePlayers(state).filter((player) => player.ragdoll || player.exhausted).length <= botCollapseGuardLimit(DEFAULT_GAME_SETTINGS, 4),
+    "default bot combat should respect the configured collapse guard"
+  );
+  const health = await api("GET", "/api/health");
+  assert.equal(health.activeBotPlayers, 4, "default brawl fixture should keep requested active bots");
+  assert.equal(health.botFillSuppressionReason, "none", "default brawl should not suppress bot fill");
+  assertAudioEvent(
+    state,
+    beforeAudioId,
+    (event) => event.kind === "kick" && ["hand", "left", "head"].includes(event.kick) && event.playerId === attackerId,
+    "default bot combat"
   );
 }
 
@@ -741,10 +1426,12 @@ async function assertBotScoresForTeam(api, team) {
   const attackDirection = team === 0 ? 1 : -1;
   const ballZ = attackDirection > 0 ? FIELD_LENGTH / 2 - 2.1 : -FIELD_LENGTH / 2 + 2.1;
   const botZ = ballZ - attackDirection * 1.08;
-  for (const index of [0, 1, 2, 3]) {
+  const activeIndexes = activePlayers(state).map((player) => player.index);
+  assert.ok(activeIndexes.includes(scorerIndex), `team-${team} scorer should be active before bot scoring fixture`);
+  for (const index of activeIndexes) {
     await api("POST", `/api/test/player/${index}`, {
       position: {
-        x: index === scorerIndex ? 0 : (index === 2 ? -9 : 9),
+        x: index === scorerIndex ? 0 : (index % 2 === 0 ? -9 : 9),
         y: PLAYER_HEIGHT / 2,
         z: index === scorerIndex ? botZ : -attackDirection * 10
       },
@@ -808,6 +1495,7 @@ function deterministicBotSettings(patch = {}) {
 }
 
 async function main() {
+  assertTexturelessRuntimeAssets();
   const port = await freePort();
   const baseUrl = `http://127.0.0.1:${port}`;
   const settingsDir = fs.mkdtempSync(path.join(os.tmpdir(), "unsoccer-settings-"));
@@ -854,6 +1542,8 @@ async function main() {
     const health = await waitForHealth(baseUrl, () => exitCode, stderrLines);
     assert.equal(health.ok, true);
     assert.equal(health.version, EXPECTED_GAME_VERSION);
+    const initialSettingsPayload = await api("GET", "/api/game-settings");
+    assertCoreCombatSettings(initialSettingsPayload.settings, "initial game settings");
 
     let state = (await api("GET", "/api/test/state")).state;
     const beforeProbeAudioId = maxAudioEventId(state);
@@ -877,14 +1567,21 @@ async function main() {
     );
 
     await assertHttpFallback(api);
+    await assertWebSocketLeaveApiBackfillsBots(api, baseUrl);
+    await assertHttpFingerprintAndPlayerGoals(api);
     await assertCommunicationProfileAndCombatSides(api, baseUrl);
     await assertBotSettingsCors(baseUrl);
     await assertGameSettingsApi(api, baseUrl, settingsFile);
     await assertBotsFillAndDisplace(api);
     await assertBotsFight(api);
     await assertSupportBotsPressureOpponents(api);
+    await assertAggressiveBotsPressureOffBall(api);
+    await assertLowStaminaBotCombatAndFill(api);
+    await assertBotsFinishExhaustedTargets(api);
     await assertBotsScoreBothTeams(api);
+    await assertDefaultBotsCanBrawlWithoutRosterCollapse(api);
     await assertDefaultBotsProduceGoal(api);
+    await assertProductionDefaultBotHealth();
     await api("POST", "/api/test/bots", { enabled: false });
     await api("POST", "/api/test/weather", { kind: "dawn" });
 
@@ -913,6 +1610,12 @@ async function main() {
     await assertPlayerHitStamina(api);
     await assertEmptySpaceStrikeVisuals(api);
     await assertGoalPostAndBouncePhysics(api);
+    await assertPlayerBallSolidCollision(api);
+    await assertBallPossessionAndContextShots(api);
+    await assertExhaustedPlayersCannotPossessBall(api);
+    await assertPossessedBallHitsOtherPlayers(api);
+    await assertFullKnockoutFriendlyFireAndJumpDash(api);
+    await assertPlayerHitVerticalReach(api);
 
     await assertKick(api, "left", { x: -0.34, y: BALL_RADIUS + 0.04, z: 1.0 }, { kickLeft: 1 });
     await assertKick(api, "hand", { x: 0.34, y: BALL_RADIUS + 0.04, z: 1.0 }, { kickRight: 1 });
@@ -924,6 +1627,7 @@ async function main() {
     await assertJumpClearsGroundBall(api);
     await assertHeadRequiresReachableHeight(api);
 
+    await api("POST", "/api/game-settings", { settings: { ballPossessionEnabled: false } });
     state = await prepareSinglePlayer(api);
     const bodyPlayerId = playerAt(state, 0).id;
     await api("POST", "/api/test/player/0", {
@@ -947,6 +1651,7 @@ async function main() {
       (event) => event.kind === "kick" && event.kick === "body" && event.playerId === bodyPlayerId && event.speed > 0,
       "body contact"
     );
+    await api("POST", "/api/game-settings", { settings: { ballPossessionEnabled: true } });
 
     await api("POST", "/api/test/players", { count: 4 });
     state = (await api("POST", "/api/test/reset", {})).state;
@@ -1041,10 +1746,13 @@ async function main() {
       port,
       version: health.version,
       checks: [
+        "textureless runtime 3D assets",
         "health",
         "websocket no-join has no phantom roster audio",
         "websocket join audioEvents",
         "http fallback join/input/state",
+        "websocket leave API immediately backfills bots",
+        "browser fingerprint rejoin and per-player goal counter",
         "communication profile chat emotion and side-aware combat",
         "runtime game settings API/schema/clamp/reload",
         "bot settings CORS and apply endpoint",
@@ -1053,18 +1761,30 @@ async function main() {
         "bots do not consume connected client capacity",
         "bot AI fighting through server combat",
         "support bot pressure fighting through server combat",
+        "aggressive off-ball bots pressure opponents",
+        "low-stamina bots keep free combat and full roster",
+        "bots finish exhausted standing targets into ragdoll",
         "bot-only scoring fixtures for blue and orange",
+        "default-aggression bots can brawl without roster collapse",
         "default bot match produces a first goal without collapse",
+        "default bot roster remains present and stable",
+        "non-test default server keeps bot fill enabled and unsuppressed",
         "11-client role assignment",
         "random non-repeating ready character assignment",
         "team-relative WASD movement",
         "smoothed keyboard axes and acceleration",
         "player movement beyond pitch bounds",
         "authoritative day start and weather controls",
-        "sprint stamina, jump, and ragdoll exhaustion",
+        "sprint stamina, jump, and exhaustion without ragdoll",
         "player hit stamina damage and ragdoll knockout",
         "thin post rebound and bouncier ball",
         "balanced half-size ball impulses",
+        "ball possession carry and context low/upper shots",
+        "possession LMB cooldown retry",
+        "exhausted players cannot capture or keep ball possession",
+        "possessed ball collides with other players and drops ownership",
+        "full knockout friendly fire and airborne dash kick",
+        "player hit vertical reach gate",
         "left kick",
         "hand hit",
         "head hit",
@@ -1075,6 +1795,7 @@ async function main() {
         "airborne body clearance",
         "head height gate",
         "body contact",
+        "solid player-ball collision and fast-ball blocker rebound",
         "delayed goal celebration and smooth ball return",
         "post-goal scoring team celebrations",
         "server audioEvents roster",
@@ -1215,10 +1936,12 @@ async function assertSprintAndJump(api) {
 
   await api("POST", "/api/test/player/0", {
     position: { x: -2, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: 100,
     input: inputState({ up: true })
   });
   let state = (await api("POST", "/api/test/tick", { frames: 30 })).state;
   const walkZ = playerAt(state, 0).position.z;
+  assert.equal(playerAt(state, 0).stamina, 100, "normal movement without Shift should not spend stamina");
 
   await api("POST", "/api/test/player/0", {
     position: { x: 2, y: PLAYER_HEIGHT / 2, z: 0 },
@@ -1229,12 +1952,14 @@ async function assertSprintAndJump(api) {
   const sprinter = playerAt(state, 0);
   assert.ok(sprinter.position.z > walkZ + 1.1, "sprint should move farther than walking over the same frames");
   assert.ok(sprinter.stamina < 100, "sprint should drain stamina");
+  assert.ok(sprinter.stamina > 80, `sprint should drain stamina gradually, got ${sprinter.stamina}`);
   assert.equal(sprinter.sprinting, true, "snapshot should mark sprinting players");
 
+  await api("POST", "/api/test/reset", {});
   const beforeJumpAudioId = maxAudioEventId(state);
   await api("POST", "/api/test/player/0", {
     position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
-    stamina: 100,
+    stamina: 80,
     grounded: true,
     verticalVelocity: 0,
     input: inputState({ jump: 1 })
@@ -1243,7 +1968,7 @@ async function assertSprintAndJump(api) {
   const jumper = playerAt(state, 0);
   assert.ok(jumper.position.y > PLAYER_HEIGHT / 2 + 0.15, "jump should raise the player");
   assert.equal(jumper.airborne, true, "jumping player should be airborne in snapshot");
-  assert.ok(jumper.stamina < 100, "jump should spend stamina");
+  assert.ok(jumper.stamina > 80, `jump should not spend stamina or block recovery, got ${jumper.stamina}`);
   assertAudioEvent(state, beforeJumpAudioId, (event) => event.kind === "kick" && event.kick === "jump", "jump");
 
   await api("POST", "/api/test/player/0", {
@@ -1256,12 +1981,51 @@ async function assertSprintAndJump(api) {
   });
   state = (await api("POST", "/api/test/tick", { frames: 14 })).state;
   const collapsedSprinter = playerAt(state, 0);
-  assert.equal(collapsedSprinter.ragdoll, true, "sprint exhaustion should activate ragdoll");
-  assert.ok(collapsedSprinter.ragdollAt > 0, "ragdoll snapshot should expose activation time");
-  assert.ok(collapsedSprinter.position.z > 0.45, "ragdoll should preserve previous forward inertia");
+  assert.equal(collapsedSprinter.exhausted, true, "sprint exhaustion should mark player exhausted");
+  assert.equal(collapsedSprinter.ragdoll, false, "sprint exhaustion should not activate ragdoll");
+  assert.equal(collapsedSprinter.ragdollAt, 0, "sprint exhaustion should not expose a ragdoll activation time");
+  assert.ok(collapsedSprinter.position.z > 0.45, "exhausted sprint should preserve previous forward inertia");
+
+  await api("POST", "/api/test/players", { count: 2 });
+  state = (await api("POST", "/api/test/reset", {})).state;
+  const exhaustedTargetId = playerAt(state, 1).id;
+  await api("POST", "/api/test/ball", {
+    position: { x: 14, y: BALL_RADIUS + 0.04, z: 18 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: 0,
+    grounded: true,
+    verticalVelocity: 0,
+    yaw: 0,
+    input: inputState({ jump: 2, kickLeft: 2, kickLeftHeld: true, kickRight: 2, head: 2 })
+  });
+  await api("POST", "/api/test/player/1", {
+    position: { x: 0.15, y: PLAYER_HEIGHT / 2, z: 1.05 },
+    stamina: PLAYER_STAMINA_MAX,
+    yaw: Math.PI,
+    input: inputState()
+  });
+  const beforeExhaustedAudioId = maxAudioEventId(state);
+  state = (await api("POST", "/api/test/tick", { frames: 4 })).state;
+  const exhaustedActor = playerAt(state, 0);
+  const exhaustedTarget = state.players.find((player) => player.id === exhaustedTargetId);
+  assert.ok(exhaustedTarget, "exhausted combat target should remain in state");
+  assert.equal(exhaustedActor.exhausted, true, "zero-stamina player should remain exhausted during blocked inputs");
+  assert.ok(exhaustedActor.position.y <= PLAYER_HEIGHT / 2 + 0.03, "exhausted player should not jump from buffered input");
+  assert.equal(exhaustedActor.lastAction, null, "exhausted player should not publish combat actions");
+  assert.equal(exhaustedTarget.stamina, PLAYER_STAMINA_MAX, "exhausted player should not damage nearby players");
+  assert.equal(exhaustedTarget.ragdoll, false, "exhausted player should not ragdoll nearby players");
+  assert.ok(
+    !newerAudioEvents(state, beforeExhaustedAudioId).some((event) => event.kind === "kick" && event.playerId === exhaustedActor.id),
+    "exhausted blocked inputs should not emit kick audio"
+  );
 }
 
 async function assertPlayerHitStamina(api) {
+  const combatSettings = await api("POST", "/api/game-settings", { settings: DEFAULT_GAME_SETTINGS });
+  assertCoreCombatSettings(combatSettings.settings, "player-hit stamina fixture");
   await api("POST", "/api/test/players", { count: 2 });
   let state = (await api("POST", "/api/test/reset", {})).state;
   const targetId = playerAt(state, 1).id;
@@ -1281,21 +2045,76 @@ async function assertPlayerHitStamina(api) {
     input: inputState({ kickRight: 1 })
   });
   state = (await api("POST", "/api/test/tick", { frames: 3 })).state;
+  const attacker = playerAt(state, 0);
   const target = state.players.find((player) => player.id === targetId);
   assert.ok(target, "hit target should remain in state");
-  assert.equal(playerAt(state, 0).lastAction, "hand");
-  assert.ok(target.stamina < 16, "hand hit should drain target stamina");
+  assert.equal(attacker.lastAction, "hand");
+  assert.equal(attacker.stamina, 100, "attacker should not spend stamina when punching by default");
+  assert.equal(target.stamina, 0, "hand hit should fully drain target stamina by default");
   assert.equal(target.exhausted, true, "target should become exhausted at zero stamina");
   assert.equal(target.ragdoll, true, "target should ragdoll when a hit empties stamina");
   assert.ok(target.ragdollAt > 0, "hit ragdoll should expose activation time");
   assert.ok(target.velocity.z > 7.5, `hit ragdoll should get a heavy forward knockback, got z=${target.velocity.z}`);
   assert.ok(target.velocity.y > 2.2, `hit ragdoll should lift the target, got y=${target.velocity.y}`);
+
+  await api("POST", "/api/test/players", { count: 2 });
+  state = (await api("POST", "/api/test/reset", {})).state;
+  const exhaustedTargetId = playerAt(state, 1).id;
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: 100,
+    yaw: 0,
+    input: inputState()
+  });
+  await api("POST", "/api/test/player/1", {
+    position: { x: 0.2, y: PLAYER_HEIGHT / 2, z: 1.05 },
+    stamina: 0,
+    ragdoll: false,
+    yaw: Math.PI,
+    input: inputState()
+  });
+  await api("POST", "/api/test/player/0", {
+    input: inputState({ kickRight: 1 })
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 3 })).state;
+  const exhaustedTarget = state.players.find((player) => player.id === exhaustedTargetId);
+  assert.ok(exhaustedTarget, "zero-stamina hit target should remain in state");
+  assert.equal(playerAt(state, 0).stamina, 100, "attacker should not spend stamina when hitting a zero-stamina target");
+  assert.equal(exhaustedTarget.ragdoll, true, "hit should ragdoll a zero-stamina target that was not already ragdolled");
+  assert.ok(exhaustedTarget.velocity.z > 7.5, `zero-stamina ragdoll hit should still knock target forward, got z=${exhaustedTarget.velocity.z}`);
+
+  await api("POST", "/api/test/players", { count: 2 });
+  state = (await api("POST", "/api/test/reset", {})).state;
+  const overlapTargetId = playerAt(state, 1).id;
+  await api("POST", "/api/test/ball", {
+    position: { x: 14, y: BALL_RADIUS + 0.04, z: 18 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: PLAYER_STAMINA_MAX,
+    yaw: 0,
+    input: inputState({ kickRight: 1 })
+  });
+  await api("POST", "/api/test/player/1", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: PLAYER_STAMINA_MAX,
+    yaw: Math.PI,
+    input: inputState()
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 4 })).state;
+  const overlapTarget = state.players.find((player) => player.id === overlapTargetId);
+  assert.ok(overlapTarget, "overlap hit target should remain in state");
+  assert.equal(playerAt(state, 0).lastAction, "hand", "overlap RMB should still publish a hand strike");
+  assert.equal(overlapTarget.stamina, 0, "overlap-range hand hit should fully drain target stamina");
+  assert.equal(overlapTarget.ragdoll, true, "overlap-range hand hit should ragdoll the target");
 }
 
 async function assertEmptySpaceStrikeVisuals(api) {
   for (const strike of [
-    { kind: "hand", input: { kickRight: 1 } },
-    { kind: "left", input: { kickLeft: 1 } }
+    { kind: "hand", input: { kickRight: 1 }, visible: true },
+    { kind: "left", input: { kickLeft: 1 }, visible: true },
+    { kind: "head", input: { head: 1 }, visible: false }
   ]) {
     await api("POST", "/api/test/players", { count: 1 });
     let state = (await api("POST", "/api/test/reset", {})).state;
@@ -1305,23 +2124,38 @@ async function assertEmptySpaceStrikeVisuals(api) {
       velocity: { x: 0, y: 0, z: 0 }
     });
     const beforeAudioId = maxAudioEventId(state);
+    const whiffStartStamina = 60;
     await api("POST", "/api/test/player/0", {
       position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
-      stamina: 100,
+      stamina: whiffStartStamina,
       yaw: 0,
       input: inputState(strike.input)
     });
     state = (await api("POST", "/api/test/tick", { frames: 3 })).state;
     const player = playerAt(state, 0);
-    assert.equal(player.lastAction, strike.kind, `${strike.kind} whiff should still replicate a visible action`);
-    assert.ok(player.lastActionAt > 0, `${strike.kind} whiff should expose action timing`);
-    assert.ok(player.stamina < 100, `${strike.kind} whiff should spend stamina`);
-    assertAudioEvent(
-      state,
-      beforeAudioId,
-      (event) => event.kind === "kick" && event.kick === strike.kind && event.playerId === player.id,
-      `${strike.kind} whiff`
+    if (strike.visible) {
+      assert.equal(player.lastAction, strike.kind, `${strike.kind} whiff should still replicate a visible action`);
+      assert.ok(player.lastActionAt > 0, `${strike.kind} whiff should expose action timing`);
+    } else {
+      assert.notEqual(player.lastAction, "body", `${strike.kind} whiff should not fall through into passive body contact`);
+    }
+    assert.ok(
+      player.stamina > whiffStartStamina,
+      `${strike.kind} whiff should not spend stamina or block recovery, got ${player.stamina}`
     );
+    if (strike.visible) {
+      assertAudioEvent(
+        state,
+        beforeAudioId,
+        (event) => event.kind === "kick" && event.kick === strike.kind && event.playerId === player.id,
+        `${strike.kind} whiff`
+      );
+    } else {
+      assert.ok(
+        !newerAudioEvents(state, beforeAudioId).some((event) => event.kind === "kick" && event.playerId === player.id),
+        `${strike.kind} empty-space whiff should not emit a fake kick audio event`
+      );
+    }
   }
 }
 
@@ -1356,12 +2190,403 @@ async function assertGoalPostAndBouncePhysics(api) {
   assert.equal(BALL_DENSITY, 3.6, "half-size ball should keep the old effective mass through higher density");
 }
 
+async function assertPlayerBallSolidCollision(api) {
+  await api("POST", "/api/test/players", { count: 1 });
+  let state = (await api("POST", "/api/test/reset", {})).state;
+  await api("POST", "/api/test/weather", { kind: "clear" });
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    velocity: { x: 0, y: 0, z: 0 },
+    yaw: 0,
+    input: inputState({ up: true })
+  });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: PLAYER_BALL_SAFE_RADIUS - 0.06 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 10 })).state;
+  assert.ok(
+    state.ball.position.z > PLAYER_BALL_SAFE_RADIUS,
+    `walking player should push the ball instead of passing through it; z=${state.ball.position.z}`
+  );
+  assert.ok(
+    speed2(state.ball.velocity) > 0.2,
+    `player body collision should give the ball visible velocity, got ${speed2(state.ball.velocity)}`
+  );
+
+  await api("POST", "/api/test/players", { count: 2 });
+  state = (await api("POST", "/api/test/reset", {})).state;
+  const blockerId = playerAt(state, 1).id;
+  await api("POST", "/api/test/player/1", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    velocity: { x: 0, y: 0, z: 0 },
+    yaw: Math.PI,
+    input: inputState()
+  });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: -1.35 },
+    velocity: { x: 0, y: 0, z: 170 }
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 1 })).state;
+  assert.ok(
+    state.ball.position.z < -PLAYER_BALL_SAFE_RADIUS + 0.12,
+    `fast ball should be kept on the incoming side of the blocker; z=${state.ball.position.z}`
+  );
+  assert.ok(
+    state.ball.velocity.z < -40,
+    `fast ball should rebound from the blocker instead of tunneling through; vz=${state.ball.velocity.z}`
+  );
+  assert.equal(
+    playerAt(state, 1).id,
+    blockerId,
+    "blocker should remain the same player after ball collision"
+  );
+}
+
+async function assertBallPossessionAndContextShots(api) {
+  const possessionCooldownMs = Math.max(KICK_COOLDOWN_MS, 1000);
+  await api("POST", "/api/game-settings", {
+    settings: { ...DEFAULT_GAME_SETTINGS, kickCooldownMs: possessionCooldownMs }
+  });
+  await api("POST", "/api/test/players", { count: 1 });
+  let state = (await api("POST", "/api/test/reset", {})).state;
+  const ownerId = playerAt(state, 0).id;
+  await api("POST", "/api/test/weather", { kind: "clear" });
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: 70,
+    yaw: 0,
+    input: inputState({ up: true })
+  });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 0.72 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 6 })).state;
+  assert.equal(state.ball.ownerPlayerId, ownerId, "near slow ground ball should attach to the player as possession");
+  const owner = playerAt(state, 0);
+  assert.ok(
+    Math.abs(state.ball.position.z - (owner.position.z + BALL_POSSESSION_CARRY_DISTANCE)) < 0.18,
+    "owned ball should stay carried in front of the player"
+  );
+  state = (await api("POST", "/api/test/tick", { frames: 18 })).state;
+  const movingOwner = playerAt(state, 0);
+  assert.equal(state.ball.ownerPlayerId, ownerId, "possession should stay with the player while dribbling before a shot");
+  assert.ok(
+    Math.abs(state.ball.position.z - (movingOwner.position.z + BALL_POSSESSION_CARRY_DISTANCE)) < 0.22,
+    "owned ball should keep following the player's carry point until a shot releases it"
+  );
+
+  await api("POST", "/api/test/player/0", { input: inputState({ kickLeft: 1 }) });
+  state = (await api("POST", "/api/test/tick", { frames: 2 })).state;
+  assert.equal(state.ball.ownerPlayerId, null, "LMB low shot should release possession");
+  assert.equal(playerAt(state, 0).lastAction, "left", "LMB possession shot should replicate as a foot action");
+  assert.ok(playerAt(state, 0).stamina >= 70, "LMB possession shot should not spend attacker stamina");
+  assert.ok(
+    state.ball.velocity.z > BALL_POSSESSION_LOW_SHOT_SPEED * 0.75,
+    `low possession shot should drive the ball forward, got vz=${state.ball.velocity.z}`
+  );
+  assert.ok(
+    state.ball.velocity.y < 1.2,
+    `low possession shot should stay low, got vy=${state.ball.velocity.y}`
+  );
+
+  await api("POST", "/api/test/reset", {});
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: 70,
+    yaw: 0,
+    input: inputState({ up: true })
+  });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 0.72 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 6 })).state;
+  assert.equal(state.ball.ownerPlayerId, ownerId, "player should be able to regain possession for a strong low shot");
+  await api("POST", "/api/test/player/0", { input: inputState({ kickLeft: 2, sprint: true }) });
+  state = (await api("POST", "/api/test/tick", { frames: 2 })).state;
+  assert.equal(state.ball.ownerPlayerId, null, "LMB+Shift strong low shot should release possession");
+  assert.equal(playerAt(state, 0).lastAction, "left", "LMB+Shift possession shot should replicate as a foot action");
+  assert.ok(playerAt(state, 0).stamina >= 70, "LMB+Shift shot should not spend attacker stamina unless Shift is driving movement drain");
+  assert.ok(
+    state.ball.velocity.z > BALL_POSSESSION_LOW_SHOT_SPEED * BALL_POSSESSION_STRONG_MULTIPLIER * 0.72,
+    `LMB+Shift low shot should be substantially stronger, got vz=${state.ball.velocity.z}`
+  );
+
+  const cooldownOwner = playerAt(state, 0);
+  await api("POST", "/api/test/ball", {
+    position: {
+      x: cooldownOwner.position.x,
+      y: BALL_RADIUS + 0.04,
+      z: cooldownOwner.position.z + BALL_POSSESSION_CARRY_DISTANCE * 0.72
+    },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 6 })).state;
+  assert.equal(state.ball.ownerPlayerId, ownerId, "player should quickly regain possession for a cooldown retry check");
+  await api("POST", "/api/test/player/0", { input: inputState({ kickLeft: 3 }) });
+  state = (await api("POST", "/api/test/tick", { frames: 2 })).state;
+  assert.equal(state.ball.ownerPlayerId, ownerId, "LMB possession shot should wait while the kick cooldown is active");
+  state = (await api("POST", "/api/test/tick", {
+    frames: Math.ceil((possessionCooldownMs + 80) / (1000 / 60))
+  })).state;
+  assert.equal(state.ball.ownerPlayerId, null, "LMB possession shot should retry and release after the cooldown expires");
+  assert.equal(playerAt(state, 0).lastAction, "left", "retried LMB possession shot should replicate as a foot action");
+
+  await api("POST", "/api/test/reset", {});
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: 70,
+    yaw: 0,
+    input: inputState({ up: true })
+  });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 0.72 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 6 })).state;
+  assert.equal(state.ball.ownerPlayerId, ownerId, "player should be able to regain possession for an upper shot");
+  await api("POST", "/api/test/player/0", { input: inputState({ kickRight: 1, sprint: true }) });
+  state = (await api("POST", "/api/test/tick", { frames: 2 })).state;
+  assert.equal(state.ball.ownerPlayerId, null, "RMB upper shot should release possession");
+  assert.equal(playerAt(state, 0).lastAction, "hand", "RMB possession shot should keep the existing right-button action channel");
+  assert.ok(playerAt(state, 0).stamina >= 70, "RMB possession shot should not spend attacker stamina");
+  assert.ok(
+    state.ball.velocity.z > BALL_POSSESSION_LOW_SHOT_SPEED * 0.95,
+    `Shift upper shot should be stronger than a normal low drive, got vz=${state.ball.velocity.z}`
+  );
+  assert.ok(
+    state.ball.velocity.y > BALL_POSSESSION_UPPER_SHOT_LIFT * BALL_POSSESSION_STRONG_MULTIPLIER * 0.5,
+    `RMB upper shot should lift the ball, got vy=${state.ball.velocity.y}`
+  );
+}
+
+async function assertExhaustedPlayersCannotPossessBall(api) {
+  await api("POST", "/api/game-settings", { settings: DEFAULT_GAME_SETTINGS });
+  await api("POST", "/api/test/players", { count: 1 });
+  let state = (await api("POST", "/api/test/reset", {})).state;
+  const exhaustedPlayerId = playerAt(state, 0).id;
+  await api("POST", "/api/test/weather", { kind: "clear" });
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    velocity: { x: 0, y: 0, z: 0 },
+    stamina: 0,
+    ragdoll: false,
+    grounded: true,
+    verticalVelocity: 0,
+    yaw: 0,
+    input: inputState({ up: true })
+  });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 0.72 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 8 })).state;
+  const exhaustedPlayer = state.players.find((player) => player.id === exhaustedPlayerId);
+  assert.ok(exhaustedPlayer, "exhausted possession fixture player should remain in state");
+  assert.equal(exhaustedPlayer.ragdoll, false, "exhausted non-ragdoll player should remain standing for the possession gate");
+  assert.equal(exhaustedPlayer.exhausted, true, "zero-stamina player should still be exhausted during the possession gate");
+  assert.equal(state.ball.ownerPlayerId, null, "exhausted player should not capture or keep possession of a nearby slow ball");
+
+  await api("POST", "/api/test/player/0", {
+    stamina: PLAYER_STAMINA_MAX,
+    input: inputState({ up: true })
+  });
+  await api("POST", "/api/test/ball", {
+    position: { x: exhaustedPlayer.position.x, y: BALL_RADIUS + 0.04, z: exhaustedPlayer.position.z + 0.72 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 8 })).state;
+  assert.equal(state.ball.ownerPlayerId, exhaustedPlayerId, "same player should regain normal possession after stamina recovers");
+}
+
+async function assertPossessedBallHitsOtherPlayers(api) {
+  await api("POST", "/api/game-settings", { settings: DEFAULT_GAME_SETTINGS });
+  await api("POST", "/api/test/players", { count: 2 });
+  let state = (await api("POST", "/api/test/reset", {})).state;
+  await api("POST", "/api/test/weather", { kind: "clear" });
+  const ownerId = playerAt(state, 0).id;
+  const blockerId = playerAt(state, 1).id;
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    velocity: { x: 0, y: 0, z: 0 },
+    stamina: PLAYER_STAMINA_MAX,
+    yaw: 0,
+    input: inputState({ up: true })
+  });
+  await api("POST", "/api/test/player/1", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 1.46 },
+    velocity: { x: 0, y: 0, z: 0 },
+    stamina: PLAYER_STAMINA_MAX,
+    yaw: Math.PI,
+    input: inputState()
+  });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 0.72 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 8 })).state;
+  const blocker = state.players.find((player) => player.id === blockerId);
+  assert.ok(blocker, "possession blocker should remain in state");
+  assert.equal(
+    state.ball.ownerPlayerId,
+    null,
+    "owned ball should drop possession when it hits another player's body"
+  );
+  assert.ok(
+    state.ball.position.z < blocker.position.z - PLAYER_BALL_SAFE_RADIUS + 0.18,
+    `owned ball should stay on the incoming side of the blocker; ball=${state.ball.position.z}, blocker=${blocker.position.z}`
+  );
+  assert.ok(
+    state.ball.velocity.z < -0.2,
+    `owned ball should rebound from the blocker instead of passing through; vz=${state.ball.velocity.z}`
+  );
+  assert.equal(
+    playerAt(state, 0).id,
+    ownerId,
+    "possession owner should remain active after losing the ball to a blocker"
+  );
+}
+
+async function assertFullKnockoutFriendlyFireAndJumpDash(api) {
+  const combatSettings = await api("POST", "/api/game-settings", { settings: DEFAULT_GAME_SETTINGS });
+  assertCoreCombatSettings(combatSettings.settings, "friendly-fire knockout fixture");
+  await api("POST", "/api/test/players", { count: 2 });
+  let state = (await api("POST", "/api/test/reset", {})).state;
+  const groundedFootTargetId = playerAt(state, 1).id;
+  await api("POST", "/api/test/weather", { kind: "clear" });
+  await api("POST", "/api/test/ball", {
+    position: { x: 14, y: BALL_RADIUS + 0.04, z: 18 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: PLAYER_STAMINA_MAX,
+    yaw: 0,
+    input: inputState()
+  });
+  await api("POST", "/api/test/player/1", {
+    position: { x: 0.1, y: PLAYER_HEIGHT / 2, z: 1.15 },
+    stamina: PLAYER_STAMINA_MAX,
+    yaw: Math.PI,
+    input: inputState()
+  });
+  await api("POST", "/api/test/player/0", { input: inputState({ kickLeft: 1 }) });
+  state = (await api("POST", "/api/test/tick", { frames: 4 })).state;
+  let attacker = playerAt(state, 0);
+  const groundedFootTarget = state.players.find((player) => player.id === groundedFootTargetId);
+  assert.ok(groundedFootTarget, "grounded LMB target should remain in state");
+  assert.equal(attacker.lastAction, "left", "grounded no-ball LMB should replicate as a foot strike");
+  assert.equal(attacker.stamina, PLAYER_STAMINA_MAX, "grounded no-ball LMB should not spend attacker stamina by default");
+  assert.equal(groundedFootTarget.stamina, 0, "grounded no-ball LMB should fully drain target stamina");
+  assert.equal(groundedFootTarget.ragdoll, true, "grounded no-ball LMB should ragdoll the target");
+
+  await api("POST", "/api/test/players", { count: 3 });
+  state = (await api("POST", "/api/test/reset", {})).state;
+  const teammateId = playerAt(state, 2).id;
+  await api("POST", "/api/test/weather", { kind: "clear" });
+  await api("POST", "/api/test/ball", {
+    position: { x: 14, y: BALL_RADIUS + 0.04, z: 18 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: PLAYER_STAMINA_MAX,
+    yaw: 0,
+    input: inputState()
+  });
+  await api("POST", "/api/test/player/2", {
+    position: { x: 0.15, y: PLAYER_HEIGHT / 2, z: 1.05 },
+    stamina: PLAYER_STAMINA_MAX,
+    yaw: Math.PI,
+    input: inputState()
+  });
+  await api("POST", "/api/test/player/0", { input: inputState({ kickRight: 1 }) });
+  state = (await api("POST", "/api/test/tick", { frames: 4 })).state;
+  attacker = playerAt(state, 0);
+  const teammate = state.players.find((player) => player.id === teammateId);
+  assert.ok(teammate, "friendly-fire target should remain in state");
+  assert.equal(teammate.team, playerAt(state, 0).team, "test target should be a teammate");
+  assert.equal(attacker.lastAction, "hand", "grounded no-ball RMB should replicate as a hand strike");
+  assert.equal(attacker.stamina, PLAYER_STAMINA_MAX, "grounded no-ball RMB should not spend attacker stamina by default");
+  assert.equal(teammate.stamina, 0, "default friendly-fire hit should fully drain teammate stamina");
+  assert.equal(teammate.ragdoll, true, "one hit should put teammate into ragdoll");
+  assert.ok(teammate.velocity.z > 7.5, `friendly-fire ragdoll should be knocked forward, got z=${teammate.velocity.z}`);
+
+  await api("POST", "/api/test/players", { count: 2 });
+  state = (await api("POST", "/api/test/reset", {})).state;
+  const airborneTargetId = playerAt(state, 1).id;
+  await api("POST", "/api/test/ball", {
+    position: { x: 14, y: BALL_RADIUS + 0.04, z: 18 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2 + 0.95, z: 0 },
+    velocity: { x: 0, y: 0, z: 0 },
+    grounded: false,
+    verticalVelocity: 0,
+    stamina: PLAYER_STAMINA_MAX,
+    yaw: 0,
+    input: inputState({ kickLeft: 1 })
+  });
+  await api("POST", "/api/test/player/1", {
+    position: { x: 0.08, y: PLAYER_HEIGHT / 2, z: 3.65 },
+    stamina: PLAYER_STAMINA_MAX,
+    yaw: Math.PI,
+    input: inputState()
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 8 })).state;
+  attacker = playerAt(state, 0);
+  const airborneTarget = state.players.find((player) => player.id === airborneTargetId);
+  assert.ok(airborneTarget, "airborne kick target should remain in state");
+  assert.equal(attacker.lastAction, "left", "airborne LMB should replicate as a foot kick");
+  assert.ok(attacker.velocity.z > 4, `airborne foot kick should dash attacker forward, got z=${attacker.velocity.z}`);
+  assert.equal(airborneTarget.stamina, 0, "airborne dash kick should sweep forward and fully drain target stamina");
+  assert.equal(airborneTarget.ragdoll, true, "airborne dash kick should ragdoll target");
+  assert.ok(airborneTarget.velocity.z > 7.5, `airborne dash kick should knock target forward, got z=${airborneTarget.velocity.z}`);
+}
+
+async function assertPlayerHitVerticalReach(api) {
+  await api("POST", "/api/game-settings", { settings: DEFAULT_GAME_SETTINGS });
+  await api("POST", "/api/test/players", { count: 2 });
+  let state = (await api("POST", "/api/test/reset", {})).state;
+  const targetId = playerAt(state, 1).id;
+  await api("POST", "/api/test/weather", { kind: "clear" });
+  await api("POST", "/api/test/ball", {
+    position: { x: 14, y: BALL_RADIUS + 0.04, z: 18 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: PLAYER_STAMINA_MAX,
+    yaw: 0,
+    input: inputState()
+  });
+  await api("POST", "/api/test/player/1", {
+    position: { x: 0.18, y: PLAYER_HEIGHT / 2 + PLAYER_HEIGHT * 1.55, z: 1.05 },
+    stamina: PLAYER_STAMINA_MAX,
+    yaw: Math.PI,
+    input: inputState()
+  });
+  await api("POST", "/api/test/player/0", { input: inputState({ kickRight: 1 }) });
+  state = (await api("POST", "/api/test/tick", { frames: 4 })).state;
+  const attacker = playerAt(state, 0);
+  const highTarget = state.players.find((player) => player.id === targetId);
+  assert.ok(highTarget, "vertical reach target should remain in state");
+  assert.equal(attacker.lastAction, "hand", "unreachable player strike should still replicate as a visible hand whiff");
+  assert.equal(attacker.stamina, PLAYER_STAMINA_MAX, "unreachable player strike should not spend attacker stamina");
+  assert.equal(highTarget.stamina, PLAYER_STAMINA_MAX, "player hit should not damage a target outside vertical reach");
+  assert.equal(highTarget.ragdoll, false, "player hit should not ragdoll a target outside vertical reach");
+}
+
 async function assertKick(api, kind, ballPosition, input) {
   let state = await prepareSinglePlayer(api);
   assert.equal(state.players.length, 1);
   const playerId = playerAt(state, 0).id;
   await api("POST", "/api/test/player/0", {
     position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: 70,
     yaw: 0,
     input: inputState()
   });
@@ -1373,6 +2598,7 @@ async function assertKick(api, kind, ballPosition, input) {
   const beforeAudioId = maxAudioEventId(state);
   state = (await api("POST", "/api/test/tick", { frames: 3 })).state;
   assert.equal(playerAt(state, 0).lastAction, kind);
+  assert.ok(playerAt(state, 0).stamina >= 70, `${kind} ball kick should not spend attacker stamina`);
   const ballSpeed = speed3(state.ball.velocity);
   assert.ok(ballSpeed > 0.5, `${kind} should move the ball`);
   assert.ok(ballSpeed < KICK_SPEED_MAX, `${kind} should not turn the half-size ball into a runaway projectile`);
@@ -1422,6 +2648,7 @@ async function assertFriendlyKickAssist(api) {
   let state = await prepareSinglePlayer(api);
   await api("POST", "/api/test/player/0", {
     position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: 70,
     yaw: 0,
     input: inputState()
   });

@@ -25,7 +25,7 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 
 ## Rules
 
-- Current release: `v0.0.033`.
+- Current release: `v0.0.052`.
 - Keep client and server separated; browser bundles must not import server-only
   modules.
 - The server is authoritative for room assignment, teams, player physics, ball
@@ -34,6 +34,87 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
   spectators/testers so QA can observe without displacing a player.
 - Controls: WASD movement, `Shift` sprint, `Space` jump, left mouse foot kick,
   right mouse hand hit, middle mouse button head hit.
+- Mobile controls: `#mobile-controls` is enabled on narrow/coarse-pointer
+  screens or `?mobileControls=1`; the left pad is a draggable virtual stick,
+  and action buttons feed the same input counters as keyboard/mouse controls.
+- `v0.0.039` keeps bots visible through a client WebSocket state watchdog and
+  fallback render tick: after join, the client must render an authoritative
+  state snapshot or fall back to HTTP polling, and RAF throttling must not leave
+  roster, stamina HUD, or bot actors empty.
+- `v0.0.040` adds explicit bot/stamina-combat diagnostics without changing the
+  accepted gameplay math: `/api/health`, `/api/game-settings`, and
+  `/api/bot-settings` expose bot totals, active bots, bot runtime enablement,
+  target fill, human clients, and test-mode state; browser QA exposes
+  `data-snapshot-active-bots`, `data-visible-bots`,
+  `data-hidden-active-players`, and `data-bots-runtime-visible`; already
+  ragdolling targets must be ignored by new player-hit checks until recovery.
+- `v0.0.041` makes bot backfill more robust when HTTP fallback tabs are closed
+  or frozen: `httpClientStaleMs` lives in `game-settings.json`,
+  `GameSettings`, `GAME_SETTINGS_SCHEMA`, and `/api/health`; stale HTTP clients
+  release active slots back to bots after 12s by default while live HTTP polling
+  continues to refresh `lastSeenAt`.
+- `v0.0.042` extends stale-slot cleanup to WebSocket clients: live tabs refresh
+  `lastSeenAt` through input, profile, chat, and emotion messages, while frozen
+  WebSocket players are closed after `websocketClientStaleMs` and removed before
+  bot fill so stale human slots do not hide bots in local or production play.
+  `/api/health` exposes `desiredBotPlayers`, `nonBotActiveSlots`, and
+  `botFillSuppressionReason`; the client also retries normal connection flow
+  after a WebSocket disconnect when auto-reconnect is enabled.
+- `v0.0.043` hardens off-ball fighting and stamina economy. RMB/head input
+  counters are consumed only after an accepted strike or visible action, so
+  cooldown timing cannot eat punches. Airborne LMB uses the configured
+  `jumpKickDashSpeed` as swept reach when it misses the ball, letting dash
+  kicks knock players down at the intended forward distance. Acceptance keeps
+  proving ten-player bot fill, stable bot roster, possession shots,
+  friendly-fire one-hit ragdoll, zero attacker stamina cost, and airborne dash
+  knockout.
+- `v0.0.044` makes bot fill tick-self-healing, hardens bot one-hit ragdoll
+  acceptance, resolves possessed-ball collisions against non-owner players by
+  dropping ownership and bouncing the ball from the blocker, keeps LMB
+  possession-shot input alive until cooldown accepts it, and gates off-ball
+  player hits by vertical reach so strikes do not damage unreachable targets.
+- `v0.0.045` keeps bot combat aligned with the new stamina economy: bot attacks
+  are free whenever the bot is not exhausted/ragdolling, low-stamina bots can
+  still throw valid combat strikes, and acceptance proves one-hit ragdoll plus
+  stable ten-bot fill through combat recovery.
+- `v0.0.046` keeps test-mode bot tuning synchronized with runtime
+  `game-settings.json`, so the file watcher cannot roll `/api/test/bots`
+  target fill back to an older `/api/bot-settings` value during acceptance or
+  local QA.
+- `v0.0.047` stabilizes client-side character presentation for fights and
+  ragdolls: procedural IK resets before each animation frame, visual ragdoll
+  roots are smoothed instead of snapped per snapshot, browser QA exposes bot
+  stamina/ragdoll/strike aggregates, and `/api/health` reports human/test/stale
+  slot pressure behind bot fill.
+- `v0.0.048` keeps exhausted players in slow recovery/walk mode and consumes
+  jump/combat inputs without firing them, fixes point-blank overlap player
+  hits, reuses displaced bot runtimes from a dormant pool, adds bot reuse/body
+  diagnostics to `/api/health`, and keeps team rings visible by pulsing opacity
+  instead of toggling visibility.
+- `v0.0.049` does not change the accepted runtime math; it hardens the release
+  gate around the Producer stamina/combat/bot contract. Acceptance now asserts
+  default friendly fire, one-hit knockout, zero jump cost, zero attacker hit
+  cost, free head whiffs, and a separate non-test local server with
+  `testMode=false`, unsuppressed bot fill, and ten active bots.
+- `v0.0.050` fixes stale human slots hiding bots in local play: browser
+  `pagehide` sends `/api/leave` for the active joined player on both WebSocket
+  and HTTP, the server removes WebSocket players through the same leave API,
+  closes their channel, rebalances roles, and default WebSocket stale cleanup is
+  12 seconds like HTTP. Airborne LMB dash-kicks also get a wider swept
+  player-hit reach so jump attacks reliably knock down their target. Exhausted
+  standing players cannot own/capture the ball; high-aggression bots can finish
+  exhausted opponents into ragdoll, while default bot combat pressure stays
+  gated above the default aggression so bot-only football matches do not
+  collapse.
+- `v0.0.051` lets default-aggression bots visibly brawl again without breaking
+  bot fill: `botCombatAggressionThreshold`,
+  `botCombatCollapseGuardRatio`, and `botCombatCollapseGuardMinDisabled` live in
+  `game-settings.json` and the admin schema, while acceptance proves one-hit
+  bot knockout, stable bot ids, active bot fill, and no fill suppression.
+- `v0.0.052` fixes point-blank no-ball fighting so visible overlap strikes also
+  apply one-hit stamina damage and ragdoll knockback. Acceptance now also
+  release-gates finite active bot positions/roles/ids, non-test human join
+  backfill, default bot roster stability, and LMB+Shift possession shots.
 - `v0.0.002` engine pass must preserve the Producer requirements: Russian
   player-facing text, HDR-style environment lighting, visible sun, 120-second
   realtime day cycle, reactive lighting, inertial perspective camera over the
@@ -273,6 +354,33 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
   punches alternate right/left server-side, LMB foot kicks use the current
   server-authored trailing foot, and snapshots expose `lastActionSide`,
   `trailingFoot`, and `stancePhase` for animation and acceptance.
+- `v0.0.033` player-ball collision hardening adds controlled server-side
+  anti-tunneling between the previous and current ball positions while keeping
+  body-contact balance separate from raw Rapier kinematic collision. Tune this
+  only through `playerBallCollisionRestitution`,
+  `playerBallCollisionPush`, and `playerBallCollisionSkin` in
+  `game-settings.json` / `GAME_SETTINGS_SCHEMA`; acceptance must prove both
+  body push and fast-ball rebound from a blocker.
+- Ball possession is server-authoritative: a slow low ball can attach to an
+  active player, follow the carry point in front of that player, and release on
+  contextual LMB/RMB shots. Tune it only through the `ballPossession*` settings
+  in `game-settings.json` / `GAME_SETTINGS_SCHEMA`; keep acceptance for carry,
+  low shot, upper shot, and Shift strong shot.
+- Combat without ball is the knockout path. Default settings allow friendly
+  fire and full one-hit stamina drain into ragdoll with knockback; airborne LMB
+  adds a forward dash and extended hit range. Keep these controlled by
+  `friendlyFireEnabled`, `playerHitFullKnockoutEnabled`,
+  `jumpKickDashSpeed`, and `jumpKickHitRangeBonus`, and keep acceptance proving
+  teammate knockout plus airborne dash knockout.
+- `v0.0.036+` stamina economy: stamina drains only from Shift sprint and
+  incoming player-hit damage. Space jump, LMB/RMB attack attempts, and whiffs
+  must never spend attacker stamina or block recovery. Keep
+  `playerStaminaJumpCost` and `playerStaminaHitCost` clamped to zero in admin
+  settings, and keep acceptance proving gradual sprint drain, zero-cost
+  jump/whiff, and one-hit target knockout.
+- Keep local browser play servers out of `UNSOCCER_TEST_MODE`; that flag is
+  only for isolated acceptance and intentionally suppresses normal default bot
+  fill unless `/api/test/bots` enables it.
 - The local `client/character-controller-test.html` validation page includes a
   textureless PBR preview converter for characters and Free3D environment
   props. The runtime debug bake stores `COLOR_0.rgba` with ambient occlusion in
@@ -319,9 +427,21 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
   `FREE3D_API_TOKEN`/`F3D_API_TOKEN`, or tokenless public LowPoly 1k worker
   inventory files whose exact `paths.json` relative path is recorded.
 - Do not guess asset paths or depend on remote assets at runtime.
-- Runtime `.glb` assets must be optimized, textureless where possible, and
-  documented with source GUID, model URL, inventory URL, direct worker URL,
-  format, LOD, relative path, bytes, and download timestamp.
+- Runtime 3D assets must be optimized and textureless. The shipped
+  `client/public/assets/{characters,environment,balls}` tree must contain no
+  image texture files, and every shipped GLB must have zero `images`, zero
+  `textures`, no material texture references, and baked `COLOR_0` vertex
+  colors. Character GLBs must also carry packed `TEXCOORD_1` roughness/
+  metalness data. Bake or approximate source textures into vertex/PBR before
+  runtime; deleting textures without baking color is a blocker.
+- Run `tools/bake_free3d_characters_textureless.py` after changing the Free3D
+  character roster or raw source textures. It reads build-time raw
+  `albedo.png`/`orm.png` sources and writes runtime GLBs with baked
+  `COLOR_0`/`TEXCOORD_1` and zero runtime image references.
+- Run `tools/bake_free3d_environment_textureless.py` through Blender when
+  replacing Free3D environment GLBs; `npm run test:unsoccer:acceptance` and
+  `tools/package_itch.py` enforce the no-runtime-textures and baked vertex
+  color contract.
 - Soccer-ball sources live under `assets/models/balls/free3d/raw`; optimized
   runtime GLBs and `roster.json` live under `client/public/assets/balls/free3d`.
 - Free3D character runtime provenance lives in
@@ -330,8 +450,9 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
   `client/public/assets/characters/free3d/roster.json`.
 - Character roster entries must stay synchronized with
   `shared/src/index.ts::CHARACTER_ROSTER`; do not add a character id there until
-  the public roster entry, local textures, and local FBX clips are present.
+  the public roster entry has a textureless local GLB and local FBX clips.
 - AutoRig task character provenance should record the canonical `/task?id=...`
   page, `/api/task/...` metadata, `/animations.glb` source, whether
   `/bundle.zip` or direct animation downloads were locked, and which local FBX
-  preview clips were shipped.
+  preview clips were prepared. Do not ship embedded-texture AutoRig GLBs in the
+  runtime roster until they have been converted to textureless vertex/PBR assets.

@@ -1,6 +1,6 @@
 {
-  "version": "v0.0.028",
-  "mode": "free3d-worker-storage-1k-glb-local-clones",
+  "version": "v0.0.036",
+  "mode": "free3d-local-textureless-vertex-pbr-glb",
   "source": "https://free3d.online/api-embeddings/",
   "note": "Environment GLBs were resolved from public Free3D worker paths.json inventories and shipped locally; runtime does not fetch remote Free3D URLs.",
   "assets": [
@@ -11,7 +11,8 @@
       "src": "assets/environment/free3d/6053007-bench-rustic.glb",
       "source": "https://free3d.online/model/6053007",
       "inventoryUrl": "https://worker-0001.free3d.online/storage/6053007_Rustic%20Wood%20Bench%20Model%20Pack%20with%20Natural%20Tree%20Trunk%20Legs/paths.json",
-      "bytes": 1074172
+      "bytes": 112364,
+      "texturePolicy": "no-runtime-textures"
     },
     {
       "guid": "6239925",
@@ -20,7 +21,8 @@
       "src": "assets/environment/free3d/6239925-bench-modern.glb",
       "source": "https://free3d.online/model/6239925",
       "inventoryUrl": "https://worker-0001.free3d.online/storage/6239925_Modern%20Minimalist%20Bench%20Model%20Pack/paths.json",
-      "bytes": 408444
+      "bytes": 74588,
+      "texturePolicy": "no-runtime-textures"
     },
     {
       "guid": "6239337",
@@ -29,7 +31,8 @@
       "src": "assets/environment/free3d/6239337-trash-bin.glb",
       "source": "https://free3d.online/model/6239337",
       "inventoryUrl": "https://worker-0001.free3d.online/storage/6239337_Outdoor%20Trash%20Bin%20Model%20Pack%20with%20Detailed%20LODs/paths.json",
-      "bytes": 4219376
+      "bytes": 4134132,
+      "texturePolicy": "no-runtime-textures"
     },
     {
       "guid": "6388689",
@@ -38,7 +41,8 @@
       "src": "assets/environment/free3d/6388689-trash-bin-modern.glb",
       "source": "https://free3d.online/model/6388689",
       "inventoryUrl": "https://worker-0001.free3d.online/storage/6388689_Modern%20Trash%20Bin%20Model%20Pack%20with%20Detailed%20Geometry/paths.json",
-      "bytes": 578964
+      "bytes": 73120,
+      "texturePolicy": "no-runtime-textures"
     },
     {
       "guid": "6335647",
@@ -47,7 +51,8 @@
       "src": "assets/environment/free3d/6335647-trash-bin-ribbed.glb",
       "source": "https://free3d.online/model/6335647",
       "inventoryUrl": "https://worker-0001.free3d.online/storage/6335647_Modern%20Trash%20Bin%20Model%20Pack%20with%20Ribbed%20Design/paths.json",
-      "bytes": 412948
+      "bytes": 62204,
+      "texturePolicy": "no-runtime-textures"
     },
     {
       "guid": "6225707",
@@ -56,7 +61,8 @@
       "src": "assets/environment/free3d/6225707-traffic-cone.glb",
       "source": "https://free3d.online/model/6225707",
       "inventoryUrl": "https://worker-0001.free3d.online/storage/6225707_Traffic%20Cone%20Model%20Pack%20HighDetail%20Surface/paths.json",
-      "bytes": 3632280
+      "bytes": 3703312,
+      "texturePolicy": "no-runtime-textures"
     },
     {
       "guid": "6225737",
@@ -65,7 +71,8 @@
       "src": "assets/environment/free3d/6225737-traffic-cone-game.glb",
       "source": "https://free3d.online/model/6225737",
       "inventoryUrl": "https://worker-0001.free3d.online/storage/6225737_Traffic%20Cone%20Model%20Pack%20for%20D%20Rendering%20and%20Game%20Development/paths.json",
-      "bytes": 377956
+      "bytes": 82236,
+      "texturePolicy": "no-runtime-textures"
     },
     {
       "guid": "6110276",
@@ -74,7 +81,9 @@
       "src": "assets/environment/free3d/6110276-urban-ruins.glb",
       "source": "https://free3d.online/model/6110276",
       "inventoryUrl": "https://worker-0001.free3d.online/storage/6110276_Urban%20Ruins%20Building%20model%20pack%20Destructed%20Cityscape%20Collection/paths.json",
-      "bytes": 5067208
+      "bytes": 3679680,
+      "texturePolicy": "no-runtime-textures"
     }
-  ]
+  ],
+  "texturePolicy": "Texture maps are baked or approximated into COLOR_0. Runtime GLB files contain zero images and zero textures."
 }

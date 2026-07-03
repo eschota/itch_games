@@ -3,6 +3,7 @@ import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import { CELEBRATION_DURATION_MS, PLAYER_HEIGHT, type CelebrationKind, type KickKind, type StrikeSide } from "@itch-games/unsoccer-shared";
+import { applyTexturelessPbrShader, bakeTexturelessPbr, type TexturelessPbrBakeResult } from "./textureless-pbr-converter";
 
 export interface Free3dCharacterAsset {
   guid: string;
@@ -37,12 +38,8 @@ export interface LoadedFree3dCharacter {
   roster: Free3dCharacterRoster;
   scene: THREE.Object3D;
   clips: Record<string, THREE.AnimationClip>;
-  textures: {
-    albedo?: THREE.Texture;
-    normal?: THREE.Texture;
-    orm?: THREE.Texture;
-  };
   textureCount: number;
+  texturelessPbr: TexturelessPbrBakeResult | null;
 }
 
 export interface CharacterControllerSnapshot {
@@ -105,7 +102,6 @@ type JumpStyle = "standing" | "run";
 const transparentFbxTexture =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=";
 const gltfLoader = new GLTFLoader();
-const textureLoader = new THREE.TextureLoader();
 const characterAnimationManager = new THREE.LoadingManager();
 characterAnimationManager.setURLModifier((url) => {
   if (/\.(png|jpe?g|webp|bmp|tga)(\?.*)?$/i.test(url)) return transparentFbxTexture;
@@ -222,24 +218,6 @@ function countMaterialTextures(root: THREE.Object3D, externalTextures: Array<THR
   return textures.size;
 }
 
-function loadTexture(src: string | undefined, colorSpace: THREE.ColorSpace = THREE.NoColorSpace): Promise<THREE.Texture | undefined> {
-  if (!src) return Promise.resolve(undefined);
-  return new Promise((resolve, reject) => {
-    textureLoader.load(
-      resolveClientAsset(src),
-      (texture) => {
-        texture.colorSpace = colorSpace;
-        texture.flipY = false;
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        resolve(texture);
-      },
-      undefined,
-      reject
-    );
-  });
-}
-
 function loadClip(name: string, src: string | undefined): Promise<[string, THREE.AnimationClip] | null> {
   if (!src) return Promise.resolve(null);
   return new Promise((resolve, reject) => {
@@ -282,13 +260,10 @@ export function loadFree3dCharacter(
       const roster = await response.json() as Free3dCharacterRoster;
       const asset = roster.assets.find((entry) => entry.guid === preferredGuid) || roster.assets[0];
       if (!asset) throw new Error("Free3D character roster is empty");
-      const [gltf, albedo, normal, orm, ...clipEntries] = await Promise.all([
+      const [gltf, ...clipEntries] = await Promise.all([
         new Promise<{ scene: THREE.Object3D; animations: THREE.AnimationClip[] }>((resolve, reject) => {
           gltfLoader.load(resolveClientAsset(asset.src), resolve, undefined, reject);
         }),
-        loadTexture(asset.textures?.albedo, THREE.SRGBColorSpace),
-        loadTexture(asset.textures?.normal),
-        loadTexture(asset.textures?.orm),
         loadOptionalClip("idle", asset.clips?.idle),
         loadOptionalClip("walk", asset.clips?.walk),
         loadOptionalClip("run", asset.clips?.run),
@@ -305,17 +280,25 @@ export function loadFree3dCharacter(
       for (const clip of gltf.animations) {
         if (!clips.idle) clips.idle = clip;
       }
-      const textureCount = Math.max(
-        asset.textureCount || 0,
-        countMaterialTextures(gltf.scene, [albedo, normal, orm])
-      );
+      const preparedScene = prepareCharacterScene(gltf.scene, asset);
+      const sourceTextureCount = countMaterialTextures(gltf.scene, []);
+      const texturelessPbr = await bakeTexturelessPbr(preparedScene, {
+        bakeGeometryAo: true,
+        aoContrast: 1.2,
+        aoSamples: 6,
+        yieldEveryVertices: 4096
+      });
+      const textureCount = countMaterialTextures(preparedScene, []);
       return {
         asset,
         roster,
-        scene: prepareCharacterScene(gltf.scene, asset),
+        scene: preparedScene,
         clips,
-        textures: { albedo, normal, orm },
-        textureCount
+        textureCount,
+        texturelessPbr: {
+          ...texturelessPbr,
+          strippedTextureCount: texturelessPbr.strippedTextureCount + sourceTextureCount + (asset.textureCount || 0)
+        }
       };
     } catch (error) {
       console.warn("Free3D character hydration failed", error);
@@ -330,15 +313,22 @@ function cloneMaterialForTeam(material: THREE.Material | THREE.Material[], loade
   if (Array.isArray(material)) return material.map((entry) => cloneMaterialForTeam(entry, loaded, tint) as THREE.Material);
   const clone = material.clone();
   if (clone instanceof THREE.MeshStandardMaterial) {
-    if (loaded.textures.albedo) clone.map = loaded.textures.albedo;
-    if (loaded.textures.normal) clone.normalMap = loaded.textures.normal;
-    if (loaded.textures.orm) {
-      clone.roughnessMap = loaded.textures.orm;
-      clone.metalnessMap = loaded.textures.orm;
-    }
-    clone.color.lerp(tint, clone.map ? 0.08 : 0.52);
+    clone.map = null;
+    clone.normalMap = null;
+    clone.roughnessMap = null;
+    clone.metalnessMap = null;
+    clone.aoMap = null;
+    clone.emissiveMap = null;
+    clone.alphaMap = null;
+    clone.bumpMap = null;
+    clone.displacementMap = null;
+    clone.lightMap = null;
+    clone.envMap = null;
+    clone.vertexColors = true;
+    clone.color.lerp(tint, 0.68);
     clone.roughness = Math.max(clone.roughness, 0.56);
     clone.metalness *= 0.2;
+    applyTexturelessPbrShader(clone);
     clone.needsUpdate = true;
   }
   return clone;
@@ -452,6 +442,7 @@ export class GameCharacterController {
     const actionName = ragdoll || celebrating ? "idle" : jumpAction || nextLocomotion;
     this.setAction(actionName);
     this.syncActionSpeed(actionName, this.smoothedSpeed);
+    this.resetBonesToBindPose();
     this.mixer.update(deltaTime);
     this.syncStrikeSide(snapshot);
     const strikePose = ragdoll || celebrating ? { pulse: 0, chamber: 0, impact: 0, recover: 0 } : this.strikePose(snapshot.lastAction, actionAge, this.activeJumpStyle);
@@ -583,6 +574,12 @@ export class GameCharacterController {
   private currentActionWeight(): number {
     const action = this.actions.get(this.activeAction);
     return action?.getEffectiveWeight() ?? 0;
+  }
+
+  private resetBonesToBindPose(): void {
+    for (const [bone, bindQuaternion] of this.boneRig.bind) {
+      bone.quaternion.copy(bindQuaternion);
+    }
   }
 
   private strikePose(action: KickKind | null, ageMs: number, jumpStyle: JumpStyle = "standing"): StrikePose {

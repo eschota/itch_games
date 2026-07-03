@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>UnSoccer v0.0.033 | Ragdoll Soccer II</title>
+    <title>UnSoccer v0.0.052 | Ragdoll Soccer II</title>
     <meta
       name="description"
-      content="UnSoccer v0.0.033: player emotion wheel, compact chat, nickname/skin/user_pic profiles, side-aware alternating hand punches, trailing-foot kicks, runtime settings admin, server bots, stamina damage, velocity ragdoll knockdowns, smoother character movement, active strike assist, LMB charge, height-aware ball contact, dense Free3D courtyard props, team markers, day cycle, jump, and hits."
+      content="UnSoccer v0.0.052: point-blank overlap punches now damage players instead of only playing a hand action, default bot rosters are release-gated for stable visible positions, LMB+Shift possession shots are covered, stamina drains only from Shift and incoming damage, combat defaults are locked in acceptance, non-test local servers prove default bot fill, exhausted players recover in slow walk mode, visible team markers pulse, stable character IK, smoother ragdoll rendering, stamina HUD, mobile controls, baked textureless vertex/PBR runtime assets, ball possession, strong shots, friendly-fire knockouts, emotions, chat, runtime settings admin, server bots, dense Free3D courtyard props, team markers, day cycle, jump, and hits."
     />
     <link rel="icon" href="data:," />
     <style>
@@ -189,6 +189,22 @@
         </div>
       </section>
       <div id="control-hints" class="control-hints" aria-live="polite"></div>
+      <section id="mobile-controls" class="mobile-controls" aria-label="&#1052;&#1086;&#1073;&#1080;&#1083;&#1100;&#1085;&#1086;&#1077; &#1091;&#1087;&#1088;&#1072;&#1074;&#1083;&#1077;&#1085;&#1080;&#1077;" hidden>
+        <div class="mobile-move-pad" aria-label="&#1044;&#1074;&#1080;&#1078;&#1077;&#1085;&#1080;&#1077;">
+          <button type="button" class="mobile-control-button mobile-up" data-mobile-dir="up" aria-label="&#1042;&#1087;&#1077;&#1088;&#1077;&#1076;">&#9650;</button>
+          <button type="button" class="mobile-control-button mobile-left" data-mobile-dir="left" aria-label="&#1042;&#1083;&#1077;&#1074;&#1086;">&#9664;</button>
+          <span class="mobile-pad-center" aria-hidden="true"></span>
+          <button type="button" class="mobile-control-button mobile-right" data-mobile-dir="right" aria-label="&#1042;&#1087;&#1088;&#1072;&#1074;&#1086;">&#9654;</button>
+          <button type="button" class="mobile-control-button mobile-down" data-mobile-dir="down" aria-label="&#1053;&#1072;&#1079;&#1072;&#1076;">&#9660;</button>
+        </div>
+        <div class="mobile-action-pad" aria-label="&#1044;&#1077;&#1081;&#1089;&#1090;&#1074;&#1080;&#1103;">
+          <button type="button" class="mobile-control-button mobile-sprint" data-mobile-action="sprint" aria-label="&#1057;&#1087;&#1088;&#1080;&#1085;&#1090;">&#1041;&#1045;&#1043;</button>
+          <button type="button" class="mobile-control-button" data-mobile-action="jump" aria-label="&#1055;&#1088;&#1099;&#1078;&#1086;&#1082;">&#1055;&#1056;&#1067;&#1046;</button>
+          <button type="button" class="mobile-control-button mobile-primary" data-mobile-action="leftKick" aria-label="&#1059;&#1076;&#1072;&#1088; &#1085;&#1086;&#1075;&#1086;&#1081;">&#1059;&#1044;&#1040;&#1056;</button>
+          <button type="button" class="mobile-control-button" data-mobile-action="rightKick" aria-label="&#1059;&#1076;&#1072;&#1088; &#1088;&#1091;&#1082;&#1086;&#1081; &#1080;&#1083;&#1080; &#1074;&#1077;&#1088;&#1093;&#1085;&#1080;&#1081; &#1091;&#1076;&#1072;&#1088;">&#1056;&#1059;&#1050;&#1040;</button>
+          <button type="button" class="mobile-control-button" data-mobile-action="headHit" aria-label="&#1043;&#1086;&#1083;&#1086;&#1074;&#1072;">&#1043;&#1054;&#1051;</button>
+        </div>
+      </section>
       <section id="game-chat" class="game-chat" aria-label="Player chat">
         <div id="chat-log" class="chat-log" aria-live="polite"></div>
         <form id="chat-form" class="chat-form" autocomplete="off">
@@ -208,7 +224,7 @@
         <button id="fullscreen-button" class="icon-button" type="button" title="Fullscreen" aria-label="Fullscreen">FS</button>
         <button id="camera-reset-button" class="icon-button" type="button" title="Camera reset" aria-label="Camera reset">CAM</button>
       </div>
-      <div id="version-badge">v0.0.033 / 83.79 MB</div>
+      <div id="version-badge">v0.0.052 / 40.05 MB</div>
       <section id="settings-panel" class="settings-panel" aria-modal="true" role="dialog" aria-labelledby="settings-title" hidden>
         <form id="settings-form" class="settings-shell">
           <header class="settings-header">

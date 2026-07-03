@@ -35,6 +35,13 @@ Use this root skill when changing, packaging, validating, or publishing the
     `ui_designer/public_pages/unsoccer-itch-page-copy.md`,
     `ui_designer/public_pages/unsoccer-itch-publishing-checklist.md`,
     `ui_designer/public_pages/unsoccer-itch-assets/`
+  - UnSoccer Yandex Games assets and upload handoff:
+    `ui_designer/public_pages/unsoccer-yandex-games-assets/`,
+    `ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md`,
+    `ui_designer/public_pages/verify-yandex-upload-pack.mjs`
+  - UnSoccer VK Play handoff:
+    `ui_designer/public_pages/unsoccer-vkplay-upload-handoff-v0.0.052.md`,
+    `ui_designer/public_pages/prepare-vkplay-upload-pack.mjs`
   - UnSoccer UI/settings runtime evidence:
     `ui_designer/public_pages/unsoccer-ui-settings-redesign-v0.0.008.md`,
     `ui_designer/public_pages/unsoccer-ui-runtime-smoke-v0.0.009.json`,
@@ -114,6 +121,10 @@ Use this root skill when changing, packaging, validating, or publishing the
   screenshots, or downloadable client files unless the Producer explicitly asks
   for dynamic behavior.
 - Treat GitHub `eschota/itch_games` as the public source repository.
+- GitHub repository settings, including webhooks, may be operated through the
+  Codex in-app Browser when the logged-in GitHub session is available and
+  `gh`/GitHub connector access is blocked. Record browser-driven changes in
+  `/ai_chat` and verify with webhook deliveries or production health endpoints.
 - Version bumps must be committed, pushed to GitHub, and autodeployed.
 - This local clone uses `git config core.hooksPath tools/hooks`, where
   `tools/hooks/post-commit` runs
@@ -169,6 +180,10 @@ Use this root skill when changing, packaging, validating, or publishing the
 - External itch.io pages are incomplete until their URL, uploaded zip, exact
   live copy, screenshots, publication date, and version match are recorded in
   `ui_designer/public_pages/`.
+- Yandex Games upload staging for UnSoccer is incomplete until
+  `node ui_designer/public_pages/verify-yandex-upload-pack.mjs --mode=live`
+  passes with pinned SHA-256 for the numbered files and the Console draft has
+  the archive/media files selected and saved.
 - Track cross-game external publication status in
   `ui_designer/public_pages/itch-publication-ledger.md`; per-game checklists
   remain the operational steps for each page.
@@ -238,8 +253,8 @@ Use this root skill when changing, packaging, validating, or publishing the
 
 ## Current Behavior
 
-- Current game release: `v0.0.033`.
-- `unsoccer` current prototype release: `v0.0.033`.
+- Current game release: `v0.0.052`.
+- `unsoccer` current prototype release: `v0.0.052`.
 - `unsoccer` uses a headless authoritative Node server with Rapier3D physics,
   plain WebSocket transport, and HTTP polling fallback; the itch package is
   static client-only and needs the live game server for multiplayer.
@@ -250,6 +265,71 @@ Use this root skill when changing, packaging, validating, or publishing the
   Do not make geckos.io a required runtime there because its native
   `node-datachannel` addon is not compatible with the target system glibc.
 - The game starts automatically when the page opens.
+- `v0.0.038` mobile controls use `#mobile-controls` with a draggable movement
+  pad and action buttons for sprint, jump, left-foot charge, hand hit, and
+  head hit. Browser QA can assert `data-mobile-last-directions`,
+  `data-mobile-last-action`, and `data-resolved-input-*`.
+- `v0.0.039` keeps WebSocket clients from joining into an empty local scene:
+  after join, the client must receive state or fall back to HTTP polling, and a
+  throttled fallback tick keeps roster, stamina HUD, and bot actors visible when
+  the in-app browser throttles `requestAnimationFrame`.
+- `v0.0.040` makes bot/runtime health inspectable during browser QA:
+  `/api/health`, `/api/game-settings`, and `/api/bot-settings` expose bot
+  totals, active bot count, target fill, runtime enablement, human clients, and
+  test-mode state; the client mirrors snapshot/visible bot counters through
+  `data-snapshot-active-bots`, `data-visible-bots`,
+  `data-hidden-active-players`, and `data-bots-runtime-visible`.
+- `v0.0.041` moves the HTTP fallback stale-player timeout to runtime settings
+  as `httpClientStaleMs` and exposes it through `/api/health`, so closed or
+  frozen HTTP tabs release active slots back to bots after 12 seconds by
+  default instead of suppressing bot fill for the old hard-coded window.
+- `v0.0.042` adds `websocketClientStaleMs` to runtime settings, schema,
+  admin-facing settings, and `/api/health`, then uses it to close frozen
+  WebSocket player slots before bot fill so stalled browser tabs cannot make
+  bots disappear. Health now exposes `desiredBotPlayers`, `nonBotActiveSlots`,
+  and `botFillSuppressionReason`, and the client retries connection flow after
+  WebSocket disconnect when auto-reconnect is enabled.
+- `v0.0.043` keeps stamina draining only from Shift and incoming full-hit
+  damage, makes RMB/head input counters consume only after an accepted strike,
+  and treats airborne LMB dash as swept player-hit reach for reliable jump-kick
+  knockouts.
+- `v0.0.044` keeps bot fill self-healing every tick, proves bot combat uses
+  the same one-hit ragdoll rule as human combat, and makes possessed balls drop
+  ownership and rebound when they hit another player.
+- `v0.0.045` keeps bot attacks free while the bot is not exhausted/ragdolling,
+  matching the stamina rule that only Shift sprint and incoming damage drain
+  stamina.
+- `v0.0.046` synchronizes `/api/test/bots` changes back into runtime game
+  settings so local acceptance and QA cannot lose the intended ten-player bot
+  fill when the settings file watcher reloads.
+- `v0.0.047` stabilizes the skinned character IK/ragdoll visual layer and adds
+  browser/server diagnostics for visible bot combat, stamina ranges, active
+  ragdoll/strike counts, human/test slot pressure, and stale client slots.
+- `v0.0.048` keeps exhausted players from firing jump/combat/possession
+  inputs, fixes overlap-range player hits, reuses displaced bots from a dormant
+  pool, exposes bot reuse/body diagnostics in health, and keeps exhausted team
+  rings visible with a pulse instead of blinking out.
+- `v0.0.049` hardens the acceptance gate for stamina, combat, and bots without
+  changing runtime math: default friendly fire, one-hit knockout, zero jump
+  cost, zero attacker hit cost, free head whiffs, and non-test ten-bot fill are
+  all explicit release checks.
+- `v0.0.050` makes WebSocket page reloads/closures release player slots through
+  `/api/leave`, allows `/api/leave` to remove WebSocket players as well as HTTP
+  players, and shortens default WebSocket stale cleanup to 12 seconds so bots
+  immediately backfill instead of disappearing behind stale human slots. It
+  also widens airborne LMB dash-kick swept hit reach for more reliable jump
+  knockouts. Exhausted standing players cannot own/capture the ball; high
+  aggression bots can finish exhausted opponents into ragdoll, while default
+  bot combat pressure stays gated above the default aggression so football-only
+  bot matches do not collapse.
+- `v0.0.051` lets default-aggression bots visibly brawl again, moves bot combat
+  aggression threshold and anti-collapse limits into runtime game settings, and
+  acceptance proves one-hit bot knockout, stable bot ids, active bot fill, and
+  no fill suppression.
+- `v0.0.052` fixes point-blank no-ball strikes so visible overlap hits apply
+  stamina damage/ragdoll, release-gates active bot ids/roles/finite positions,
+  and covers LMB+Shift possession shots while preserving the Shift/damage-only
+  stamina drain contract.
 - `unsoccer` v0.0.002 has a client-only procedural Web Audio layer driven by
   authoritative server snapshots for kicks, body contacts, goals, countdown,
   roster changes, and ball rolling.
@@ -427,6 +507,9 @@ Use this root skill when changing, packaging, validating, or publishing the
   must add the value to `GameSettings`, `DEFAULT_GAME_SETTINGS`,
   `GAME_SETTINGS_SCHEMA`, `game-settings.json`, and the admin page contract in
   the same change.
+- The UnSoccer settings admin must stay Russian-facing. `GAME_SETTINGS_SCHEMA`
+  must cover every key in `DEFAULT_GAME_SETTINGS`/`game-settings.json`, and
+  acceptance must keep a full per-key `/api/game-settings` roundtrip check.
 - `unsoccer` v0.0.033 adds the core personalization/communication layer:
   mouse-wheel opens a local-only 9-emotion wheel above the local player for a
   2-second idle window, continued wheel motion cycles the selection, and any
@@ -442,6 +525,13 @@ Use this root skill when changing, packaging, validating, or publishing the
   current server-authored trailing foot, and snapshots expose
   `lastActionSide`, `trailingFoot`, and `stancePhase` so character animation and
   acceptance can assert the resolved limb side instead of inferring from input.
+- `unsoccer` v0.0.036+ makes stamina drain only from Shift sprint and
+  incoming player-hit damage. Space jump, LMB/RMB attacks, and whiffs must
+  never spend attacker stamina or block recovery; keep `playerStaminaJumpCost`
+  and `playerStaminaHitCost` clamped to zero in settings.
+- Local browser play servers for UnSoccer must run without
+  `UNSOCCER_TEST_MODE`; that flag is only for isolated acceptance and prevents
+  normal default bot fill unless `/api/test/bots` enables it.
 - `v0.0.006` adds procedural Web Audio feedback and exposes
   `window.orbitalCourierAudio` plus `orbital-courier:audio-event` so future
   network code can replicate semantic sound events instead of audio files.
@@ -475,3 +565,10 @@ Moscow deploy script installed as
 `ai_chat/deploy/itch-games-autodeploy-moscow.sh`. Do not reuse Qwertystock
 service paths or secrets across hosts; copy only server-side webhook secrets
 into the target environment when configuring the GitHub webhook.
+
+When GitHub settings access is blocked by sudo/2FA, the existing primary
+`io-games.mecharulez.com` GitHub webhook may fan out to Moscow through
+`/ai_chat/api/deploy-relay`. The primary service must set
+`AI_CHAT_DEPLOY_RELAY_URLS=https://moscow-io-games.mecharulez.com/ai_chat/api/deploy-relay`,
+and the Moscow service must allow only the primary host IP with
+`AI_CHAT_DEPLOY_RELAY_ALLOW_IPS=145.239.0.57`.

@@ -366,10 +366,21 @@ function kickAssistHorizontalRange(kind) {
 function playerHitProfile(kind) {
     const settings = gameSettings();
     if (kind === "hand")
-        return { range: Math.max(1.1, settings.handKickAssistRange * 0.81), cone: 0.24 };
+        return { range: Math.max(1.7, settings.handKickAssistRange + settings.playerRadius * 0.35), cone: -0.22 };
     if (kind === "head")
-        return { range: Math.max(1.05, settings.headKickAssistRange * 0.85), cone: 0.18 };
-    return { range: Math.max(1.1, settings.footKickAssistRange * 0.7), cone: 0.2 };
+        return { range: Math.max(1.45, settings.headKickAssistRange + settings.playerRadius * 0.18), cone: -0.08 };
+    return { range: Math.max(1.8, settings.footKickAssistRange + settings.playerRadius * 0.22), cone: -0.2 };
+}
+function playerHitVerticalRange(kind) {
+    const settings = gameSettings();
+    if (kind === "hand")
+        return settings.playerHeight * 0.78;
+    if (kind === "head")
+        return settings.playerHeight * 0.9;
+    return settings.playerHeight * 0.86;
+}
+function playerHitHeightInRange(attackerPosition, targetPosition, kind) {
+    return Math.abs(targetPosition.y - attackerPosition.y) <= playerHitVerticalRange(kind);
 }
 function leftKickPowerMultiplier(charge) {
     const settings = gameSettings();
@@ -532,10 +543,15 @@ class UnsoccerServer {
     goalReset = null;
     botSettings = { ...DEFAULT_BOT_SETTINGS };
     nextBotId = 1;
+    dormantBots = [];
+    botReuseCount = 0;
+    botRepairCount = 0;
     testBotsEnabled = false;
     lastBallTouchPlayerId = null;
     lastBallTouchTeam = null;
     lastBallTouchAt = 0;
+    ballOwnerPlayerId = null;
+    ballPossessionReleasedUntil = 0;
     async start() {
         await RAPIER.init();
         this.loadGameSettingsFromDisk({ resetPhysics: false, source: "startup" });
@@ -709,7 +725,7 @@ class UnsoccerServer {
             const body = this.requestBody(request);
             const clientFingerprint = sanitizeClientFingerprint(body.clientFingerprint);
             const existingPlayer = this.playerByFingerprint(clientFingerprint);
-            if (!existingPlayer && this.connectedClientCount() >= MAX_ROOM_CLIENTS) {
+            if (!existingPlayer && this.rawConnectedClientCount() >= MAX_ROOM_CLIENTS) {
                 response.status(409).json({ ok: false, error: "server-full", maxRoomClients: MAX_ROOM_CLIENTS });
                 return;
             }
@@ -796,11 +812,14 @@ class UnsoccerServer {
         this.app.post("/api/leave", (request, response) => {
             const body = this.requestBody(request);
             const player = this.players.get(String(body.clientId || ""));
-            if (player && player.transport === "http") {
+            if (player && (player.transport === "http" || player.transport === "websocket")) {
+                const channel = player.channel;
+                player.channel = null;
                 this.persistPlayerSession(player);
                 this.pushRosterAudioEvent(player, "leave");
                 this.destroyBody(player);
                 this.players.delete(player.id);
+                channel?.close();
                 this.rebalanceRoles();
                 this.message = `${player.name} \u0432\u044b\u0448\u0435\u043b`;
             }
@@ -838,6 +857,8 @@ class UnsoccerServer {
             const currentVelocity = vec3FromRapier(this.ballBody.linvel());
             const position = this.vecField(body.position, currentPosition);
             const velocity = this.vecField(body.velocity, currentVelocity);
+            this.ballOwnerPlayerId = null;
+            this.ballPossessionReleasedUntil = 0;
             this.ballBody.setTranslation(position, true);
             this.ballBody.setLinvel(velocity, true);
             this.ballBody.setAngvel(zeroVec(), true);
@@ -891,14 +912,24 @@ class UnsoccerServer {
                 return;
             const body = this.requestBody(request);
             const settingsBody = typeof body.settings === "object" && body.settings !== null ? body.settings : null;
+            let changed = false;
             if (body.settings !== undefined) {
                 this.botSettings = this.normalizeBotSettings(body.settings, this.botSettings);
                 if (settingsBody && settingsBody.enabled !== undefined)
                     this.testBotsEnabled = this.botSettings.enabled;
+                changed = true;
             }
             if (body.enabled !== undefined) {
                 this.testBotsEnabled = Boolean(body.enabled);
                 this.botSettings = this.normalizeBotSettings({ enabled: this.testBotsEnabled }, this.botSettings);
+                changed = true;
+            }
+            if (changed) {
+                this.applyGameSettings(gameSettingsWithBotPatch(this.settings, this.botSettings), {
+                    source: "api-test-bots",
+                    writeFile: false,
+                    resetPhysics: false
+                });
             }
             this.rebalanceRoles();
             response.json({ ok: true, settings: this.botSettings, state: this.snapshot() });
@@ -982,8 +1013,6 @@ class UnsoccerServer {
         };
     }
     gameSettingsPayload(now = Date.now()) {
-        const bots = this.botPlayers();
-        const humans = this.connectedClientCount();
         return {
             ok: true,
             version: GAME_VERSION,
@@ -996,35 +1025,46 @@ class UnsoccerServer {
             defaults: { ...DEFAULT_GAME_SETTINGS },
             schema: GAME_SETTINGS_SCHEMA,
             state: this.snapshot(now),
-            info: {
-                ...this.serverInfo(),
-                botPlayers: bots.length,
-                humanClients: humans
-            }
+            info: this.serverInfo()
         };
     }
     botSettingsPayload(now = Date.now()) {
-        const bots = this.botPlayers();
-        const humans = this.connectedClientCount();
         return {
             ok: true,
             settings: { ...this.botSettings },
             defaults: { ...DEFAULT_BOT_SETTINGS },
             state: this.snapshot(now),
-            info: {
-                ...this.serverInfo(),
-                botPlayers: bots.length,
-                humanClients: humans
-            }
+            info: this.serverInfo()
         };
     }
-    connectedClientCount() {
+    rawConnectedClientCount() {
         let count = 0;
         for (const player of this.players.values()) {
-            if (player.transport !== "bot")
+            if (player.transport === "websocket" || player.transport === "http")
                 count += 1;
         }
         return count;
+    }
+    isStaleClientPlayer(player, now) {
+        if (player.transport === "http")
+            return now - player.lastSeenAt >= this.settings.httpClientStaleMs;
+        if (player.transport === "websocket")
+            return now - player.lastSeenAt >= this.settings.websocketClientStaleMs;
+        return false;
+    }
+    liveHumanClientCount(now = Date.now()) {
+        let count = 0;
+        for (const player of this.players.values()) {
+            if ((player.transport === "websocket" || player.transport === "http") && !this.isStaleClientPlayer(player, now))
+                count += 1;
+        }
+        return count;
+    }
+    nonBotActiveSlotCount(now = Date.now()) {
+        const nonBots = [...this.players.values()]
+            .filter((player) => player.transport !== "bot" && !this.isStaleClientPlayer(player, now))
+            .sort((a, b) => a.joinOrder - b.joinOrder);
+        return Math.min(nonBots.length, this.settings.maxActivePlayers);
     }
     playerByFingerprint(clientFingerprint) {
         if (!clientFingerprint)
@@ -1054,15 +1094,35 @@ class UnsoccerServer {
     botsEnabled() {
         return this.botSettings.enabled && (!TEST_MODE || this.testBotsEnabled);
     }
-    desiredBotCount() {
+    desiredBotCount(now = Date.now()) {
         if (!this.botsEnabled())
             return 0;
         const target = clamp(Math.floor(this.botSettings.targetActivePlayers), 0, this.settings.maxActivePlayers);
-        const nonBotCount = this.connectedClientCount();
+        const nonBotCount = this.nonBotActiveSlotCount(now);
         return Math.max(0, target - Math.min(target, nonBotCount));
     }
+    botFillSuppressionReason(nonBotActiveSlots) {
+        if (!this.botSettings.enabled)
+            return "bots-disabled";
+        if (TEST_MODE && !this.testBotsEnabled)
+            return "test-mode-disabled";
+        const target = clamp(Math.floor(this.botSettings.targetActivePlayers), 0, this.settings.maxActivePlayers);
+        if (target <= 0)
+            return "target-zero";
+        if (nonBotActiveSlots >= target) {
+            const activeTestSlots = [...this.players.values()]
+                .filter((player) => player.role === "player" && player.transport === "test")
+                .length;
+            if (activeTestSlots >= target)
+                return "test-slots-full";
+            if (activeTestSlots > 0)
+                return "mixed-human-test-slots-full";
+            return "human-slots-full";
+        }
+        return "none";
+    }
     syncBots(now = Date.now()) {
-        const desired = this.desiredBotCount();
+        const desired = this.desiredBotCount(now);
         const bots = this.botPlayers();
         while (bots.length > desired) {
             const bot = bots.pop();
@@ -1071,19 +1131,108 @@ class UnsoccerServer {
             this.pushRosterAudioEvent(bot, "leave", now);
             this.destroyBody(bot);
             this.players.delete(bot.id);
+            this.resetBotRuntimeForReuse(bot, now);
+            this.dormantBots.push(bot);
+            while (this.dormantBots.length > this.settings.maxActivePlayers)
+                this.dormantBots.shift();
         }
         while (bots.length < desired) {
-            const botNumber = this.nextBotId++;
-            const runtime = this.createRuntime({
-                id: `${BOT_ID_PREFIX}${botNumber}`,
-                name: BOT_NAMES[(botNumber - 1) % BOT_NAMES.length],
-                channel: null,
-                transport: "bot"
-            });
-            runtime.botPersonality = botPersonality(botNumber);
-            runtime.botFlank = botNumber % 2 === 0 ? 1 : -1;
-            this.players.set(runtime.id, runtime);
-            bots.push(runtime);
+            const runtime = this.dormantBots.pop();
+            let botRuntime;
+            if (runtime) {
+                this.resetBotRuntimeForReuse(runtime, now);
+                this.botReuseCount += 1;
+                botRuntime = runtime;
+            }
+            else {
+                const botNumber = this.nextBotId++;
+                botRuntime = this.createRuntime({
+                    id: `${BOT_ID_PREFIX}${botNumber}`,
+                    name: BOT_NAMES[(botNumber - 1) % BOT_NAMES.length],
+                    channel: null,
+                    transport: "bot"
+                });
+                botRuntime.botPersonality = botPersonality(botNumber);
+                botRuntime.botFlank = botNumber % 2 === 0 ? 1 : -1;
+            }
+            this.players.set(botRuntime.id, botRuntime);
+            bots.push(botRuntime);
+        }
+    }
+    resetBotRuntimeForReuse(bot, now) {
+        bot.role = "spectator";
+        bot.team = null;
+        bot.index = this.players.size;
+        bot.joinOrder = this.joinCounter++;
+        bot.goals = 0;
+        bot.clientFingerprint = null;
+        bot.channel = null;
+        bot.transport = "bot";
+        bot.input = { ...DEFAULT_INPUT };
+        bot.inputSequence = 0;
+        bot.body = null;
+        bot.moveAxis = { x: 0, z: 0 };
+        bot.moveVelocity = zeroVec();
+        bot.lastKickAt = 0;
+        bot.lastHeadAt = 0;
+        bot.lastKickLeft = 0;
+        bot.lastKickLeftHeld = false;
+        bot.leftKickChargeStartedAt = -1;
+        bot.leftKickChargeHeldMs = 0;
+        bot.kickLeftHoldConsumed = false;
+        bot.leftKickBufferedUntil = 0;
+        bot.leftKickBufferedCharge = 0;
+        bot.lastKickRight = 0;
+        bot.nextHandSide = 1;
+        bot.lastHead = 0;
+        bot.lastJump = 0;
+        bot.lastBodyAt = 0;
+        bot.lastJumpAt = 0;
+        bot.lastAction = null;
+        bot.lastActionSide = null;
+        bot.lastActionAt = 0;
+        bot.celebration = null;
+        bot.celebrationAt = 0;
+        bot.celebrationAvailableUntil = 0;
+        bot.lastAudioRole = null;
+        bot.yaw = 0;
+        bot.velocity = zeroVec();
+        bot.pushVelocity = zeroVec();
+        bot.stamina = this.settings.playerStaminaMax;
+        bot.staminaRecoveryBlockedUntil = 0;
+        bot.sprinting = false;
+        bot.exhausted = false;
+        bot.ragdoll = false;
+        bot.ragdollAt = 0;
+        bot.ragdollVelocity = zeroVec();
+        bot.grounded = true;
+        bot.verticalVelocity = 0;
+        bot.lastSeenAt = now;
+    }
+    activeBotBodyInvalid(bot) {
+        if (bot.transport !== "bot" || bot.role !== "player")
+            return false;
+        if (!bot.body)
+            return true;
+        const position = bot.body.translation();
+        return !Number.isFinite(position.x) || !Number.isFinite(position.y) || !Number.isFinite(position.z);
+    }
+    ensureBotFill(now = Date.now()) {
+        const desired = this.desiredBotCount(now);
+        const bots = this.botPlayers();
+        let invalidActiveBotBody = false;
+        for (const bot of bots) {
+            if (!this.activeBotBodyInvalid(bot))
+                continue;
+            invalidActiveBotBody = true;
+            this.destroyBody(bot);
+        }
+        const activeBots = bots.filter((player) => player.role === "player");
+        const bodyMismatch = bots.some((player) => (player.role === "player" ? !player.body : Boolean(player.body)));
+        if (bots.length !== desired || activeBots.length !== desired || bodyMismatch) {
+            if (bodyMismatch || invalidActiveBotBody)
+                this.botRepairCount += 1;
+            this.rebalanceRoles();
         }
     }
     pushAudioEvent(now, event) {
@@ -1175,10 +1324,13 @@ class UnsoccerServer {
         });
     }
     createTestPlayers(count) {
+        this.ballOwnerPlayerId = null;
+        this.ballPossessionReleasedUntil = 0;
         for (const player of this.players.values()) {
             this.destroyBody(player);
         }
         this.players.clear();
+        this.dormantBots.length = 0;
         this.joinCounter = 0;
         if (TEST_MODE) {
             this.testBotsEnabled = false;
@@ -1259,6 +1411,7 @@ class UnsoccerServer {
             lastSeenAt: Date.now(),
             botPersonality: botPersonality(botSeed),
             botFlank: botSeed % 2 === 0 ? 1 : -1,
+            botBehavior: "balanced",
             botLastKickCommandAt: 0,
             botLastHandCommandAt: 0,
             botLastHeadCommandAt: 0,
@@ -1311,6 +1464,8 @@ class UnsoccerServer {
         this.lastBallTouchPlayerId = null;
         this.lastBallTouchTeam = null;
         this.lastBallTouchAt = 0;
+        this.ballOwnerPlayerId = null;
+        this.ballPossessionReleasedUntil = 0;
         for (const session of this.persistedPlayers.values())
             session.goals = 0;
         this.resetBall(now);
@@ -1459,7 +1614,7 @@ class UnsoccerServer {
             let firstJoin = false;
             if (!runtime) {
                 const existingPlayer = this.playerByFingerprint(clientFingerprint);
-                if (!existingPlayer && this.connectedClientCount() >= MAX_ROOM_CLIENTS) {
+                if (!existingPlayer && this.rawConnectedClientCount() >= MAX_ROOM_CLIENTS) {
                     channel.emit("server-full", { maxRoomClients: MAX_ROOM_CLIENTS });
                     channel.close();
                     return;
@@ -1508,6 +1663,7 @@ class UnsoccerServer {
             if (runtime.channel !== channel)
                 return;
             const body = profilePatchSource(data);
+            runtime.lastSeenAt = Date.now();
             this.addChatMessage(runtime, body.text, Date.now());
         });
         channel.on("emotion", (data) => {
@@ -1516,6 +1672,7 @@ class UnsoccerServer {
             if (runtime.channel !== channel)
                 return;
             const body = profilePatchSource(data);
+            runtime.lastSeenAt = Date.now();
             this.applyEmotion(runtime, body.emotionId || body.id, Date.now());
         });
         channel.on("profile", (data) => {
@@ -1545,6 +1702,7 @@ class UnsoccerServer {
     }
     rebalanceRoles() {
         const now = Date.now();
+        this.removeStaleClientPlayers(now);
         this.syncBots(now);
         const ordered = [...this.players.values()].sort((a, b) => {
             const controllerOrder = Number(a.transport === "bot") - Number(b.transport === "bot");
@@ -1559,6 +1717,15 @@ class UnsoccerServer {
             if (active) {
                 const teamSlot = Math.floor(orderIndex / 2);
                 player.botFlank = teamSlot % 2 === 0 ? -1 : 1;
+                if (player.transport === "bot") {
+                    const secondEnforcer = this.botSettings.aggression >= 0.72 && teamSlot === 3;
+                    player.botBehavior = this.botSettings.aggression >= 0.35 && (teamSlot === 1 || secondEnforcer)
+                        ? "enforcer"
+                        : "balanced";
+                }
+            }
+            else if (player.transport === "bot") {
+                player.botBehavior = "balanced";
             }
             if (active && !player.body)
                 this.createBody(player);
@@ -1584,6 +1751,8 @@ class UnsoccerServer {
     destroyBody(player) {
         if (!player.body)
             return;
+        if (this.ballOwnerPlayerId === player.id)
+            this.dropBallOwner(Date.now());
         this.world.removeRigidBody(player.body);
         player.body = null;
     }
@@ -1667,29 +1836,50 @@ class UnsoccerServer {
             .sort((a, b) => a.distance - b.distance || a.player.index - b.player.index)
             .findIndex((entry) => entry.player.id === bot.id);
         const isPrimaryBallBot = teammateBallRank <= 0 && teamCanContestBall;
-        const canFight = bot.stamina >= this.settings.playerStaminaHitCost + 24 && !bot.exhausted && !bot.ragdoll;
-        const canStrike = bot.stamina >= this.settings.playerStaminaHitCost + 16 && !bot.exhausted && !bot.ragdoll;
+        const canAct = !bot.exhausted && !bot.ragdoll;
+        const canFight = canAct;
+        const canStrike = canAct;
+        const disabledPlayerCount = activePlayers.filter((player) => player.ragdoll || player.exhausted).length;
+        const collapseGuardLimit = Math.max(this.settings.botCombatCollapseGuardMinDisabled, Math.floor(activePlayers.length * this.settings.botCombatCollapseGuardRatio));
+        const collapseGuardActive = disabledPlayerCount >= collapseGuardLimit;
+        const nearestOpponentExhausted = nearestOpponent?.exhausted === true;
+        const canFinishExhaustedOpponent = nearestOpponentExhausted && fightWeight >= 0.8;
+        const botCombatPressureAllowed = this.botSettings.aggression >= this.settings.botCombatAggressionThreshold || canFinishExhaustedOpponent;
         const opponentBetweenBotAndBall = opponentPosition !== null
             && ballDistance > 0.35
             && opponentDistance < ballDistance
             && (((opponentPosition.x - botPosition.x) / Math.max(opponentDistance, 0.001)) * ((ballPosition.x - botPosition.x) / ballDistance)
                 + ((opponentPosition.z - botPosition.z) / Math.max(opponentDistance, 0.001)) * ((ballPosition.z - botPosition.z) / ballDistance)) > 0.62;
         const opponentBallDistance = opponentPosition ? distance2d(opponentPosition, ballPosition) : Infinity;
-        const supportCanPressure = nearestOpponent !== null
+        const canPressureOpponent = nearestOpponent !== null
             && opponentPosition !== null
             && !isPrimaryBallBot
             && canFight
+            && botCombatPressureAllowed
+            && (!collapseGuardActive || canFinishExhaustedOpponent)
             && !nearestOpponent.ragdoll
-            && !nearestOpponent.exhausted
-            && teammateBallRank >= 1
+            && (!nearestOpponent.exhausted || canFinishExhaustedOpponent)
+            && teammateBallRank >= 1;
+        const standardSupportCanPressure = canPressureOpponent
             && teammateBallRank <= 2 + Math.round(fightWeight * 2)
             && opponentBallDistance <= this.botSettings.chaseDistance + this.botSettings.supportReleaseDistance * 0.5
             && opponentDistance <= this.botSettings.fightDistance + this.botSettings.supportReleaseDistance + 0.9
             && ballDistance > this.settings.footKickAssistRange;
+        const enforcerPressDistance = this.botSettings.fightDistance + this.botSettings.supportReleaseDistance + 2.6 + fightWeight * 1.2;
+        const enforcerCanPressure = canPressureOpponent
+            && bot.botBehavior === "enforcer"
+            && !collapseGuardActive
+            && fightWeight >= 0.45
+            && opponentDistance <= enforcerPressDistance
+            && ballDistance > this.settings.footKickAssistRange * 0.75;
+        const supportCanPressure = standardSupportCanPressure || enforcerCanPressure;
         const shouldFight = nearestOpponent !== null
             && opponentPosition !== null
             && canFight
+            && botCombatPressureAllowed
+            && (!collapseGuardActive || canFinishExhaustedOpponent)
             && !nearestOpponent.ragdoll
+            && (!nearestOpponent.exhausted || canFinishExhaustedOpponent)
             && opponentDistance <= this.botSettings.fightDistance
             && (isPrimaryBallBot
                 ? ballDistance > this.botSettings.shootDistance * 0.8
@@ -1700,7 +1890,14 @@ class UnsoccerServer {
         if (shouldFight && opponentPosition) {
             target = opponentDistance > 1.05 ? opponentPosition : botPosition;
             yawTarget = opponentPosition;
-            if (bot.stamina >= this.settings.playerStaminaHitCost + 28 && now - bot.botLastHandCommandAt >= this.botSettings.handIntervalMs) {
+            const headFightReady = opponentDistance <= Math.min(this.botSettings.fightDistance, this.settings.headKickAssistRange + 0.45)
+                && now - bot.botLastHeadCommandAt >= this.botSettings.headIntervalMs
+                && (ballIsHigh || Math.sin(now * 0.006 + bot.botPersonality * 17) > 0.35);
+            if (headFightReady) {
+                input.head = bot.lastHead + 1;
+                bot.botLastHeadCommandAt = now;
+            }
+            else if (now - bot.botLastHandCommandAt >= this.botSettings.handIntervalMs) {
                 input.kickRight = bot.lastKickRight + 1;
                 bot.botLastHandCommandAt = now;
             }
@@ -1708,7 +1905,7 @@ class UnsoccerServer {
                 input.head = bot.lastHead + 1;
                 bot.botLastHeadCommandAt = now;
             }
-            else if (bot.stamina >= this.settings.playerStaminaHitCost + 24 && now - bot.botLastKickCommandAt >= this.botSettings.kickIntervalMs * 1.6) {
+            else if (now - bot.botLastKickCommandAt >= this.botSettings.kickIntervalMs * 1.6) {
                 input.kickLeft = bot.lastKickLeft + 1;
                 bot.botLastKickCommandAt = now;
             }
@@ -1793,12 +1990,13 @@ class UnsoccerServer {
         input.down = move.down;
         input.left = move.left;
         input.right = move.right;
-        input.sprint = isPrimaryBallBot
+        input.sprint = (isPrimaryBallBot || enforcerCanPressure)
             && bot.stamina >= this.settings.playerStaminaMax * 0.52
             && !bot.exhausted
             && !bot.ragdoll
             && (distance2d(botPosition, target) >= this.botSettings.sprintDistance
-                || (ballDistance <= this.botSettings.chaseDistance && Math.abs(ballPosition.z) > this.settings.fieldLength * 0.28));
+                || (enforcerCanPressure && opponentDistance > this.botSettings.fightDistance)
+                || (isPrimaryBallBot && ballDistance <= this.botSettings.chaseDistance && Math.abs(ballPosition.z) > this.settings.fieldLength * 0.28));
         input.yaw = this.yawTowards(botPosition, yawTarget, attackDirection);
         if (ballIsHigh
             && canStrike
@@ -1850,7 +2048,7 @@ class UnsoccerServer {
         for (const candidate of activePlayers) {
             if (candidate.id === bot.id || candidate.team === bot.team || !candidate.body)
                 continue;
-            if (candidate.ragdoll || candidate.exhausted)
+            if (candidate.ragdoll)
                 continue;
             const distance = distance2d(origin, this.runtimePosition(candidate));
             if (distance < bestDistance) {
@@ -1863,12 +2061,19 @@ class UnsoccerServer {
     tick(now = Date.now(), emitSnapshot = true) {
         const dt = 1 / SERVER_TICK_RATE;
         this.tickCount += 1;
-        this.cleanupStaleHttpPlayers(now);
+        this.cleanupStaleClientPlayers(now);
+        this.ensureBotFill(now);
         this.updateWeather(now);
         this.updateBotInputs(now);
+        const previousPlayerPositions = new Map();
+        for (const player of this.players.values()) {
+            if (player.body)
+                previousPlayerPositions.set(player.id, vec3FromRapier(player.body.translation()));
+        }
         for (const player of this.players.values()) {
             this.updatePlayer(player, dt, now);
         }
+        this.syncBallToOwner(now);
         const previousBallTranslation = this.ballBody.translation();
         const previousBallPosition = {
             x: previousBallTranslation.x,
@@ -1877,7 +2082,18 @@ class UnsoccerServer {
         };
         this.world.timestep = dt;
         this.world.step();
-        this.containBall();
+        const ownerBeforePostStepSync = this.ballOwnerPlayerId;
+        if (this.syncBallToOwner(now)) {
+            this.resolvePlayerBallCollision(previousBallPosition, now, previousPlayerPositions, {
+                skipPlayerId: ownerBeforePostStepSync,
+                dropOwnerOnHit: true
+            });
+            this.containBall();
+        }
+        else {
+            this.resolvePlayerBallCollision(previousBallPosition, now, previousPlayerPositions);
+            this.containBall();
+        }
         const goalResetActive = this.updateGoalReset(now);
         if (!goalResetActive)
             this.checkGoal(previousBallPosition, now);
@@ -1893,23 +2109,30 @@ class UnsoccerServer {
                 player.channel?.emit(eventName, data);
         }
     }
-    cleanupStaleHttpPlayers(now) {
+    cleanupStaleClientPlayers(now) {
+        const changed = this.removeStaleClientPlayers(now);
+        if (changed) {
+            this.rebalanceRoles();
+            this.message = "Игрок вышел";
+        }
+    }
+    removeStaleClientPlayers(now) {
         let changed = false;
         for (const player of this.players.values()) {
-            if (player.transport !== "http")
+            if (player.transport !== "http" && player.transport !== "websocket")
                 continue;
-            if (now - player.lastSeenAt < 30000)
+            if (!this.isStaleClientPlayer(player, now))
                 continue;
+            const staleChannel = player.channel;
+            player.channel = null;
             this.persistPlayerSession(player);
             this.pushRosterAudioEvent(player, "leave", now);
             this.destroyBody(player);
             this.players.delete(player.id);
+            staleChannel?.close();
             changed = true;
         }
-        if (changed) {
-            this.rebalanceRoles();
-            this.message = "\u0418\u0433\u0440\u043e\u043a \u0432\u044b\u0448\u0435\u043b";
-        }
+        return changed;
     }
     nextCharacterId() {
         if (this.characterDeck.length === 0) {
@@ -1927,6 +2150,8 @@ class UnsoccerServer {
     beginRagdoll(player, now, impulse = zeroVec()) {
         if (!player.body)
             return;
+        if (this.ballOwnerPlayerId === player.id)
+            this.dropBallOwner(now);
         const carry = player.ragdoll
             ? player.ragdollVelocity
             : {
@@ -2026,8 +2251,10 @@ class UnsoccerServer {
         if (canSprint) {
             player.stamina = Math.max(0, player.stamina - this.settings.playerStaminaSprintDrainPerSecond * dt);
             player.staminaRecoveryBlockedUntil = now + this.settings.playerStaminaRecoveryDelayMs;
-            if (player.stamina <= 0.01)
-                this.beginRagdoll(player, now);
+            if (player.stamina <= 0.01) {
+                player.exhausted = true;
+                player.sprinting = false;
+            }
         }
         else if (now >= player.staminaRecoveryBlockedUntil) {
             player.stamina = Math.min(this.settings.playerStaminaMax, player.stamina + this.settings.playerStaminaRecoveryPerSecond * dt);
@@ -2097,7 +2324,8 @@ class UnsoccerServer {
         else
             player.yaw = player.input.yaw;
         player.body.setNextKinematicTranslation(resolvedNext);
-        this.processBodyContact(player, now, resolvedNext);
+        if (!this.tryCaptureBall(player, now, resolvedNext))
+            this.processBodyContact(player, now, resolvedNext);
         this.processKick(player, now, dt, resolvedNext);
     }
     tryJump(player, now) {
@@ -2105,13 +2333,11 @@ class UnsoccerServer {
             return;
         if (player.ragdoll)
             return;
+        if (player.exhausted)
+            return;
         if (now - player.lastJumpAt < this.settings.playerJumpCooldownMs)
             return;
-        if (player.stamina < this.settings.playerStaminaJumpCost)
-            return;
         player.lastJumpAt = now;
-        player.stamina = Math.max(0, player.stamina - this.settings.playerStaminaJumpCost);
-        player.staminaRecoveryBlockedUntil = now + this.settings.playerStaminaRecoveryDelayMs;
         player.verticalVelocity = this.settings.playerJumpStrength;
         player.grounded = false;
         player.lastAction = "jump";
@@ -2124,8 +2350,6 @@ class UnsoccerServer {
             position: this.runtimePosition(player),
             speed: this.settings.playerJumpStrength
         });
-        if (player.stamina <= 0.01)
-            this.beginRagdoll(player, now);
     }
     updateStance(player, dt) {
         const speed = Math.hypot(player.velocity.x, player.velocity.z);
@@ -2181,6 +2405,8 @@ class UnsoccerServer {
         if (!player.body)
             return;
         if (this.goalReset)
+            return;
+        if (this.ballOwnerPlayerId === player.id)
             return;
         if (this.hasPendingActiveStrike(player, now))
             return;
@@ -2243,8 +2469,126 @@ class UnsoccerServer {
         this.lastBallTouchTeam = player.team;
         this.lastBallTouchAt = now;
     }
+    ballOwner() {
+        if (!this.ballOwnerPlayerId)
+            return null;
+        const owner = this.players.get(this.ballOwnerPlayerId) || null;
+        if (!owner || owner.role !== "player" || !owner.body || owner.ragdoll || owner.exhausted)
+            return null;
+        return owner;
+    }
+    dropBallOwner(now) {
+        this.ballOwnerPlayerId = null;
+        this.ballPossessionReleasedUntil = now + this.settings.ballPossessionRecaptureDelayMs;
+    }
+    ballCarryPosition(player, playerPosition = player.body?.translation()) {
+        const base = playerPosition ? vec3FromRapier(playerPosition) : this.runtimePosition(player);
+        const forwardX = Math.sin(player.yaw);
+        const forwardZ = Math.cos(player.yaw);
+        return {
+            x: base.x + forwardX * this.settings.ballPossessionCarryDistance,
+            y: base.y - this.settings.playerHeight / 2 + this.settings.ballRadius + this.settings.ballPossessionCarryHeight,
+            z: base.z + forwardZ * this.settings.ballPossessionCarryDistance
+        };
+    }
+    syncBallToOwner(now) {
+        if (!this.settings.ballPossessionEnabled) {
+            if (this.ballOwnerPlayerId)
+                this.dropBallOwner(now);
+            return false;
+        }
+        const owner = this.ballOwner();
+        if (!owner || !owner.body) {
+            if (this.ballOwnerPlayerId)
+                this.dropBallOwner(now);
+            return false;
+        }
+        const carryPosition = this.ballCarryPosition(owner);
+        this.ballBody.setTranslation(carryPosition, true);
+        this.ballBody.setLinvel({
+            x: owner.velocity.x,
+            y: Math.max(0, owner.velocity.y),
+            z: owner.velocity.z
+        }, true);
+        this.ballBody.setAngvel({ x: owner.velocity.z * 1.8, y: 0, z: -owner.velocity.x * 1.8 }, true);
+        this.recordBallTouch(owner, now);
+        return true;
+    }
+    tryCaptureBall(player, now, playerPosition) {
+        if (!this.settings.ballPossessionEnabled)
+            return false;
+        if (this.ballOwnerPlayerId || now < this.ballPossessionReleasedUntil)
+            return false;
+        if (!player.body || player.role !== "player" || player.ragdoll || player.exhausted)
+            return false;
+        const position = playerPosition || vec3FromRapier(player.body.translation());
+        const ballPosition = vec3FromRapier(this.ballBody.translation());
+        const ballSpeed = this.ballSpeed();
+        const groundBallY = this.settings.ballRadius + this.settings.ballPossessionMaxCaptureHeight;
+        if (ballSpeed > this.settings.ballPossessionMaxCaptureSpeed || ballPosition.y > groundBallY)
+            return false;
+        const distance = distance2d(position, ballPosition);
+        if (distance > this.settings.ballPossessionRange)
+            return false;
+        if (!ballOverlapsPlayerBodyHeight(position, ballPosition))
+            return false;
+        this.ballOwnerPlayerId = player.id;
+        this.syncBallToOwner(now);
+        return true;
+    }
+    possessionShotPowerMultiplier(charge, strong) {
+        const chargeFraction = strong ? 1 : clamp(charge, 0, 1);
+        const base = Math.max(0, this.settings.ballPossessionBasePowerMultiplier);
+        const full = Math.max(base, this.settings.ballPossessionFullPowerMultiplier, base * Math.max(1, this.settings.ballPossessionStrongMultiplier));
+        return lerp(base, full, chargeFraction);
+    }
+    releasePossessionShot(player, now, shot, charge = 0) {
+        if (this.ballOwnerPlayerId !== player.id || !player.body)
+            return false;
+        if (this.goalReset || player.ragdoll || player.exhausted)
+            return false;
+        const cooldown = shot === "upper" ? this.settings.handCooldownMs : this.settings.kickCooldownMs;
+        if (now - player.lastKickAt < cooldown)
+            return false;
+        player.lastKickAt = now;
+        const forwardX = Math.sin(player.yaw);
+        const forwardZ = Math.cos(player.yaw);
+        const strong = Boolean(player.input.sprint);
+        const multiplier = this.possessionShotPowerMultiplier(charge, strong);
+        const shotSpeed = (shot === "upper" ? this.settings.ballPossessionUpperShotSpeed : this.settings.ballPossessionLowShotSpeed) * multiplier;
+        const lift = (shot === "upper" ? this.settings.ballPossessionUpperShotLift : this.settings.ballPossessionLowShotLift) * (strong ? 1.18 : 1);
+        const carryPosition = this.ballCarryPosition(player);
+        this.ballOwnerPlayerId = null;
+        this.ballPossessionReleasedUntil = now + this.settings.ballPossessionRecaptureDelayMs;
+        this.ballBody.setTranslation(carryPosition, true);
+        this.ballBody.setLinvel({
+            x: forwardX * shotSpeed + player.velocity.x * 0.18,
+            y: lift,
+            z: forwardZ * shotSpeed + player.velocity.z * 0.18
+        }, true);
+        this.recordBallTouch(player, now);
+        player.lastAction = shot === "upper" ? "hand" : "left";
+        player.lastActionSide = shot === "upper" ? sideLabel(player.nextHandSide) : player.trailingFoot;
+        player.lastActionAt = now;
+        if (shot === "upper")
+            player.nextHandSide = player.nextHandSide === 1 ? -1 : 1;
+        this.pushAudioEvent(now, {
+            kind: "kick",
+            kick: player.lastAction,
+            playerId: player.id,
+            position: this.runtimePosition(player),
+            speed: this.ballSpeed()
+        });
+        this.message = `${player.name} ${shot === "upper" ? "\u043f\u043e\u0434\u0431\u0440\u043e\u0441\u0438\u043b \u043c\u044f\u0447 \u0432\u0435\u0440\u0445\u043e\u043c" : "\u043f\u0440\u043e\u0431\u0438\u043b \u043c\u044f\u0447 \u043d\u0438\u0437\u043e\u043c"}${strong ? " \u0441 \u0443\u0441\u0438\u043b\u0435\u043d\u0438\u0435\u043c" : ""}`;
+        return true;
+    }
     processKick(player, now, dt, contactPosition) {
         const leftHeld = Boolean(player.input.kickLeftHeld);
+        if (player.exhausted) {
+            this.consumeExhaustedCombatInput(player, leftHeld);
+            return;
+        }
+        const ownsBall = this.ballOwnerPlayerId === player.id;
         if (leftHeld && !player.lastKickLeftHeld) {
             player.leftKickChargeStartedAt = now;
             player.leftKickChargeHeldMs = 0;
@@ -2256,7 +2600,7 @@ class UnsoccerServer {
         const leftKickCharge = player.leftKickChargeStartedAt >= 0 || player.leftKickChargeHeldMs > 0
             ? leftKickChargeFractionFromHeldMs(player.leftKickChargeHeldMs)
             : 0;
-        if (leftHeld && !player.kickLeftHoldConsumed) {
+        if (!ownsBall && leftHeld && !player.kickLeftHoldConsumed) {
             if (this.tryKick(player, "left", now, {
                 charge: leftKickCharge,
                 requireBallContact: true,
@@ -2266,8 +2610,9 @@ class UnsoccerServer {
             }
         }
         if (player.input.kickLeft > player.lastKickLeft) {
-            player.lastKickLeft = player.input.kickLeft;
+            const nextKickLeft = player.input.kickLeft;
             if (this.tryCelebration(player, "celebrate1", now)) {
+                player.lastKickLeft = nextKickLeft;
                 if (!leftHeld && player.lastKickLeftHeld) {
                     player.leftKickChargeStartedAt = -1;
                     player.leftKickChargeHeldMs = 0;
@@ -2276,16 +2621,28 @@ class UnsoccerServer {
                 player.lastKickLeftHeld = leftHeld;
                 return;
             }
+            let consumedLeftKick = player.kickLeftHoldConsumed;
             if (!player.kickLeftHoldConsumed) {
-                if (this.tryKick(player, "left", now, { charge: leftKickCharge, contactPosition })) {
+                if (this.ballOwnerPlayerId === player.id) {
+                    consumedLeftKick = this.releasePossessionShot(player, now, "low", leftKickCharge);
+                    if (consumedLeftKick) {
+                        player.leftKickBufferedUntil = 0;
+                        player.leftKickBufferedCharge = 0;
+                    }
+                }
+                else if (this.tryKick(player, "left", now, { charge: leftKickCharge, contactPosition })) {
+                    consumedLeftKick = true;
                     player.leftKickBufferedUntil = 0;
                     player.leftKickBufferedCharge = 0;
                 }
                 else {
+                    consumedLeftKick = true;
                     player.leftKickBufferedUntil = now + this.settings.leftKickInputBufferMs;
                     player.leftKickBufferedCharge = leftKickCharge;
                 }
             }
+            if (consumedLeftKick)
+                player.lastKickLeft = nextKickLeft;
             player.kickLeftHoldConsumed = false;
         }
         if (!leftHeld && player.lastKickLeftHeld) {
@@ -2309,17 +2666,40 @@ class UnsoccerServer {
             player.leftKickBufferedCharge = 0;
         }
         if (player.input.kickRight > player.lastKickRight) {
-            player.lastKickRight = player.input.kickRight;
-            if (this.tryCelebration(player, "celebrate2", now))
+            const nextKickRight = player.input.kickRight;
+            if (this.tryCelebration(player, "celebrate2", now)) {
+                player.lastKickRight = nextKickRight;
                 return;
-            this.tryKick(player, "hand", now, { contactPosition });
+            }
+            const acted = this.ballOwnerPlayerId === player.id
+                ? this.releasePossessionShot(player, now, "upper")
+                : this.tryKick(player, "hand", now, { contactPosition });
+            if (acted)
+                player.lastKickRight = nextKickRight;
         }
         if (player.input.head > player.lastHead) {
-            player.lastHead = player.input.head;
-            if (this.tryCelebration(player, "celebrate3", now))
+            const nextHead = player.input.head;
+            if (this.tryCelebration(player, "celebrate3", now)) {
+                player.lastHead = nextHead;
                 return;
-            this.tryKick(player, "head", now, { contactPosition });
+            }
+            if (this.tryKick(player, "head", now, { contactPosition }))
+                player.lastHead = nextHead;
         }
+    }
+    consumeExhaustedCombatInput(player, leftHeld) {
+        if (player.input.kickLeft > player.lastKickLeft)
+            player.lastKickLeft = player.input.kickLeft;
+        if (player.input.kickRight > player.lastKickRight)
+            player.lastKickRight = player.input.kickRight;
+        if (player.input.head > player.lastHead)
+            player.lastHead = player.input.head;
+        player.leftKickChargeStartedAt = -1;
+        player.leftKickChargeHeldMs = 0;
+        player.kickLeftHoldConsumed = false;
+        player.leftKickBufferedUntil = 0;
+        player.leftKickBufferedCharge = 0;
+        player.lastKickLeftHeld = leftHeld;
     }
     tryCelebration(player, kind, now) {
         if (!player.body || player.role !== "player")
@@ -2341,6 +2721,8 @@ class UnsoccerServer {
         if (!player.body)
             return false;
         if (player.ragdoll)
+            return false;
+        if (player.exhausted)
             return false;
         if (kind === "jump" || kind === "body")
             return false;
@@ -2392,8 +2774,11 @@ class UnsoccerServer {
             && verticalInRange
             && (closeBodyContact || playerToBallAlignment >= -0.15);
         const ballInRange = preciseInRange || assistedInRange;
+        const airborneDashReach = kind === "left" && !player.grounded && !ballInRange
+            ? this.settings.jumpKickDashSpeed * 0.5
+            : 0;
         const playerHitInRange = !options.requireBallContact
-            && this.canApplyPlayerHit(player, kind, { x: forwardX, z: forwardZ });
+            && this.canApplyPlayerHit(player, kind, { x: forwardX, z: forwardZ }, { rangeBonus: airborneDashReach });
         if (options.requireBallContact && !ballInRange)
             return false;
         const shouldKeepLeftKickBuffered = kind === "left"
@@ -2415,20 +2800,12 @@ class UnsoccerServer {
         else if (kind === "hand") {
             if (now - player.lastKickAt < this.settings.handCooldownMs)
                 return false;
-            if (player.stamina < this.settings.playerStaminaHitCost)
-                return false;
             player.lastKickAt = now;
-            player.stamina = Math.max(0, player.stamina - this.settings.playerStaminaHitCost);
-            player.staminaRecoveryBlockedUntil = now + this.settings.playerStaminaRecoveryDelayMs;
         }
         else {
             if (now - player.lastKickAt < this.settings.kickCooldownMs)
                 return false;
-            if (player.stamina < this.settings.playerStaminaHitCost)
-                return false;
             player.lastKickAt = now;
-            player.stamina = Math.max(0, player.stamina - this.settings.playerStaminaHitCost);
-            player.staminaRecoveryBlockedUntil = now + this.settings.playerStaminaRecoveryDelayMs;
         }
         let acted = false;
         if (ballInRange) {
@@ -2451,7 +2828,11 @@ class UnsoccerServer {
             this.recordBallTouch(player, now);
             acted = true;
         }
-        acted = (playerHitInRange && this.applyPlayerHit(player, kind, now, { x: forwardX, z: forwardZ })) || acted;
+        if (!ballInRange && kind === "left" && !player.grounded)
+            this.applyJumpKickDash(player, { x: forwardX, z: forwardZ });
+        acted = (!options.requireBallContact
+            && this.applyPlayerHit(player, kind, now, { x: forwardX, z: forwardZ }, { rangeBonus: airborneDashReach }))
+            || acted;
         acted = acted || visualOnlyStrike;
         if (!acted)
             return false;
@@ -2468,40 +2849,54 @@ class UnsoccerServer {
             speed: Math.max(kind === "head" ? this.settings.headKickStrength : kind === "hand" ? this.settings.handHitStrength : this.settings.footKickStrength, this.ballSpeed())
         });
         this.message = `${player.name} ${this.actionLabel(kind, player.lastActionSide)}`;
-        if (player.stamina <= 0.01) {
-            this.beginRagdoll(player, now, {
-                x: forwardX * 1.1,
-                y: 0.45,
-                z: forwardZ * 1.1
-            });
-        }
         return true;
     }
-    applyPlayerHit(attacker, kind, now, forward) {
+    applyJumpKickDash(player, forward) {
+        const dash = this.settings.jumpKickDashSpeed;
+        if (dash <= 0)
+            return;
+        player.pushVelocity.x += forward.x * dash;
+        player.pushVelocity.z += forward.z * dash;
+        player.velocity = {
+            x: player.velocity.x + forward.x * dash,
+            y: player.velocity.y,
+            z: player.velocity.z + forward.z * dash
+        };
+    }
+    applyPlayerHit(attacker, kind, now, forward, options = {}) {
         if (!attacker.body || kind === "body" || kind === "jump")
             return false;
         const origin = attacker.body.translation();
-        const { range, cone } = playerHitProfile(kind);
+        const profile = playerHitProfile(kind);
+        const dashReach = Math.max(0, options.rangeBonus || 0);
+        const range = profile.range + (kind === "left" && !attacker.grounded ? this.settings.jumpKickHitRangeBonus : 0) + dashReach;
+        const cone = profile.cone;
         let hit = false;
         for (const target of this.players.values()) {
-            if (target.id === attacker.id || target.role !== "player" || !target.body)
+            if (target.id === attacker.id || target.role !== "player" || !target.body || target.ragdoll)
+                continue;
+            if (!this.settings.friendlyFireEnabled && target.team !== null && target.team === attacker.team)
                 continue;
             const targetPosition = target.body.translation();
             const dx = targetPosition.x - origin.x;
             const dz = targetPosition.z - origin.z;
             const distance = Math.hypot(dx, dz);
-            if (distance > range || distance < 0.001)
+            if (distance > range)
                 continue;
-            const alignment = (dx / distance) * forward.x + (dz / distance) * forward.z;
-            if (alignment < cone)
+            if (!playerHitHeightInRange(origin, targetPosition, kind))
+                continue;
+            const pointBlank = distance <= this.settings.playerRadius * 0.65;
+            const alignment = distance > 0.001 ? (dx / distance) * forward.x + (dz / distance) * forward.z : 1;
+            if (!pointBlank && alignment < cone)
                 continue;
             const airborneHead = kind === "head" && !attacker.grounded;
-            const damage = kind === "left"
-                ? this.settings.footPlayerStaminaDamage
-                : kind === "hand"
-                    ? this.settings.handPlayerStaminaDamage
-                    : this.settings.headPlayerStaminaDamage + (airborneHead ? this.settings.airborneHeadStaminaDamageBonus : 0);
-            const staminaBeforeHit = target.stamina;
+            const damage = this.settings.playerHitFullKnockoutEnabled
+                ? this.settings.playerStaminaMax
+                : kind === "left"
+                    ? this.settings.footPlayerStaminaDamage
+                    : kind === "hand"
+                        ? this.settings.handPlayerStaminaDamage
+                        : this.settings.headPlayerStaminaDamage + (airborneHead ? this.settings.airborneHeadStaminaDamageBonus : 0);
             target.stamina = Math.max(0, target.stamina - damage);
             target.staminaRecoveryBlockedUntil = now + this.settings.playerHitRecoveryDelayMs;
             if (target.stamina <= 0.01)
@@ -2509,7 +2904,7 @@ class UnsoccerServer {
             target.lastAction = "body";
             target.lastActionSide = null;
             target.lastActionAt = now;
-            if (staminaBeforeHit > 0.01 && target.stamina <= 0.01) {
+            if (target.stamina <= 0.01) {
                 const knockoutPower = this.settings.playerRagdollHitKnockback * (kind === "hand" ? 1.12 : kind === "head" ? 1.05 : 0.96);
                 this.beginRagdoll(target, now, {
                     x: forward.x * knockoutPower + attacker.velocity.x * 0.22,
@@ -2525,22 +2920,30 @@ class UnsoccerServer {
         }
         return hit;
     }
-    canApplyPlayerHit(attacker, kind, forward) {
+    canApplyPlayerHit(attacker, kind, forward, options = {}) {
         if (!attacker.body || kind === "body" || kind === "jump")
             return false;
         const origin = attacker.body.translation();
-        const { range, cone } = playerHitProfile(kind);
+        const profile = playerHitProfile(kind);
+        const dashReach = Math.max(0, options.rangeBonus || 0);
+        const range = profile.range + (kind === "left" && !attacker.grounded ? this.settings.jumpKickHitRangeBonus : 0) + dashReach;
+        const cone = profile.cone;
         for (const target of this.players.values()) {
-            if (target.id === attacker.id || target.role !== "player" || !target.body)
+            if (target.id === attacker.id || target.role !== "player" || !target.body || target.ragdoll)
+                continue;
+            if (!this.settings.friendlyFireEnabled && target.team !== null && target.team === attacker.team)
                 continue;
             const targetPosition = target.body.translation();
             const dx = targetPosition.x - origin.x;
             const dz = targetPosition.z - origin.z;
             const distance = Math.hypot(dx, dz);
-            if (distance > range || distance < 0.001)
+            if (distance > range)
                 continue;
-            const alignment = (dx / distance) * forward.x + (dz / distance) * forward.z;
-            if (alignment >= cone)
+            if (!playerHitHeightInRange(origin, targetPosition, kind))
+                continue;
+            const pointBlank = distance <= this.settings.playerRadius * 0.65;
+            const alignment = distance > 0.001 ? (dx / distance) * forward.x + (dz / distance) * forward.z : 1;
+            if (pointBlank || alignment >= cone)
                 return true;
         }
         return false;
@@ -2691,6 +3094,104 @@ class UnsoccerServer {
         this.ballBody.setTranslation(nextPosition, true);
         this.ballBody.setLinvel(nextVelocity, true);
     }
+    resolvePlayerBallCollision(previousBallPosition, now, previousPlayerPositions = new Map(), options = {}) {
+        if (this.goalReset)
+            return;
+        const ballPosition = this.ballBody.translation();
+        const ballVelocity = this.ballBody.linvel();
+        const nextPosition = { x: ballPosition.x, y: Math.max(ballPosition.y, this.settings.ballRadius), z: ballPosition.z };
+        const nextVelocity = { x: ballVelocity.x, y: ballVelocity.y, z: ballVelocity.z };
+        const safeRadius = this.settings.playerRadius + this.settings.ballRadius + this.settings.playerBallCollisionSkin;
+        const restitution = Math.max(0, this.settings.playerBallCollisionRestitution);
+        let resolved = false;
+        for (const player of this.players.values()) {
+            if (player.role !== "player" || !player.body)
+                continue;
+            if (options.skipPlayerId && player.id === options.skipPlayerId)
+                continue;
+            const playerPosition = vec3FromRapier(player.body.translation());
+            const previousPlayerPosition = previousPlayerPositions.get(player.id) || playerPosition;
+            const verticalOverlap = ballOverlapsPlayerBodyHeight(playerPosition, nextPosition)
+                || ballOverlapsPlayerBodyHeight(playerPosition, previousBallPosition)
+                || ballOverlapsPlayerBodyHeight(previousPlayerPosition, nextPosition)
+                || ballOverlapsPlayerBodyHeight(previousPlayerPosition, previousBallPosition);
+            if (!verticalOverlap)
+                continue;
+            const currentDx = nextPosition.x - playerPosition.x;
+            const currentDz = nextPosition.z - playerPosition.z;
+            const currentDistance = Math.hypot(currentDx, currentDz);
+            let normalX = currentDistance > 0.001 ? currentDx / currentDistance : 0;
+            let normalZ = currentDistance > 0.001 ? currentDz / currentDistance : 0;
+            let hit = currentDistance < safeRadius;
+            if (!hit) {
+                const relativePreviousX = previousBallPosition.x - previousPlayerPosition.x;
+                const relativePreviousZ = previousBallPosition.z - previousPlayerPosition.z;
+                const relativeNextX = nextPosition.x - playerPosition.x;
+                const relativeNextZ = nextPosition.z - playerPosition.z;
+                const segmentX = relativeNextX - relativePreviousX;
+                const segmentZ = relativeNextZ - relativePreviousZ;
+                const segmentLengthSq = segmentX * segmentX + segmentZ * segmentZ;
+                if (segmentLengthSq > 0.000001) {
+                    const t = clamp(-(relativePreviousX * segmentX + relativePreviousZ * segmentZ) / segmentLengthSq, 0, 1);
+                    const closestDx = relativePreviousX + segmentX * t;
+                    const closestDz = relativePreviousZ + segmentZ * t;
+                    const closestDistance = Math.hypot(closestDx, closestDz);
+                    hit = closestDistance < safeRadius;
+                    if (hit) {
+                        const previousDx = previousBallPosition.x - previousPlayerPosition.x;
+                        const previousDz = previousBallPosition.z - previousPlayerPosition.z;
+                        const previousDistance = Math.hypot(previousDx, previousDz);
+                        if (previousDistance > 0.001) {
+                            normalX = previousDx / previousDistance;
+                            normalZ = previousDz / previousDistance;
+                        }
+                        else if (closestDistance > 0.001) {
+                            normalX = closestDx / closestDistance;
+                            normalZ = closestDz / closestDistance;
+                        }
+                        else {
+                            const speed = Math.hypot(nextVelocity.x, nextVelocity.z);
+                            normalX = speed > 0.001 ? -nextVelocity.x / speed : Math.sin(player.yaw);
+                            normalZ = speed > 0.001 ? -nextVelocity.z / speed : Math.cos(player.yaw);
+                        }
+                    }
+                }
+            }
+            if (!hit)
+                continue;
+            if (Math.hypot(normalX, normalZ) < 0.001) {
+                normalX = Math.sin(player.yaw);
+                normalZ = Math.cos(player.yaw);
+            }
+            nextPosition.x = playerPosition.x + normalX * safeRadius;
+            nextPosition.z = playerPosition.z + normalZ * safeRadius;
+            const approach = nextVelocity.x * normalX + nextVelocity.z * normalZ;
+            if (approach < 0) {
+                nextVelocity.x -= (1 + restitution) * approach * normalX;
+                nextVelocity.z -= (1 + restitution) * approach * normalZ;
+                nextVelocity.y = Math.max(nextVelocity.y, 0.08);
+            }
+            const bodyPush = player.velocity.x * normalX + player.velocity.z * normalZ;
+            if (bodyPush > 0) {
+                const currentPushSpeed = nextVelocity.x * normalX + nextVelocity.z * normalZ;
+                const targetPushSpeed = bodyPush * this.settings.playerBallCollisionPush;
+                if (currentPushSpeed < targetPushSpeed) {
+                    const pushDelta = targetPushSpeed - currentPushSpeed;
+                    nextVelocity.x += normalX * pushDelta;
+                    nextVelocity.z += normalZ * pushDelta;
+                    nextVelocity.y = Math.max(nextVelocity.y, 0.04);
+                }
+            }
+            this.recordBallTouch(player, now);
+            if (options.dropOwnerOnHit && this.ballOwnerPlayerId)
+                this.dropBallOwner(now);
+            resolved = true;
+        }
+        if (!resolved)
+            return;
+        this.ballBody.setTranslation(nextPosition, true);
+        this.ballBody.setLinvel(nextVelocity, true);
+    }
     resolveGoalPostBounce(nextPosition, nextVelocity) {
         const goalZs = [-this.settings.fieldLength / 2, this.settings.fieldLength / 2];
         for (const goalZ of goalZs) {
@@ -2782,6 +3283,8 @@ class UnsoccerServer {
         this.lastBallTouchPlayerId = null;
         this.lastBallTouchTeam = null;
         this.lastBallTouchAt = 0;
+        this.ballOwnerPlayerId = null;
+        this.ballPossessionReleasedUntil = now + this.settings.ballPossessionRecaptureDelayMs;
         this.ballBody.setTranslation(this.kickoffBallPosition(), true);
         this.ballBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
         this.ballBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
@@ -2825,7 +3328,8 @@ class UnsoccerServer {
         const ball = {
             position: vec3FromRapier(this.ballBody.translation()),
             velocity: vec3FromRapier(this.ballBody.linvel()),
-            variant: this.activeBallVariant
+            variant: this.activeBallVariant,
+            ownerPlayerId: this.ballOwnerPlayerId
         };
         return {
             version: GAME_VERSION,
@@ -2885,19 +3389,67 @@ class UnsoccerServer {
         };
     }
     serverInfo() {
+        const now = Date.now();
         let activePlayers = 0;
+        let activeBotPlayers = 0;
+        let activeHumanPlayers = 0;
+        let activeTestPlayers = 0;
+        let staleHumanClients = 0;
+        let staleHttpClients = 0;
+        let staleWebSocketClients = 0;
         for (const player of this.players.values()) {
-            if (player.role === "player")
+            const clientTransport = player.transport === "http" || player.transport === "websocket";
+            const staleClient = clientTransport && this.isStaleClientPlayer(player, now);
+            if (staleClient) {
+                staleHumanClients += 1;
+                if (player.transport === "http")
+                    staleHttpClients += 1;
+                if (player.transport === "websocket")
+                    staleWebSocketClients += 1;
+            }
+            if (player.role === "player") {
                 activePlayers += 1;
+                if (player.transport === "bot")
+                    activeBotPlayers += 1;
+                else if (player.transport === "test")
+                    activeTestPlayers += 1;
+                else if (!staleClient)
+                    activeHumanPlayers += 1;
+            }
         }
+        const botPlayers = this.botPlayers().length;
+        const invalidActiveBotPlayers = [...this.players.values()].filter((player) => this.activeBotBodyInvalid(player)).length;
+        const humanClients = this.liveHumanClientCount(now);
+        const desiredBotPlayers = this.desiredBotCount(now);
+        const nonBotActiveSlots = this.nonBotActiveSlotCount(now);
         return {
             ok: true,
             version: GAME_VERSION,
             settingsRevision: this.settingsRevision,
             activePlayers,
-            connectedClients: this.connectedClientCount(),
+            botPlayers,
+            activeBotPlayers,
+            dormantBotPlayers: this.dormantBots.length,
+            botReuseCount: this.botReuseCount,
+            botRepairCount: this.botRepairCount,
+            invalidActiveBotPlayers,
+            desiredBotPlayers,
+            nonBotActiveSlots,
+            activeHumanPlayers,
+            activeTestPlayers,
+            staleHumanClients,
+            staleHttpClients,
+            staleWebSocketClients,
+            botFillSuppressionReason: this.botFillSuppressionReason(nonBotActiveSlots),
+            humanClients,
+            connectedClients: humanClients,
             maxActivePlayers: this.settings.maxActivePlayers,
             maxRoomClients: MAX_ROOM_CLIENTS,
+            botsRuntimeEnabled: this.botsEnabled(),
+            botTargetActivePlayers: this.botSettings.targetActivePlayers,
+            httpClientStaleMs: this.settings.httpClientStaleMs,
+            websocketClientStaleMs: this.settings.websocketClientStaleMs,
+            testMode: TEST_MODE,
             transports: {
                 websocket: this.websocketEnabled,
                 http: true

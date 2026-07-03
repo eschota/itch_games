@@ -235,6 +235,8 @@ const eventFeedEl = requireElement<HTMLElement>("#event-feed");
 const ballOffscreenIndicatorEl = requireElement<HTMLElement>("#ball-offscreen-indicator");
 const playersOffscreenIndicatorsEl = requireElement<HTMLElement>("#players-offscreen-indicators");
 const controlHintsEl = requireElement<HTMLElement>("#control-hints");
+const mobileControlsEl = requireElement<HTMLElement>("#mobile-controls");
+const mobileMovePadEl = requireElement<HTMLElement>(".mobile-move-pad");
 const emotionWheelEl = requireElement<HTMLElement>("#emotion-wheel");
 const chatPanelEl = requireElement<HTMLElement>("#game-chat");
 const chatLogEl = requireElement<HTMLElement>("#chat-log");
@@ -261,8 +263,8 @@ const graphicsStateEl = requireElement<HTMLElement>("#graphics-state");
 const networkStateEl = requireElement<HTMLElement>("#network-state");
 const testSoundButton = requireElement<HTMLButtonElement>("#test-sound-button");
 const versionBadge = requireElement<HTMLElement>("#version-badge");
-const ART_PASS_VERSION = "v0.0.033";
-const BUILD_WEIGHT_LABEL = "83.79 MB";
+const ART_PASS_VERSION = "v0.0.036";
+const BUILD_WEIGHT_LABEL = "40.05 MB";
 const DAWN_START_SECONDS = 3 * 60 * 60;
 const DAYLIGHT_START_SECONDS = 5 * 60 * 60;
 const DUSK_START_SECONDS = 21 * 60 * 60;
@@ -650,6 +652,7 @@ let leftKickChargeStartedAt = 0;
 let leftKickChargingPointerId: number | null = null;
 let leftKickChargingByPointer = false;
 let lastFrameSeconds = 0;
+let lastRenderFrameAt = 0;
 let interpolationAlpha = 1;
 let interpolationRenderAgeMs = 0;
 let qaDayCycleSeconds: number | null = readQaDayCycleSeconds();
@@ -692,6 +695,22 @@ let emotionWheelSelectedIndex = 0;
 let emotionWheelCloseTimer = 0;
 const pressedCodes = new Set<string>();
 const eventFeedMessages: string[] = [];
+type MobileDirection = "up" | "down" | "left" | "right";
+type MobileAction = "sprint" | "jump" | "leftKick" | "rightKick" | "headHit";
+const mobileDirectionPointers = new Map<number, MobileDirection>();
+const mobileActionPointers = new Map<number, MobileAction>();
+const mobileMoveVector = { x: 0, y: 0, strength: 0 };
+let mobileMovePointerId: number | null = null;
+const MOBILE_MOVE_DEAD_ZONE = 0.18;
+const MOBILE_DIRECTION_ACTIONS: Record<MobileDirection, InputAction> = {
+  up: "moveForward",
+  down: "moveBack",
+  left: "moveLeft",
+  right: "moveRight"
+};
+const mobilePointerMedia = matchMedia("(pointer: coarse)");
+const mobileWidthMedia = matchMedia("(max-width: 840px)");
+const forceMobileControls = new URLSearchParams(location.search).get("mobileControls") === "1";
 
 function inputEl(selector: string): HTMLInputElement {
   return requireElement<HTMLInputElement>(selector);
@@ -721,6 +740,11 @@ function sanitizeLocalUserPic(value: string): string {
 
 function sanitizeLocalSkin(value: string): string {
   return (CHARACTER_ROSTER as readonly string[]).includes(value) ? value : rosterSkinFallback();
+}
+
+function migrateStoredSkin(value: string | undefined, hasExplicitSkin: boolean): string {
+  if (!hasExplicitSkin && value === "6299851") return rosterSkinFallback();
+  return sanitizeLocalSkin(value || "");
 }
 
 function randomFingerprintSeed(): string {
@@ -774,9 +798,10 @@ function loadBrowserFingerprint(): string {
 
 function loadLocalProfile(): LocalPlayerProfile {
   const query = new URLSearchParams(location.search);
+  const explicitSkin = query.get("skin") || query.get("skinId");
   const fallback: LocalPlayerProfile = {
     nickname: sanitizeLocalName(query.get("name") || ""),
-    skinId: sanitizeLocalSkin(query.get("skin") || query.get("skinId") || ""),
+    skinId: sanitizeLocalSkin(explicitSkin || ""),
     userPic: sanitizeLocalUserPic(query.get("user_pic") || query.get("userPic") || "")
   };
   try {
@@ -784,7 +809,7 @@ function loadLocalProfile(): LocalPlayerProfile {
     if (!stored) return fallback;
     return {
       nickname: sanitizeLocalName(query.get("name") || stored.nickname || fallback.nickname),
-      skinId: sanitizeLocalSkin(query.get("skin") || query.get("skinId") || stored.skinId || fallback.skinId),
+      skinId: explicitSkin ? sanitizeLocalSkin(explicitSkin) : migrateStoredSkin(stored.skinId || fallback.skinId, false),
       userPic: sanitizeLocalUserPic(query.get("user_pic") || query.get("userPic") || stored.userPic || fallback.userPic)
     };
   } catch (_) {
@@ -946,6 +971,7 @@ function openChat(): void {
   chatInputEl.focus();
   chatInputEl.select();
   pressedCodes.clear();
+  clearMobileControls();
   updateResolvedInput();
   sendInput(true);
   document.documentElement.dataset.chatActive = "true";
@@ -1240,6 +1266,7 @@ function setSettingsOpen(open: boolean): void {
   document.documentElement.dataset.settingsOpen = String(open);
   if (open) {
     pressedCodes.clear();
+    clearMobileControls();
     updateResolvedInput();
     syncSettingsUi();
     settingsPanel.querySelector<HTMLElement>("button[data-settings-tab]")?.focus();
@@ -1364,9 +1391,54 @@ function pushEventFeed(message: string): void {
   eventFeedEl.innerHTML = eventFeedMessages.map((item) => `<p>${escapeHtml(item)}</p>`).join("");
 }
 
-function syncInputTestPad(): void {
+function mergedPressedCodes(): Set<string> {
+  const codes = new Set(pressedCodes);
+  for (const direction of activeMobileDirections()) {
+    const code = codeForAction(settings.controls, MOBILE_DIRECTION_ACTIONS[direction]);
+    if (code) codes.add(code);
+  }
+  if ([...mobileActionPointers.values()].includes("sprint")) {
+    const code = codeForAction(settings.controls, "sprint");
+    if (code) codes.add(code);
+  }
+  return codes;
+}
+
+function activeMobileDirections(): MobileDirection[] {
+  const directions = [...mobileDirectionPointers.values()];
+  if (mobileMoveVector.strength > MOBILE_MOVE_DEAD_ZONE) {
+    if (mobileMoveVector.y < -MOBILE_MOVE_DEAD_ZONE) directions.push("up");
+    if (mobileMoveVector.y > MOBILE_MOVE_DEAD_ZONE) directions.push("down");
+    if (mobileMoveVector.x < -MOBILE_MOVE_DEAD_ZONE) directions.push("left");
+    if (mobileMoveVector.x > MOBILE_MOVE_DEAD_ZONE) directions.push("right");
+  }
+  return directions;
+}
+
+function updateMobileMoveVector(event: PointerEvent): void {
+  const rect = mobileMovePadEl.getBoundingClientRect();
+  const centerX = rect.left + rect.width * 0.5;
+  const centerY = rect.top + rect.height * 0.5;
+  const radius = Math.max(24, Math.min(rect.width, rect.height) * 0.43);
+  const rawX = (event.clientX - centerX) / radius;
+  const rawY = (event.clientY - centerY) / radius;
+  const length = Math.hypot(rawX, rawY);
+  const clamped = Math.min(1, length);
+  mobileMoveVector.x = length > 0 ? (rawX / length) * clamped : 0;
+  mobileMoveVector.y = length > 0 ? (rawY / length) * clamped : 0;
+  mobileMoveVector.strength = clamped;
+}
+
+function resetMobileMoveVector(): void {
+  mobileMovePointerId = null;
+  mobileMoveVector.x = 0;
+  mobileMoveVector.y = 0;
+  mobileMoveVector.strength = 0;
+}
+
+function syncInputTestPad(activeCodes = mergedPressedCodes()): void {
   for (const item of document.querySelectorAll<HTMLElement>("[data-pad]")) {
-    item.classList.toggle("is-active", actionPressed(settings.controls, item.dataset.pad as InputAction, pressedCodes));
+    item.classList.toggle("is-active", actionPressed(settings.controls, item.dataset.pad as InputAction, activeCodes));
   }
 }
 
@@ -1421,10 +1493,58 @@ function cancelLeftKickCharge(): void {
   syncLeftKickChargeDataset();
 }
 
+function syncMobileControlsUi(): void {
+  const enabled = forceMobileControls || mobilePointerMedia.matches || mobileWidthMedia.matches;
+  const portrait = window.innerHeight >= window.innerWidth;
+  const activeDirections = activeMobileDirections();
+  const activeDirectionSet = new Set(activeDirections);
+  mobileControlsEl.hidden = !enabled;
+  document.documentElement.dataset.mobileControls = String(enabled);
+  document.documentElement.dataset.mobileControlsForce = String(forceMobileControls);
+  document.documentElement.dataset.mobileControlsPortrait = String(portrait);
+  document.documentElement.dataset.mobileDirections = [...new Set(activeDirections)].sort().join(",");
+  document.documentElement.dataset.mobileActions = [...new Set(mobileActionPointers.values())].sort().join(",");
+  document.documentElement.dataset.mobileMoveX = mobileMoveVector.x.toFixed(3);
+  document.documentElement.dataset.mobileMoveY = mobileMoveVector.y.toFixed(3);
+  document.documentElement.dataset.mobileMoveStrength = mobileMoveVector.strength.toFixed(3);
+  if (activeDirections.length > 0) {
+    document.documentElement.dataset.mobileLastDirections = [...new Set(activeDirections)].sort().join(",");
+    document.documentElement.dataset.mobileLastMoveStrength = mobileMoveVector.strength.toFixed(3);
+  }
+  mobileMovePadEl.dataset.active = String(mobileMoveVector.strength > MOBILE_MOVE_DEAD_ZONE);
+  mobileMovePadEl.style.setProperty("--mobile-stick-x", `${(mobileMoveVector.x * 18).toFixed(1)}px`);
+  mobileMovePadEl.style.setProperty("--mobile-stick-y", `${(mobileMoveVector.y * 18).toFixed(1)}px`);
+  for (const button of mobileControlsEl.querySelectorAll<HTMLButtonElement>("[data-mobile-dir]")) {
+    const direction = button.dataset.mobileDir as MobileDirection;
+    button.classList.toggle("is-active", activeDirectionSet.has(direction));
+  }
+  for (const button of mobileControlsEl.querySelectorAll<HTMLButtonElement>("[data-mobile-action]")) {
+    const action = button.dataset.mobileAction as MobileAction;
+    button.classList.toggle("is-active", [...mobileActionPointers.values()].includes(action));
+  }
+}
+
 function updateResolvedInput(): void {
-  input = resolveMovementInput(settings.controls, pressedCodes, localJoin?.team ?? null, input);
+  const activeCodes = mergedPressedCodes();
+  input = resolveMovementInput(settings.controls, activeCodes, localJoin?.team ?? null, input);
   syncLeftKickChargeInput();
-  syncInputTestPad();
+  syncInputTestPad(activeCodes);
+  document.documentElement.dataset.resolvedInputDirections = [
+    input.up ? "up" : "",
+    input.down ? "down" : "",
+    input.left ? "left" : "",
+    input.right ? "right" : ""
+  ].filter(Boolean).join(",");
+  document.documentElement.dataset.resolvedInputSprint = String(input.sprint);
+  document.documentElement.dataset.resolvedInputActions = [
+    `left:${input.kickLeft}`,
+    `right:${input.kickRight}`,
+    `head:${input.head}`,
+    `jump:${input.jump}`,
+    `held:${input.kickLeftHeld}`,
+    `charge:${input.kickLeftCharge.toFixed(3)}`
+  ].join(",");
+  syncMobileControlsUi();
 }
 
 function formatBinding(code: string): string {
@@ -2679,6 +2799,17 @@ class PlayerVisual {
     return this.currentCharacterId === characterId;
   }
 
+  debugState() {
+    return {
+      visible: this.root.visible,
+      characterAttached: Boolean(this.characterController),
+      rigRagdoll: Boolean(this.characterDebug?.ragdoll),
+      rigStrike: this.characterDebug?.strike || "none",
+      rigStrikePulse: this.characterDebug?.strikePulse || 0,
+      handStrikeVisible: this.handStrike.visible
+    };
+  }
+
   private async attachCharacterModel(): Promise<void> {
     const loaded = await loadFree3dCharacter("assets/characters/free3d/roster.json", this.snapshot.characterId);
     if (!loaded || this.characterController) {
@@ -2701,6 +2832,8 @@ class PlayerVisual {
     document.documentElement.dataset.playerRigMode = loaded.roster.mode;
     document.documentElement.dataset.playerRigClipCount = String(Object.keys(loaded.clips).length);
     document.documentElement.dataset.playerRigTextures = String(loaded.textureCount);
+    document.documentElement.dataset.playerRigTexturelessPbr = String(Boolean(loaded.texturelessPbr?.converted));
+    document.documentElement.dataset.playerRigTexturelessStripped = String(loaded.texturelessPbr?.strippedTextureCount ?? 0);
     document.documentElement.dataset.playerRigIk = "procedural-bone-ik-overlay";
     document.documentElement.dataset.playerRigAttached = String(free3dCharacterAttachCount);
   }
@@ -2714,7 +2847,7 @@ class PlayerVisual {
     const snapDistance = this.renderInitialized ? this.renderPosition.distanceTo(targetPosition) : Number.POSITIVE_INFINITY;
     const dt = this.lastRenderUpdateTime > 0 ? Math.min(0.05, Math.max(0.001, time - this.lastRenderUpdateTime)) : 1 / 60;
     this.lastRenderUpdateTime = time;
-    if (!this.renderInitialized || snapDistance > PLAYER_SNAP_DISTANCE || snapshot.ragdoll) {
+    if (!this.renderInitialized || snapDistance > PLAYER_SNAP_DISTANCE) {
       this.renderPosition.copy(targetPosition);
       this.renderVelocity.set(snapshot.velocity.x, snapshot.velocity.y, snapshot.velocity.z);
       this.renderYaw = snapshot.yaw;
@@ -2793,19 +2926,26 @@ class PlayerVisual {
     const handArc = Math.sin(handPulse * Math.PI);
     if (this.characterController) {
       this.characterDebug = this.characterController.update(snapshot, time);
-      document.documentElement.dataset.playerRigAction = this.characterDebug.action;
-      document.documentElement.dataset.playerRigLocomotion = this.characterDebug.locomotion;
-      document.documentElement.dataset.playerRigStrike = this.characterDebug.strike;
-      document.documentElement.dataset.playerRigStrikePulse = this.characterDebug.strikePulse.toFixed(2);
-      document.documentElement.dataset.playerRigStrikeSide = this.characterDebug.strikeSide;
-      document.documentElement.dataset.playerRigTrailingFoot = snapshot.trailingFoot;
-      document.documentElement.dataset.playerRigLastActionSide = snapshot.lastActionSide || "none";
-      document.documentElement.dataset.playerRigCelebration = this.characterDebug.celebration;
-      document.documentElement.dataset.playerRigCelebrationPulse = this.characterDebug.celebrationPulse.toFixed(2);
-      document.documentElement.dataset.playerRigJumpStyle = this.characterDebug.jumpStyle;
-      document.documentElement.dataset.playerRigRagdoll = String(this.characterDebug.ragdoll);
-      document.documentElement.dataset.playerRigIk = this.characterDebug.ikMode;
-      document.documentElement.dataset.playerRigIkBones = String(this.characterDebug.boneCount);
+      if (!localJoin || snapshot.id === localJoin.id) {
+        document.documentElement.dataset.playerRigAction = this.characterDebug.action;
+        document.documentElement.dataset.playerRigLocomotion = this.characterDebug.locomotion;
+        document.documentElement.dataset.playerRigStrike = this.characterDebug.strike;
+        document.documentElement.dataset.playerRigStrikePulse = this.characterDebug.strikePulse.toFixed(2);
+        document.documentElement.dataset.playerRigStrikeSide = this.characterDebug.strikeSide;
+        document.documentElement.dataset.playerRigTrailingFoot = snapshot.trailingFoot;
+        document.documentElement.dataset.playerRigLastActionSide = snapshot.lastActionSide || "none";
+        document.documentElement.dataset.playerRigCelebration = this.characterDebug.celebration;
+        document.documentElement.dataset.playerRigCelebrationPulse = this.characterDebug.celebrationPulse.toFixed(2);
+        document.documentElement.dataset.playerRigJumpStyle = this.characterDebug.jumpStyle;
+        document.documentElement.dataset.playerRigRagdoll = String(this.characterDebug.ragdoll);
+        document.documentElement.dataset.playerRigIk = this.characterDebug.ikMode;
+        document.documentElement.dataset.playerRigIkBones = String(this.characterDebug.boneCount);
+        document.documentElement.dataset.localPlayerRigAction = this.characterDebug.action;
+        document.documentElement.dataset.localPlayerRigLocomotion = this.characterDebug.locomotion;
+        document.documentElement.dataset.localPlayerRigStrike = this.characterDebug.strike;
+        document.documentElement.dataset.localPlayerRigStrikePulse = this.characterDebug.strikePulse.toFixed(2);
+        document.documentElement.dataset.localPlayerRigRagdoll = String(this.characterDebug.ragdoll);
+      }
     }
 
     this.rig.position.y = bob + (snapshot.airborne ? 0.08 : 0);
@@ -3017,10 +3157,12 @@ class PlayerVisual {
     this.teamHaloMaterial.color.setHex(markerColor);
     this.teamHaloMaterial.opacity = snapshot.team === null ? 0.08 : snapshot.id === localJoin?.id ? 0.28 + localKickCharge * 0.2 : 0.2;
     this.ringMaterial.color.setHex(markerColor);
-    this.ringMaterial.opacity = snapshot.team === null ? 0.42 : snapshot.id === localJoin?.id ? 1 : 0.9;
-    this.ring.scale.setScalar(1 + actionPulse * 0.18 + celebrationArc * 0.22 + localKickCharge * 0.34);
-    this.ring.visible = !snapshot.exhausted || Math.sin(time * 12) > 0;
-    this.teamHalo.visible = this.ring.visible;
+    const exhaustionPulse = snapshot.exhausted ? 0.55 + Math.sin(time * 12) * 0.18 : 1;
+    this.ringMaterial.opacity = (snapshot.team === null ? 0.42 : snapshot.id === localJoin?.id ? 1 : 0.9) * exhaustionPulse;
+    this.ring.scale.setScalar(1 + actionPulse * 0.18 + celebrationArc * 0.22 + localKickCharge * 0.34 + (snapshot.exhausted ? (1 - exhaustionPulse) * 0.16 : 0));
+    this.ring.visible = snapshot.role === "player";
+    this.teamHaloMaterial.opacity *= snapshot.exhausted ? 0.72 : 1;
+    this.teamHalo.visible = snapshot.role === "player";
     this.label.material.opacity = snapshot.id === localJoin?.id ? 1 : 0.78;
     if (snapshot.id === localJoin?.id) {
       document.documentElement.dataset.localTeamMarker = snapshot.team === 0 ? "blue" : snapshot.team === 1 ? "orange" : "spectator";
@@ -3233,20 +3375,57 @@ function connectWebSocket(name: string) {
   transportMode = "websocket";
   const wsChannel = new WebSocketNetworkChannel(webSocketUrl());
   channel = wsChannel;
+  let stateWatchdogTimer = 0;
+  let stateWatchdogStartedAt = 0;
+  const clearStateWatchdog = () => {
+    if (!stateWatchdogTimer) return;
+    window.clearTimeout(stateWatchdogTimer);
+    stateWatchdogTimer = 0;
+  };
   const fallbackTimer = window.setTimeout(() => {
     if (!connected && transportMode === "websocket" && channel === wsChannel) {
+      clearStateWatchdog();
       wsChannel.close();
       channel = null;
       void connectHttp(name, "websocket-timeout");
     }
   }, 1800);
+  wsChannel.on("joined", (data) => {
+    acceptJoin(data as JoinAccepted);
+    stateWatchdogStartedAt = performance.now();
+    document.documentElement.dataset.websocketStateWatchdog = "waiting";
+    clearStateWatchdog();
+    stateWatchdogTimer = window.setTimeout(() => {
+      if (transportMode !== "websocket" || channel !== wsChannel) return;
+      if (latestSnapshotReceivedAt > stateWatchdogStartedAt) return;
+      document.documentElement.dataset.websocketStateWatchdog = "fallback";
+      connected = false;
+      transportMode = "none";
+      channel = null;
+      wsChannel.close();
+      resetServerAudioCursor();
+      resetStateInterpolation();
+      void connectHttp(name, "websocket-state-timeout");
+    }, 900);
+  });
+  wsChannel.on("server-full", () => {
+    statusEl.textContent = "\u0421\u0435\u0440\u0432\u0435\u0440 \u0437\u0430\u043f\u043e\u043b\u043d\u0435\u043d.";
+    pushEventFeed("\u0421\u0435\u0440\u0432\u0435\u0440 \u0437\u0430\u043f\u043e\u043b\u043d\u0435\u043d");
+  });
+  wsChannel.on("state", (data) => {
+    clearStateWatchdog();
+    document.documentElement.dataset.websocketStateWatchdog = "ok";
+    receiveState(data as ServerState);
+  });
   wsChannel.onConnect((error) => {
     if (transportMode !== "websocket" || channel !== wsChannel) {
+      clearStateWatchdog();
       wsChannel.close();
       return;
     }
     if (error) {
       window.clearTimeout(fallbackTimer);
+      clearStateWatchdog();
       channel = null;
       void connectHttp(name, error.message);
       console.warn("unsoccer connection failed", error.message);
@@ -3263,6 +3442,7 @@ function connectWebSocket(name: string) {
   });
   wsChannel.onDisconnect(() => {
     if (transportMode !== "websocket" || channel !== wsChannel) return;
+    clearStateWatchdog();
     connected = false;
     transportMode = "none";
     channel = null;
@@ -3274,16 +3454,12 @@ function connectWebSocket(name: string) {
     pushEventFeed("\u041e\u0442\u043a\u043b\u044e\u0447\u0435\u043d\u043e");
     updatePlayerChip();
     updateNetworkHud();
-  });
-  wsChannel.on("joined", (data) => {
-    acceptJoin(data as JoinAccepted);
-  });
-  wsChannel.on("server-full", () => {
-    statusEl.textContent = "\u0421\u0435\u0440\u0432\u0435\u0440 \u0437\u0430\u043f\u043e\u043b\u043d\u0435\u043d.";
-    pushEventFeed("\u0421\u0435\u0440\u0432\u0435\u0440 \u0437\u0430\u043f\u043e\u043b\u043d\u0435\u043d");
-  });
-  wsChannel.on("state", (data) => {
-    receiveState(data as ServerState);
+    document.documentElement.dataset.autoReconnect = String(settings.network.autoReconnect);
+    if (settings.network.autoReconnect) {
+      window.setTimeout(() => {
+        if (!connected && transportMode === "none" && settings.network.autoReconnect) connect();
+      }, 900);
+    }
   });
 }
 
@@ -3508,7 +3684,8 @@ function interpolateBall(from: ServerState["ball"], to: ServerState["ball"], alp
   return {
     position: lerpVec3(from.position, to.position, alpha),
     velocity: lerpVec3(from.velocity, to.velocity, alpha),
-    variant: to.variant
+    variant: to.variant,
+    ownerPlayerId: to.ownerPlayerId
   };
 }
 
@@ -3681,23 +3858,29 @@ function updateHud(state: ServerState) {
   const rawMessage = state.message;
   const message = translateServerMessage(rawMessage);
   if (settings.accessibility.captions && message) pushEventFeed(message);
+  const statusMessage = isTransientEventMessage(message) ? "" : message;
   if (isWeatherServerMessage(rawMessage)) {
     statusEl.textContent = message;
     statusEl.title = rawMessage;
   } else if (!localJoin || localJoin.role === "spectator") {
     statusEl.title = "";
-    statusEl.textContent = `${message}.${goalResetText || countdown || " \u041d\u0430\u0431\u043b\u044e\u0434\u0435\u043d\u0438\u0435."}`;
-  } else if (message) {
+    statusEl.textContent = `${statusMessage || "\u041d\u0430\u0431\u043b\u044e\u0434\u0435\u043d\u0438\u0435"}.${goalResetText || countdown || ""}`;
+  } else if (statusMessage) {
     statusEl.title = "";
-    statusEl.textContent = `${message}.${goalResetText || countdown}`;
+    statusEl.textContent = `${statusMessage}.${goalResetText || countdown}`;
+  } else {
+    statusEl.title = "";
+    statusEl.textContent = `\u0412\u044b: ${teamNameLabel(localJoin.team)} #${localJoin.index + 1}.${goalResetText || countdown}`;
   }
   rosterEl.innerHTML = state.players.map((player) => {
     const dot = player.team === 0 ? "blue" : player.team === 1 ? "orange" : "spectator";
     const role = player.role === "player" ? teamNameLabel(player.team) : "\u0417\u0440\u0438\u0442\u0435\u043b\u044c";
     const shortRole = player.role === "player" ? (player.team === 0 ? "\u0421" : "\u041e") : "\u0417";
-    const self = player.id === localJoin?.id ? "\u0432\u044b" : shortRole;
+    const controllerBadge = player.controller === "bot" ? "\u0418\u0418" : player.controller === "test" ? "\u0422\u0415\u0421\u0422" : "";
+    const self = player.id === localJoin?.id ? "\u0432\u044b" : controllerBadge || shortRole;
     const goals = Math.max(0, Math.floor(player.goals || 0));
-    return `<div class="roster-row" title="${escapeHtml(role)}" data-player-goals="${goals}">${renderUserPicMarkup(player.userPic, "roster-avatar")}<i class="dot ${dot}"></i><span>${escapeHtml(player.name)}</span><b class="roster-goals" title="\u0413\u043e\u043b\u044b">${goals}</b><small>${self}</small></div>`;
+    const title = controllerBadge ? `${role} • ${controllerBadge}` : role;
+    return `<div class="roster-row" title="${escapeHtml(title)}" data-player-goals="${goals}" data-controller="${escapeHtml(player.controller)}">${renderUserPicMarkup(player.userPic, "roster-avatar")}<i class="dot ${dot}"></i><span>${escapeHtml(player.name)}</span><b class="roster-goals" title="\u0413\u043e\u043b\u044b">${goals}</b><small>${self}</small></div>`;
   }).join("");
   updateChatUi(state);
 }
@@ -3747,6 +3930,17 @@ function updateWeatherHud(weather: WeatherSnapshot | undefined, dayTimeSeconds: 
 
 function isWeatherServerMessage(message: string): boolean {
   return /^\s*(\u041f\u043e\u0433\u043e\u0434\u0430|Weather):/i.test(message);
+}
+
+function isTransientEventMessage(message: string): boolean {
+  return message.includes("\u0443\u0434\u0430\u0440\u0438\u043b")
+    || message.includes("\u0441\u044b\u0433\u0440\u0430\u043b \u0433\u043e\u043b\u043e\u0432\u043e\u0439")
+    || message.includes("\u043f\u0440\u043e\u0434\u0430\u0432\u0438\u043b")
+    || message.includes("\u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0438\u043b\u0441\u044f")
+    || message.includes("left-kicked")
+    || message.includes("right-kicked")
+    || message.includes("headed")
+    || message.includes("body-checked");
 }
 
 function weatherEmoji(kind: WeatherSnapshot["kind"]): string {
@@ -3894,10 +4088,70 @@ function applyState(state: ServerState, time: number, deltaSeconds = 1 / 60) {
       players.delete(id);
     }
   }
+  const visibleVisuals = [...players.entries()].filter(([_id, visual]) => visual.root.visible);
+  const visiblePlayerIds = new Set(visibleVisuals.map(([id]) => id));
+  const visibleVisualDebug = new Map(visibleVisuals.map(([id, visual]) => [id, visual.debugState()]));
+  const activePlayers = state.players.filter((player) => player.role === "player");
+  const botPlayers = state.players.filter((player) => player.controller === "bot");
+  const activeBots = activePlayers.filter((player) => player.controller === "bot");
+  const visibleBots = activeBots.filter((player) => visiblePlayerIds.has(player.id));
+  const hiddenActivePlayers = activePlayers.filter((player) => !visiblePlayerIds.has(player.id));
+  const recentStrikePlayers = activePlayers.filter((player) => {
+    const age = state.serverTime - player.lastActionAt;
+    return Boolean(player.lastAction) && player.lastActionAt > 0 && age >= 0 && age <= 1200;
+  });
+  const activeStamina = activePlayers.map((player) => player.stamina);
+  const botStamina = activeBots.map((player) => player.stamina);
+  const staminaStats = (values: number[]) => ({
+    min: values.length ? Math.round(Math.min(...values) * 10) / 10 : 0,
+    max: values.length ? Math.round(Math.max(...values) * 10) / 10 : 0
+  });
+  const activeStaminaStats = staminaStats(activeStamina);
+  const botStaminaStats = staminaStats(botStamina);
+  const visibleRagdollPlayers = activePlayers.filter((player) => player.ragdoll && visiblePlayerIds.has(player.id));
+  const visibleStrikePlayers = recentStrikePlayers.filter((player) => visiblePlayerIds.has(player.id));
+  const visibleRigRagdollPlayers = activePlayers.filter((player) => visibleVisualDebug.get(player.id)?.rigRagdoll);
+  const visibleRigStrikePlayers = activePlayers.filter((player) => {
+    const debug = visibleVisualDebug.get(player.id);
+    return debug ? debug.rigStrike !== "none" && debug.rigStrikePulse > 0 : false;
+  });
+  const visibleRiggedBots = visibleBots.filter((player) => visibleVisualDebug.get(player.id)?.characterAttached);
+  const activeRagdollBots = activeBots.filter((player) => player.ragdoll);
+  const activeStrikeBots = recentStrikePlayers.filter((player) => player.controller === "bot");
+  document.documentElement.dataset.snapshotPlayers = String(state.players.length);
+  document.documentElement.dataset.snapshotActivePlayers = String(activePlayers.length);
+  document.documentElement.dataset.snapshotBotPlayers = String(botPlayers.length);
+  document.documentElement.dataset.snapshotActiveBots = String(activeBots.length);
+  document.documentElement.dataset.visiblePlayers = String(visibleVisuals.length);
+  document.documentElement.dataset.visibleBots = String(visibleBots.length);
+  document.documentElement.dataset.hiddenActivePlayers = String(hiddenActivePlayers.length);
+  document.documentElement.dataset.botsRuntimeVisible = String(activeBots.length > 0 && visibleBots.length === activeBots.length);
+  document.documentElement.dataset.visibleRiggedBots = String(visibleRiggedBots.length);
+  document.documentElement.dataset.botsCharactersVisible = String(activeBots.length > 0 && visibleRiggedBots.length === activeBots.length);
+  document.documentElement.dataset.activeRagdollPlayers = String(activePlayers.filter((player) => player.ragdoll).length);
+  document.documentElement.dataset.visibleRagdollPlayers = String(visibleRagdollPlayers.length);
+  document.documentElement.dataset.visibleRigRagdollPlayers = String(visibleRigRagdollPlayers.length);
+  document.documentElement.dataset.botRagdollCount = String(activeRagdollBots.length);
+  document.documentElement.dataset.visibleBotRagdollCount = String(visibleRagdollPlayers.filter((player) => player.controller === "bot").length);
+  document.documentElement.dataset.activeStrikePlayers = String(recentStrikePlayers.length);
+  document.documentElement.dataset.visibleStrikePlayers = String(visibleStrikePlayers.length);
+  document.documentElement.dataset.visibleRigStrikePlayers = String(visibleRigStrikePlayers.length);
+  document.documentElement.dataset.botStrikeCount = String(activeStrikeBots.length);
+  document.documentElement.dataset.visibleBotStrikeCount = String(visibleStrikePlayers.filter((player) => player.controller === "bot").length);
+  document.documentElement.dataset.activeSprintingPlayers = String(activePlayers.filter((player) => player.sprinting).length);
+  document.documentElement.dataset.botSprintingCount = String(activeBots.filter((player) => player.sprinting).length);
+  document.documentElement.dataset.activeExhaustedPlayers = String(activePlayers.filter((player) => player.exhausted).length);
+  document.documentElement.dataset.botExhaustedCount = String(activeBots.filter((player) => player.exhausted).length);
+  document.documentElement.dataset.activeStaminaMin = String(activeStaminaStats.min);
+  document.documentElement.dataset.activeStaminaMax = String(activeStaminaStats.max);
+  document.documentElement.dataset.botStaminaMin = String(botStaminaStats.min);
+  document.documentElement.dataset.botStaminaMax = String(botStaminaStats.max);
+  document.documentElement.dataset.snapshotReceived = "true";
+  document.documentElement.dataset.snapshotServerVersion = state.version;
   document.documentElement.dataset.playerRig = free3dCharacterHydrated
     ? "free3d-skinned-character-controller"
     : "procedural-animated-footballer-loading";
-  document.documentElement.dataset.animatedPlayers = String([...players.values()].filter((visual) => visual.root.visible).length);
+  document.documentElement.dataset.animatedPlayers = String(visibleVisuals.length);
   document.documentElement.dataset.celebrationVisible = String(visibleCelebrations > 0);
   document.documentElement.dataset.celebrationVisibleCount = String(visibleCelebrations);
   weatherLayer.update(state.weather, time);
@@ -4303,12 +4557,111 @@ function updateOffscreenIndicators(state: ServerState | null): void {
   document.documentElement.dataset.offscreenPlayers = String(offscreenPlayers);
 }
 
+function mobileButtonFromEvent(event: PointerEvent): HTMLButtonElement | null {
+  return event.target instanceof Element
+    ? event.target.closest<HTMLButtonElement>("[data-mobile-dir],[data-mobile-action]")
+    : null;
+}
+
+function onMobilePointerDown(event: PointerEvent): void {
+  const movePad = event.target instanceof Element
+    ? event.target.closest<HTMLElement>(".mobile-move-pad")
+    : null;
+  const button = mobileButtonFromEvent(event);
+  if ((!button && !movePad) || settingsOpen) return;
+  unlockAudio();
+  event.preventDefault();
+  event.stopPropagation();
+  canvas.focus();
+  if (movePad) {
+    mobileMovePointerId = event.pointerId;
+    updateMobileMoveVector(event);
+    try {
+      mobileMovePadEl.setPointerCapture(event.pointerId);
+    } catch {
+      // Pointer capture is best-effort; release/cancel still reset the movement state.
+    }
+    updateResolvedInput();
+    sendInput(true);
+    return;
+  }
+
+  if (!button) return;
+  try {
+    button.setPointerCapture(event.pointerId);
+  } catch {
+    // Some browsers reject capture for already-ended touches.
+  }
+
+  if (button.dataset.mobileDir) {
+    mobileDirectionPointers.set(event.pointerId, button.dataset.mobileDir as MobileDirection);
+    updateResolvedInput();
+    sendInput(true);
+    return;
+  }
+
+  const action = button.dataset.mobileAction as MobileAction | undefined;
+  if (!action) return;
+  mobileActionPointers.set(event.pointerId, action);
+  document.documentElement.dataset.mobileLastAction = action;
+  document.documentElement.dataset.mobileLastActionAt = String(Math.round(performance.now()));
+  if (action === "sprint") {
+    updateResolvedInput();
+  } else if (action === "jump") {
+    input.jump += 1;
+  } else if (action === "leftKick") {
+    if (!leftKickChargingByPointer) beginLeftKickCharge(event.pointerId);
+  } else if (action === "rightKick") {
+    input.kickRight += 1;
+    triggerLocalHandStrikePreview();
+  } else if (action === "headHit") {
+    input.head += 1;
+  }
+  sendInput(true);
+  syncMobileControlsUi();
+}
+
+function onMobilePointerMove(event: PointerEvent): void {
+  if (event.pointerId !== mobileMovePointerId) return;
+  event.preventDefault();
+  event.stopPropagation();
+  updateMobileMoveVector(event);
+  updateResolvedInput();
+  sendInput(true);
+}
+
+function finishMobilePointer(pointerId: number, cancel = false): void {
+  const action = mobileActionPointers.get(pointerId);
+  const hadDirection = mobileDirectionPointers.delete(pointerId);
+  const hadAction = mobileActionPointers.delete(pointerId);
+  const hadMoveVector = pointerId === mobileMovePointerId;
+  if (hadMoveVector) resetMobileMoveVector();
+  if (action === "leftKick") {
+    if (cancel) cancelLeftKickCharge();
+    else releaseLeftKickCharge(pointerId);
+  }
+  if (!hadDirection && !hadAction && !hadMoveVector) return;
+  updateResolvedInput();
+  sendInput(true);
+}
+
+function clearMobileControls(): void {
+  if (mobileDirectionPointers.size === 0 && mobileActionPointers.size === 0 && mobileMovePointerId === null) return;
+  mobileDirectionPointers.clear();
+  mobileActionPointers.clear();
+  resetMobileMoveVector();
+  if (leftKickChargingByPointer) cancelLeftKickCharge();
+  updateResolvedInput();
+  sendInput(true);
+}
+
 function resize() {
   const width = window.innerWidth;
   const height = window.innerHeight;
   renderer.setSize(width, height, false);
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
+  syncMobileControlsUi();
 }
 
 addEventListener("keydown", (event) => {
@@ -4442,6 +4795,23 @@ const audioUnlockOptions: AddEventListenerOptions = { capture: true, passive: tr
 addEventListener("pointerdown", unlockAudio, audioUnlockOptions);
 addEventListener("mousedown", unlockAudio, audioUnlockOptions);
 addEventListener("touchstart", unlockAudio, audioUnlockOptions);
+mobileControlsEl.addEventListener("pointerdown", onMobilePointerDown);
+mobileControlsEl.addEventListener("pointermove", onMobilePointerMove);
+mobileControlsEl.addEventListener("pointerup", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  finishMobilePointer(event.pointerId);
+});
+mobileControlsEl.addEventListener("pointercancel", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  finishMobilePointer(event.pointerId, true);
+});
+mobileControlsEl.addEventListener("lostpointercapture", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  finishMobilePointer(event.pointerId, true);
+});
 canvas.addEventListener("pointerdown", (event) => {
   if (emotionWheelOpen) {
     event.preventDefault();
@@ -4506,21 +4876,27 @@ canvas.addEventListener("wheel", (event) => {
 
 addEventListener("resize", resize);
 addEventListener("blur", () => {
-  if (!leftKickChargingByPointer) return;
-  cancelLeftKickCharge();
-  sendInput(true);
+  if (mobileDirectionPointers.size > 0 || mobileActionPointers.size > 0) {
+    clearMobileControls();
+    return;
+  }
+  if (leftKickChargingByPointer) {
+    cancelLeftKickCharge();
+    sendInput(true);
+  }
 });
 addEventListener("pagehide", () => {
-  if (transportMode !== "http" || !httpClientId) return;
-  const body = JSON.stringify({ clientId: httpClientId });
+  const clientId = transportMode === "http" ? httpClientId : localJoin?.id;
+  if (!clientId) return;
+  const body = JSON.stringify({ clientId });
   navigator.sendBeacon(`${serverApiBase()}/leave`, new Blob([body], { type: "application/json" }));
 });
 resize();
 initializeProfileControls();
 connect();
 
-function frame(time: number) {
-  requestAnimationFrame(frame);
+function runFrame(time: number) {
+  lastRenderFrameAt = performance.now();
   const seconds = time * 0.001;
   const delta = lastFrameSeconds > 0 ? Math.min(0.05, seconds - lastFrameSeconds) : 1 / 60;
   lastFrameSeconds = seconds;
@@ -4542,4 +4918,14 @@ function frame(time: number) {
   renderer.render(scene, camera);
 }
 
+function frame(time: number) {
+  requestAnimationFrame(frame);
+  runFrame(time);
+}
+
 requestAnimationFrame(frame);
+window.setInterval(() => {
+  if (performance.now() - lastRenderFrameAt < 250) return;
+  document.documentElement.dataset.rafFallbackTick = String(Math.round(performance.now()));
+  runFrame(performance.now());
+}, 250);

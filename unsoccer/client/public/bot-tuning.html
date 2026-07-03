@@ -204,6 +204,20 @@
         gap: 8px;
       }
 
+      .telemetry-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .telemetry-head h3 {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
       .metric {
         border: 1px solid var(--line);
         border-radius: 6px;
@@ -339,6 +353,21 @@
             <div class="metric"><span>Blue</span><strong id="blueMetric">0</strong></div>
             <div class="metric"><span>Orange</span><strong id="orangeMetric">0</strong></div>
           </div>
+          <div class="telemetry-head">
+            <h3>Behavior Telemetry</h3>
+            <button id="resetTelemetryButton">Reset Metrics</button>
+          </div>
+          <div class="metrics">
+            <div class="metric"><span>Goals/min</span><strong id="goalsRateMetric">0.0</strong></div>
+            <div class="metric"><span>Combat/min</span><strong id="combatRateMetric">0.0</strong></div>
+            <div class="metric"><span>Foot</span><strong id="footMetric">0</strong></div>
+            <div class="metric"><span>Hand</span><strong id="handMetric">0</strong></div>
+            <div class="metric"><span>Head</span><strong id="headMetric">0</strong></div>
+            <div class="metric"><span>Body</span><strong id="bodyMetric">0</strong></div>
+            <div class="metric"><span>Non-foot</span><strong id="nonFootMetric">0</strong></div>
+            <div class="metric"><span>Resets</span><strong id="resetMetric">0</strong></div>
+          </div>
+          <div id="telemetryLog" class="log">Waiting for live events.</div>
           <table>
             <thead>
               <tr>
@@ -363,17 +392,17 @@
       const DEFAULT_SETTINGS = {
         enabled: true,
         targetActivePlayers: 10,
-        aggression: 0.38,
-        shootDistance: 4.15,
-        fightDistance: 1.28,
-        chaseDistance: 5.4,
-        sprintDistance: 6.8,
-        shotAlignmentMin: 0.18,
-        supportReleaseDistance: 2.2,
-        kickIntervalMs: 440,
-        handIntervalMs: 1150,
-        headIntervalMs: 1100,
-        jumpChance: 0.015
+        aggression: 0.5,
+        shootDistance: 4.1,
+        fightDistance: 1.52,
+        chaseDistance: 5.7,
+        sprintDistance: 6.6,
+        shotAlignmentMin: 0.14,
+        supportReleaseDistance: 2.65,
+        kickIntervalMs: 430,
+        handIntervalMs: 950,
+        headIntervalMs: 900,
+        jumpChance: 0.018
       };
       const CONTROL_DEFS = [
         ["targetActivePlayers", "Target players", 0, 10, 1],
@@ -401,9 +430,27 @@
         humanMetric: document.getElementById("humanMetric"),
         blueMetric: document.getElementById("blueMetric"),
         orangeMetric: document.getElementById("orangeMetric"),
+        goalsRateMetric: document.getElementById("goalsRateMetric"),
+        combatRateMetric: document.getElementById("combatRateMetric"),
+        footMetric: document.getElementById("footMetric"),
+        handMetric: document.getElementById("handMetric"),
+        headMetric: document.getElementById("headMetric"),
+        bodyMetric: document.getElementById("bodyMetric"),
+        nonFootMetric: document.getElementById("nonFootMetric"),
+        resetMetric: document.getElementById("resetMetric"),
+        telemetryLog: document.getElementById("telemetryLog"),
         playersBody: document.getElementById("playersBody")
       };
       const controlNodes = new Map();
+      const telemetry = {
+        initialized: false,
+        startedAt: Date.now(),
+        lastEventId: 0,
+        lastScoreTotal: null,
+        counts: { goal: 0, foot: 0, hand: 0, head: 0, body: 0, reset: 0 },
+        events: []
+      };
+      let latestState = null;
 
       function readStored() {
         try {
@@ -547,8 +594,97 @@
         return "-";
       }
 
+      function controllerName(controller) {
+        if (controller === "bot") return "AI";
+        if (controller === "human") return "Human";
+        return controller || "-";
+      }
+
+      function resetTelemetry(state = latestState) {
+        const events = Array.isArray(state?.audioEvents) ? state.audioEvents : [];
+        const scoreTotal = Number(state?.score?.blue || 0) + Number(state?.score?.orange || 0);
+        telemetry.initialized = true;
+        telemetry.startedAt = Date.now();
+        telemetry.lastEventId = events.reduce((maxId, event) => Math.max(maxId, Number(event.id) || 0), 0);
+        telemetry.lastScoreTotal = scoreTotal;
+        telemetry.counts = { goal: 0, foot: 0, hand: 0, head: 0, body: 0, reset: 0 };
+        telemetry.events = [];
+        renderTelemetry();
+      }
+
+      function classifyCombatEvent(event) {
+        const kind = String(event?.kind || event?.type || event?.name || "").toLowerCase();
+        const kick = String(event?.kick || event?.action || event?.hit || "").toLowerCase();
+        if (!kind && !kick) return null;
+        if (kick.includes("hand") || kind.includes("hand")) return "hand";
+        if (kick.includes("head") || kind.includes("head")) return "head";
+        if (kick.includes("body") || kind.includes("body")) return "body";
+        if (kind === "kick" || kind.includes("kick") || kick.includes("left") || kick.includes("right") || kick.includes("foot")) return "foot";
+        return null;
+      }
+
+      function recordTelemetry(state) {
+        const events = Array.isArray(state?.audioEvents) ? state.audioEvents : [];
+        if (!telemetry.initialized) {
+          resetTelemetry(state);
+          return;
+        }
+        const now = Date.now();
+        const scoreTotal = Number(state?.score?.blue || 0) + Number(state?.score?.orange || 0);
+        if (telemetry.lastScoreTotal !== null) {
+          if (scoreTotal < telemetry.lastScoreTotal) {
+            telemetry.counts.reset += 1;
+            telemetry.events.push({ at: now, category: "reset" });
+          } else if (scoreTotal > telemetry.lastScoreTotal) {
+            const delta = scoreTotal - telemetry.lastScoreTotal;
+            telemetry.counts.goal += delta;
+            for (let index = 0; index < delta; index += 1) telemetry.events.push({ at: now, category: "goal" });
+          }
+        }
+        telemetry.lastScoreTotal = scoreTotal;
+        const maxEventId = events.reduce((maxId, event) => Math.max(maxId, Number(event.id) || 0), 0);
+        if (maxEventId < telemetry.lastEventId) resetTelemetry(state);
+        let nextLastEventId = telemetry.lastEventId;
+        for (const event of events) {
+          const id = Number(event.id) || 0;
+          if (id <= telemetry.lastEventId) continue;
+          nextLastEventId = Math.max(nextLastEventId, id);
+          const category = classifyCombatEvent(event);
+          if (category) {
+            telemetry.counts[category] += 1;
+            telemetry.events.push({ at: now, category });
+          }
+        }
+        telemetry.lastEventId = nextLastEventId;
+        telemetry.events = telemetry.events.filter((event) => now - event.at <= 60000);
+      }
+
+      function renderTelemetry() {
+        const now = Date.now();
+        const elapsedSeconds = Math.max(1, (now - telemetry.startedAt) / 1000);
+        const rollingSeconds = Math.max(1, Math.min(60, elapsedSeconds));
+        const rollingMinutes = rollingSeconds / 60;
+        const rollingEvents = telemetry.events.filter((event) => now - event.at <= 60000);
+        const rollingGoals = rollingEvents.filter((event) => event.category === "goal").length;
+        const rollingCombat = rollingEvents.filter((event) => ["foot", "hand", "head", "body"].includes(event.category)).length;
+        const combat = telemetry.counts.foot + telemetry.counts.hand + telemetry.counts.head + telemetry.counts.body;
+        const nonFoot = telemetry.counts.hand + telemetry.counts.head + telemetry.counts.body;
+        nodes.goalsRateMetric.textContent = (rollingGoals / rollingMinutes).toFixed(1);
+        nodes.combatRateMetric.textContent = (rollingCombat / rollingMinutes).toFixed(1);
+        nodes.footMetric.textContent = String(telemetry.counts.foot);
+        nodes.handMetric.textContent = String(telemetry.counts.hand);
+        nodes.headMetric.textContent = String(telemetry.counts.head);
+        nodes.bodyMetric.textContent = String(telemetry.counts.body);
+        nodes.nonFootMetric.textContent = String(nonFoot);
+        nodes.resetMetric.textContent = String(telemetry.counts.reset);
+        nodes.telemetryLog.textContent = `Since reset: ${Math.round(elapsedSeconds)}s, goals ${telemetry.counts.goal}, combat ${combat}, non-foot ${nonFoot}, resets ${telemetry.counts.reset}`;
+      }
+
       function render(payload) {
         const state = payload.state || {};
+        latestState = state;
+        recordTelemetry(state);
+        renderTelemetry();
         const players = Array.isArray(state.players) ? state.players : [];
         const active = players.filter((player) => player.role === "player");
         const bots = players.filter((player) => player.controller === "bot");
@@ -570,7 +706,7 @@
           const cells = [
             player.index ?? "-",
             player.name || player.id || "-",
-            player.controller || "-",
+            controllerName(player.controller),
             teamName(player.team),
             player.stamina ?? "-",
             player.lastAction || "-"
@@ -619,8 +755,13 @@
         setSettings(DEFAULT_SETTINGS);
         setLog("Defaults loaded locally.");
       });
+      document.getElementById("resetTelemetryButton").addEventListener("click", () => {
+        resetTelemetry();
+        setLog("Live metrics reset locally.");
+      });
       document.getElementById("matchButton").addEventListener("click", () => {
         setSettings({ ...collectSettings(), enabled: true, targetActivePlayers: 10 });
+        resetTelemetry();
         applySettings().catch((error) => {
           setStatus("Apply failed", "bad");
           setLog(error.message || String(error));

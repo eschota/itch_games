@@ -1,4 +1,4 @@
-export const GAME_VERSION = "v0.0.033";
+export const GAME_VERSION = "v0.0.052";
 export const ROOM_ID = "unsoccer-default-room";
 export const MAX_ACTIVE_PLAYERS = 10;
 export const MAX_ROOM_CLIENTS = 32;
@@ -24,8 +24,8 @@ export const PLAYER_EXHAUSTED_SPEED_MULTIPLIER = 0.46;
 export const PLAYER_EXHAUSTED_RECOVERY_THRESHOLD = 20;
 export const PLAYER_STAMINA_MAX = 100;
 export const PLAYER_STAMINA_SPRINT_DRAIN_PER_SECOND = 24;
-export const PLAYER_STAMINA_JUMP_COST = 18;
-export const PLAYER_STAMINA_HIT_COST = 9;
+export const PLAYER_STAMINA_JUMP_COST = 0;
+export const PLAYER_STAMINA_HIT_COST = 0;
 export const PLAYER_STAMINA_RECOVERY_DELAY_MS = 700;
 export const PLAYER_STAMINA_RECOVERY_PER_SECOND = 17;
 export const PLAYER_JUMP_STRENGTH = 6.1;
@@ -60,6 +60,24 @@ export const BODY_BUMP_RANGE = 0.62;
 export const BODY_BUMP_MIN_SPEED = 3.1;
 export const BODY_BUMP_STRENGTH = 0.18;
 export const BODY_BUMP_COOLDOWN_MS = 240;
+export const PLAYER_BALL_COLLISION_RESTITUTION = 1.08;
+export const PLAYER_BALL_COLLISION_PUSH = 0.42;
+export const PLAYER_BALL_COLLISION_SKIN = 0.035;
+export const BALL_POSSESSION_RANGE = 0.98;
+export const BALL_POSSESSION_CARRY_DISTANCE = 0.86;
+export const BALL_POSSESSION_CARRY_HEIGHT = 0.04;
+export const BALL_POSSESSION_MAX_CAPTURE_SPEED = 8.5;
+export const BALL_POSSESSION_MAX_CAPTURE_HEIGHT = 0.72;
+export const BALL_POSSESSION_RECAPTURE_DELAY_MS = 360;
+export const BALL_POSSESSION_LOW_SHOT_SPEED = 11.2;
+export const BALL_POSSESSION_UPPER_SHOT_SPEED = 10.2;
+export const BALL_POSSESSION_LOW_SHOT_LIFT = 0.22;
+export const BALL_POSSESSION_UPPER_SHOT_LIFT = 4.2;
+export const BALL_POSSESSION_STRONG_MULTIPLIER = 1.85;
+export const BALL_POSSESSION_BASE_POWER_MULTIPLIER = 4;
+export const BALL_POSSESSION_FULL_POWER_MULTIPLIER = 8;
+export const JUMP_KICK_DASH_SPEED = 7.4;
+export const JUMP_KICK_HIT_RANGE_BONUS = 0.95;
 export const POST_GOAL_CELEBRATION_MS = 5000;
 export const POST_GOAL_BALL_RETURN_MS = 1000;
 export const KICKOFF_COUNTDOWN_MS = 1200;
@@ -173,6 +191,7 @@ export interface BallSnapshot {
   position: Vec3;
   velocity: Vec3;
   variant: number;
+  ownerPlayerId: string | null;
 }
 
 export type GoalResetPhase = "none" | "celebration" | "returning" | "kickoff";
@@ -296,9 +315,29 @@ export interface ServerInfo {
   version: string;
   settingsRevision: number;
   activePlayers: number;
+  botPlayers: number;
+  activeBotPlayers: number;
+  dormantBotPlayers: number;
+  botReuseCount: number;
+  botRepairCount: number;
+  invalidActiveBotPlayers: number;
+  desiredBotPlayers: number;
+  nonBotActiveSlots: number;
+  activeHumanPlayers: number;
+  activeTestPlayers: number;
+  staleHumanClients: number;
+  staleHttpClients: number;
+  staleWebSocketClients: number;
+  botFillSuppressionReason: string;
+  humanClients: number;
   connectedClients: number;
   maxActivePlayers: number;
   maxRoomClients: number;
+  botsRuntimeEnabled: boolean;
+  botTargetActivePlayers: number;
+  httpClientStaleMs: number;
+  websocketClientStaleMs: number;
+  testMode: boolean;
   transports?: {
     websocket: boolean;
     http: boolean;
@@ -321,17 +360,16 @@ export const DEFAULT_INPUT: InputState = {
 };
 
 export const CHARACTER_ROSTER = [
+  "6288738",
   "6299851",
   "6243756",
   "6270571",
   "6324128",
   "6244727",
-  "6288738",
   "6304269",
   "6298522",
   "6255142",
-  "6294728",
-  "666dc6f4-0cc4-4714-a7cf-39cfb6655fe8"
+  "6294728"
 ] as const;
 
 export interface GameSettings {
@@ -408,6 +446,27 @@ export interface GameSettings {
   bodyBumpMinSpeed: number;
   bodyBumpStrength: number;
   bodyBumpCooldownMs: number;
+  playerBallCollisionRestitution: number;
+  playerBallCollisionPush: number;
+  playerBallCollisionSkin: number;
+  ballPossessionEnabled: boolean;
+  ballPossessionRange: number;
+  ballPossessionCarryDistance: number;
+  ballPossessionCarryHeight: number;
+  ballPossessionMaxCaptureSpeed: number;
+  ballPossessionMaxCaptureHeight: number;
+  ballPossessionRecaptureDelayMs: number;
+  ballPossessionLowShotSpeed: number;
+  ballPossessionUpperShotSpeed: number;
+  ballPossessionLowShotLift: number;
+  ballPossessionUpperShotLift: number;
+  ballPossessionStrongMultiplier: number;
+  ballPossessionBasePowerMultiplier: number;
+  ballPossessionFullPowerMultiplier: number;
+  friendlyFireEnabled: boolean;
+  playerHitFullKnockoutEnabled: boolean;
+  jumpKickDashSpeed: number;
+  jumpKickHitRangeBonus: number;
   propImpulseMultiplier: number;
   propDamping: number;
   propReturnStrength: number;
@@ -417,9 +476,14 @@ export interface GameSettings {
   kickoffCountdownMs: number;
   celebrationWindowMs: number;
   celebrationDurationMs: number;
+  httpClientStaleMs: number;
+  websocketClientStaleMs: number;
   botsEnabled: boolean;
   botTargetActivePlayers: number;
   botAggression: number;
+  botCombatAggressionThreshold: number;
+  botCombatCollapseGuardRatio: number;
+  botCombatCollapseGuardMinDisabled: number;
   botShootDistance: number;
   botFightDistance: number;
   botChaseDistance: number;
@@ -520,6 +584,27 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   bodyBumpMinSpeed: BODY_BUMP_MIN_SPEED,
   bodyBumpStrength: BODY_BUMP_STRENGTH,
   bodyBumpCooldownMs: BODY_BUMP_COOLDOWN_MS,
+  playerBallCollisionRestitution: PLAYER_BALL_COLLISION_RESTITUTION,
+  playerBallCollisionPush: PLAYER_BALL_COLLISION_PUSH,
+  playerBallCollisionSkin: PLAYER_BALL_COLLISION_SKIN,
+  ballPossessionEnabled: true,
+  ballPossessionRange: BALL_POSSESSION_RANGE,
+  ballPossessionCarryDistance: BALL_POSSESSION_CARRY_DISTANCE,
+  ballPossessionCarryHeight: BALL_POSSESSION_CARRY_HEIGHT,
+  ballPossessionMaxCaptureSpeed: BALL_POSSESSION_MAX_CAPTURE_SPEED,
+  ballPossessionMaxCaptureHeight: BALL_POSSESSION_MAX_CAPTURE_HEIGHT,
+  ballPossessionRecaptureDelayMs: BALL_POSSESSION_RECAPTURE_DELAY_MS,
+  ballPossessionLowShotSpeed: BALL_POSSESSION_LOW_SHOT_SPEED,
+  ballPossessionUpperShotSpeed: BALL_POSSESSION_UPPER_SHOT_SPEED,
+  ballPossessionLowShotLift: BALL_POSSESSION_LOW_SHOT_LIFT,
+  ballPossessionUpperShotLift: BALL_POSSESSION_UPPER_SHOT_LIFT,
+  ballPossessionStrongMultiplier: BALL_POSSESSION_STRONG_MULTIPLIER,
+  ballPossessionBasePowerMultiplier: BALL_POSSESSION_BASE_POWER_MULTIPLIER,
+  ballPossessionFullPowerMultiplier: BALL_POSSESSION_FULL_POWER_MULTIPLIER,
+  friendlyFireEnabled: true,
+  playerHitFullKnockoutEnabled: true,
+  jumpKickDashSpeed: JUMP_KICK_DASH_SPEED,
+  jumpKickHitRangeBonus: JUMP_KICK_HIT_RANGE_BONUS,
   propImpulseMultiplier: 1,
   propDamping: 2.4,
   propReturnStrength: 1.25,
@@ -529,19 +614,24 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   kickoffCountdownMs: KICKOFF_COUNTDOWN_MS,
   celebrationWindowMs: CELEBRATION_WINDOW_MS,
   celebrationDurationMs: CELEBRATION_DURATION_MS,
+  httpClientStaleMs: 12000,
+  websocketClientStaleMs: 12000,
   botsEnabled: true,
   botTargetActivePlayers: MAX_ACTIVE_PLAYERS,
-  botAggression: 0.38,
-  botShootDistance: 4.15,
-  botFightDistance: 1.28,
-  botChaseDistance: 5.4,
-  botSprintDistance: 6.8,
-  botShotAlignmentMin: 0.18,
-  botSupportReleaseDistance: 2.2,
-  botKickIntervalMs: 440,
-  botHandIntervalMs: 1150,
-  botHeadIntervalMs: 1100,
-  botJumpChance: 0.015
+  botAggression: 0.5,
+  botCombatAggressionThreshold: 0.5,
+  botCombatCollapseGuardRatio: 0.25,
+  botCombatCollapseGuardMinDisabled: 2,
+  botShootDistance: 4.1,
+  botFightDistance: 1.52,
+  botChaseDistance: 5.7,
+  botSprintDistance: 6.6,
+  botShotAlignmentMin: 0.14,
+  botSupportReleaseDistance: 2.65,
+  botKickIntervalMs: 430,
+  botHandIntervalMs: 950,
+  botHeadIntervalMs: 900,
+  botJumpChance: 0.018
 };
 
 export const GAME_SETTINGS_SCHEMA: GameSettingSchemaItem[] = [
@@ -572,11 +662,11 @@ export const GAME_SETTINGS_SCHEMA: GameSettingSchemaItem[] = [
   { key: "playerSprintMultiplier", group: "Игрок", label: "Множитель спринта", description: "Множитель скорости при зажатом Shift и наличии стамины.", input: "range", min: 1, max: 3, step: 0.01 },
   { key: "playerExhaustedSpeedMultiplier", group: "Игрок", label: "Скорость без стамины", description: "Множитель скорости, когда стамина полностью потрачена.", input: "range", min: 0.1, max: 1, step: 0.01 },
   { key: "playerExhaustedRecoveryThreshold", group: "Игрок", label: "Порог выхода из усталости", description: "Сколько стамины надо восстановить, чтобы игрок снова мог нормально бежать.", input: "range", min: 0, max: 100, step: 1 },
-  { key: "playerStaminaMax", group: "Игрок", label: "Максимум стамины", description: "Максимальная стамина для спринта, прыжков и драки.", input: "range", min: 25, max: 250, step: 1 },
+  { key: "playerStaminaMax", group: "Игрок", label: "Максимум стамины", description: "Максимальная стамина. По умолчанию тратится только на Shift и входящий урон.", input: "range", min: 25, max: 250, step: 1 },
   { key: "playerStaminaSprintDrainPerSecond", group: "Игрок", label: "Расход спринта", description: "Стамина, которая тратится за секунду спринта.", input: "range", min: 1, max: 80, step: 1 },
-  { key: "playerStaminaJumpCost", group: "Игрок", label: "Цена прыжка", description: "Стамина, которую тратит прыжок на Space.", input: "range", min: 0, max: 80, step: 1 },
-  { key: "playerStaminaHitCost", group: "Игрок", label: "Цена удара", description: "Стамина, которую атакующий платит за удары рукой и ногой.", input: "range", min: 0, max: 60, step: 1 },
-  { key: "playerStaminaRecoveryDelayMs", group: "Игрок", label: "Задержка восстановления", description: "Миллисекунды до начала восстановления после траты или урона стамине.", input: "number", min: 0, max: 5000, step: 50 },
+  { key: "playerStaminaJumpCost", group: "Игрок", label: "Цена прыжка", description: "Заблокировано правилом: Space не тратит стамину. Стамина уходит только на Shift и входящий урон.", input: "range", min: 0, max: 0, step: 1 },
+  { key: "playerStaminaHitCost", group: "Игрок", label: "Цена удара", description: "Заблокировано правилом: атакующий не тратит стамину на удар. Стамина уходит только у цели от урона.", input: "range", min: 0, max: 0, step: 1 },
+  { key: "playerStaminaRecoveryDelayMs", group: "Игрок", label: "Задержка восстановления", description: "Миллисекунды до восстановления после спринта или настроенной дополнительной траты стамины.", input: "number", min: 0, max: 5000, step: 50 },
   { key: "playerStaminaRecoveryPerSecond", group: "Игрок", label: "Скорость восстановления", description: "Сколько стамины восстанавливается в секунду после задержки.", input: "range", min: 0, max: 80, step: 1 },
   { key: "playerHitRecoveryDelayMs", group: "Игрок", label: "Задержка после удара", description: "Миллисекунды до восстановления стамины после урона от другого игрока.", input: "number", min: 0, max: 6000, step: 50 },
   { key: "playerJumpStrength", group: "Игрок", label: "Сила прыжка", description: "Вертикальный импульс прыжка на Space.", input: "range", min: 1, max: 14, step: 0.1 },
@@ -618,6 +708,27 @@ export const GAME_SETTINGS_SCHEMA: GameSettingSchemaItem[] = [
   { key: "bodyBumpMinSpeed", group: "Удары", label: "Мин. скорость толчка", description: "Минимальная скорость игрока, при которой пассивный толчок телом активен.", input: "range", min: 0, max: 12, step: 0.1 },
   { key: "bodyBumpStrength", group: "Удары", label: "Сила толчка телом", description: "Пассивный импульс контакта телом, применяемый к мячу.", input: "range", min: 0, max: 2, step: 0.01 },
   { key: "bodyBumpCooldownMs", group: "Удары", label: "Кулдаун толчка телом", description: "Минимальная пауза между пассивными толчками телом.", input: "number", min: 0, max: 2000, step: 10 },
+  { key: "playerBallCollisionRestitution", group: "Мяч", label: "Отскок от игрока", description: "Насколько сильно мяч отражается от твердого коллайдера игрока при столкновении.", input: "range", min: 0, max: 2, step: 0.01 },
+  { key: "playerBallCollisionPush", group: "Мяч", label: "Толчок корпусом", description: "Доля скорости игрока, передаваемая мячу при физическом контакте корпусом.", input: "range", min: 0, max: 2, step: 0.01 },
+  { key: "playerBallCollisionSkin", group: "Мяч", label: "Запас контакта", description: "Дополнительный зазор вокруг игрока, который не дает мячу проскакивать через капсулу между тиками.", input: "range", min: 0, max: 0.2, step: 0.005 },
+  { key: "ballPossessionEnabled", group: "Мяч", label: "Владение мячом", description: "Если включено, близкий игрок подбирает мяч и ведет его перед собой.", input: "checkbox" },
+  { key: "ballPossessionRange", group: "Мяч", label: "Дистанция подбора", description: "Горизонтальная дистанция, на которой игрок захватывает свободный медленный мяч.", input: "range", min: 0.2, max: 2.5, step: 0.01 },
+  { key: "ballPossessionCarryDistance", group: "Мяч", label: "Дистанция ведения", description: "Насколько далеко перед игроком держится мяч во время владения.", input: "range", min: 0.3, max: 2, step: 0.01 },
+  { key: "ballPossessionCarryHeight", group: "Мяч", label: "Высота ведения", description: "Дополнительная высота мяча над газоном при владении.", input: "range", min: 0, max: 0.4, step: 0.01 },
+  { key: "ballPossessionMaxCaptureSpeed", group: "Мяч", label: "Макс. скорость подбора", description: "Мяч быстрее этого значения не прилипает к игроку, а продолжает лететь или отскакивать.", input: "range", min: 0, max: 30, step: 0.1 },
+  { key: "ballPossessionMaxCaptureHeight", group: "Мяч", label: "Макс. высота подбора", description: "Мяч выше этой высоты не считается доступным для ведения ногой.", input: "range", min: 0.2, max: 2.5, step: 0.01 },
+  { key: "ballPossessionRecaptureDelayMs", group: "Мяч", label: "Задержка повторного подбора", description: "Пауза после удара, в течение которой мяч не прилипает обратно к игрокам.", input: "number", min: 0, max: 2000, step: 10 },
+  { key: "ballPossessionLowShotSpeed", group: "Мяч", label: "Скорость низкого удара", description: "Скорость ЛКМ-удара по мячу при владении.", input: "range", min: 1, max: 35, step: 0.1 },
+  { key: "ballPossessionUpperShotSpeed", group: "Мяч", label: "Скорость верхнего удара", description: "Горизонтальная скорость ПКМ-удара верхом при владении.", input: "range", min: 1, max: 35, step: 0.1 },
+  { key: "ballPossessionLowShotLift", group: "Мяч", label: "Подъем низкого удара", description: "Вертикальная скорость ЛКМ-удара при владении.", input: "range", min: 0, max: 5, step: 0.05 },
+  { key: "ballPossessionUpperShotLift", group: "Мяч", label: "Подъем верхнего удара", description: "Вертикальная скорость ПКМ-удара верхом при владении.", input: "range", min: 0, max: 12, step: 0.05 },
+  { key: "ballPossessionStrongMultiplier", group: "Мяч", label: "Множитель Shift-удара", description: "Множитель скорости низкого и верхнего удара, если во время удара зажат Shift.", input: "range", min: 1, max: 4, step: 0.05 },
+  { key: "ballPossessionBasePowerMultiplier", group: "Мяч", label: "База удара владения", description: "Множитель силы ЛКМ/ПКМ-удара, когда игрок владеет мячом и бьет без заряда.", input: "range", min: 1, max: 12, step: 0.05 },
+  { key: "ballPossessionFullPowerMultiplier", group: "Мяч", label: "Полный удар владения", description: "Множитель силы ЛКМ/ПКМ-удара при полном заряде или Shift.", input: "range", min: 1, max: 16, step: 0.05 },
+  { key: "friendlyFireEnabled", group: "Удары", label: "Бить своих", description: "Разрешает ударами без мяча вырубать игроков своей команды.", input: "checkbox" },
+  { key: "playerHitFullKnockoutEnabled", group: "Удары", label: "Нокаут с одного удара", description: "Если включено, любой точный удар по игроку сразу сбивает всю стамину и включает ragdoll.", input: "checkbox" },
+  { key: "jumpKickDashSpeed", group: "Удары", label: "Dash удара в прыжке", description: "Дополнительная скорость вперед для удара ногой в воздухе.", input: "range", min: 0, max: 20, step: 0.1 },
+  { key: "jumpKickHitRangeBonus", group: "Удары", label: "Дальность удара в прыжке", description: "Дополнительная дальность попадания ногой во время airborne dash-удара.", input: "range", min: 0, max: 3, step: 0.05 },
   { key: "propImpulseMultiplier", group: "Объекты", label: "Импульс объектов", description: "Общий множитель толчков от игроков и мяча по физическим объектам окружения.", input: "range", min: 0, max: 4, step: 0.01 },
   { key: "propDamping", group: "Объекты", label: "Затухание объектов", description: "Как быстро подвижные объекты теряют скорость после толчка.", input: "range", min: 0.1, max: 8, step: 0.05 },
   { key: "propReturnStrength", group: "Объекты", label: "Возврат объектов", description: "Пружинная сила, возвращающая локальные объекты окружения к домашней позиции.", input: "range", min: 0, max: 6, step: 0.05 },
@@ -627,9 +738,14 @@ export const GAME_SETTINGS_SCHEMA: GameSettingSchemaItem[] = [
   { key: "kickoffCountdownMs", group: "Матч", label: "Отсчет розыгрыша", description: "Миллисекунды отсчета перед розыгрышем после возврата мяча.", input: "number", min: 0, max: 10000, step: 100 },
   { key: "celebrationWindowMs", group: "Матч", label: "Окно эмоции гола", description: "Сколько миллисекунд игроки могут запускать празднование после гола.", input: "number", min: 0, max: 20000, step: 100 },
   { key: "celebrationDurationMs", group: "Матч", label: "Длительность эмоции", description: "Сколько миллисекунд длится выбранная анимация празднования.", input: "number", min: 0, max: 10000, step: 100 },
+  { key: "httpClientStaleMs", group: "Сеть", label: "Таймаут HTTP-игрока", description: "Через сколько миллисекунд без HTTP polling игрок считается вышедшим и освобождает активный слот под бота.", input: "number", min: 3000, max: 60000, step: 500 },
+  { key: "websocketClientStaleMs", group: "Сеть", label: "Таймаут WebSocket-игрока", description: "Через сколько миллисекунд без WebSocket input/heartbeat вкладка считается зависшей и освобождает активный слот под бота.", input: "number", min: 5000, max: 180000, step: 500 },
   { key: "botsEnabled", group: "Боты", label: "Включить ботов", description: "Заполняет ли сервер свободные активные слоты AI-игроками.", input: "checkbox" },
   { key: "botTargetActivePlayers", group: "Боты", label: "Цель заполнения ботами", description: "Желаемое число активных игроков на поле, включая людей и ботов.", input: "range", min: 0, max: MAX_ACTIVE_PLAYERS, step: 1 },
   { key: "botAggression", group: "Боты", label: "Агрессия", description: "Большее значение заставляет ботов чаще выбирать драку.", input: "range", min: 0, max: 1, step: 0.01 },
+  { key: "botCombatAggressionThreshold", group: "Боты", label: "Порог драки", description: "Минимальная агрессия, с которой боты начинают выбирать удары по игрокам на обычной сложности.", input: "range", min: 0, max: 1, step: 0.01 },
+  { key: "botCombatCollapseGuardRatio", group: "Боты", label: "Лимит нокаутов", description: "Доля активных игроков в ragdoll/усталости, после которой боты временно перестают начинать новые драки.", input: "range", min: 0, max: 1, step: 0.01 },
+  { key: "botCombatCollapseGuardMinDisabled", group: "Боты", label: "Мин. лимит нокаутов", description: "Минимальное число уже вырубленных игроков до включения защиты от массового collapse матча.", input: "range", min: 1, max: MAX_ACTIVE_PLAYERS, step: 1 },
   { key: "botShootDistance", group: "Боты", label: "Дистанция удара по воротам", description: "Дистанция до мяча, на которой бот пытается пробить.", input: "range", min: 1.2, max: 8, step: 0.05 },
   { key: "botFightDistance", group: "Боты", label: "Дистанция драки", description: "Дистанция до соперника, на которой бот рассматривает удары руками и ногами.", input: "range", min: 0.8, max: 4, step: 0.05 },
   { key: "botChaseDistance", group: "Боты", label: "Дистанция погони", description: "Дистанция до мяча, на которой бот активно включается в преследование.", input: "range", min: 1, max: 12, step: 0.05 },

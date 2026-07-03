@@ -271,7 +271,7 @@ function collectTextures(material: THREE.Material | THREE.Material[] | null | un
   }
 }
 
-function patchPackedPbrShader(material: THREE.MeshStandardMaterial): void {
+export function applyTexturelessPbrShader(material: THREE.MeshStandardMaterial): void {
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader
       .replace(
@@ -345,7 +345,7 @@ function createTexturelessMaterial(source: THREE.Material | null, stats: Materia
     geometryAo: stats.count > 0 ? clamp01(stats.geometryAo / stats.count) : 1,
     uv1: "roughness-metalness"
   };
-  patchPackedPbrShader(material);
+  applyTexturelessPbrShader(material);
   material.needsUpdate = true;
   return material;
 }
@@ -803,6 +803,8 @@ export async function bakeTexturelessPbr(root: THREE.Object3D, options: Texturel
     const geometry = createTessellatedBakeGeometry(sourceGeometry, materialSources);
     if (!geometry.attributes.normal) geometry.computeVertexNormals();
     const position = geometry.attributes.position;
+    const sourceColor = geometry.attributes.color as THREE.BufferAttribute | THREE.InterleavedBufferAttribute | undefined;
+    const sourcePackedPbr = geometry.attributes.uv1 as THREE.BufferAttribute | THREE.InterleavedBufferAttribute | undefined;
     const uv = geometry.attributes.uv;
     const vertexCount = position.count;
     if (vertexCount <= 0) continue;
@@ -821,6 +823,16 @@ export async function bakeTexturelessPbr(root: THREE.Object3D, options: Texturel
       for (let index = start; index < end; index += 1) {
         sampleUv.set(uv ? uv.getX(index) : 0.5, uv ? uv.getY(index) : 0.5);
         const pbr = sampleMaterial(source, sampleUv, scratchSample);
+        if (sourceColor) {
+          scratchSample.r *= sourceColor.getX(index);
+          scratchSample.g *= sourceColor.getY(index);
+          scratchSample.b *= sourceColor.getZ(index);
+          if (sourceColor.itemSize >= 4) pbr.ao *= clamp01(sourceColor.getW(index));
+        }
+        if (sourcePackedPbr && !source.ormMap && !source.roughnessMap && !source.metalnessMap) {
+          pbr.roughness = clamp01(sourcePackedPbr.getX(index));
+          pbr.metalness = clamp01(sourcePackedPbr.getY(index));
+        }
         const geometryAo = sampleGeometryAo(occlusionBaker, mesh, geometry, index);
         const ao = contrastAo(clamp01(pbr.ao * geometryAo), occlusionBaker.contrast);
         const roughness = clamp01(pbr.roughness);

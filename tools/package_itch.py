@@ -7,6 +7,7 @@ import os
 import json
 import pathlib
 import shutil
+import struct
 import sys
 import zipfile
 
@@ -26,6 +27,12 @@ BLOCKED_PUBLIC_DOC_MARKERS = (
     "agent",
     "deploy",
 )
+TEXTURELESS_RUNTIME_ASSET_DIRS = (
+    pathlib.Path("assets") / "characters",
+    pathlib.Path("assets") / "environment",
+    pathlib.Path("assets") / "balls",
+)
+BLOCKED_TEXTURE_FILE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".ktx2", ".basis"}
 
 GAMES = {
     ORBITAL_COURIER: {
@@ -54,6 +61,7 @@ def iter_unsoccer_dist(path: pathlib.Path) -> list[pathlib.Path]:
             f"{path} is missing; run `npm run build:unsoccer` before packaging"
         )
     prune_unsoccer_unused_character_assets(path)
+    assert_unsoccer_textureless_runtime_assets(path)
     return sorted(item for item in path.rglob("*") if item.is_file())
 
 
@@ -67,6 +75,80 @@ def prune_unsoccer_unused_character_assets(dist_root: pathlib.Path) -> None:
     for child in character_dir.iterdir():
         if child.is_dir() and child.name not in keep:
             shutil.rmtree(child)
+
+
+def read_glb_json(path: pathlib.Path) -> dict:
+    data = path.read_bytes()
+    if data[:4] != b"glTF":
+        raise RuntimeError(f"{path} is not a GLB file")
+    offset = 12
+    while offset < len(data):
+        length, chunk_type = struct.unpack_from("<I4s", data, offset)
+        offset += 8
+        chunk = data[offset : offset + length]
+        offset += length
+        if chunk_type == b"JSON":
+            return json.loads(chunk.decode("utf-8"))
+    raise RuntimeError(f"{path} is missing a GLB JSON chunk")
+
+
+def material_has_texture_reference(material: dict) -> bool:
+    pbr = material.get("pbrMetallicRoughness") or {}
+    return any(
+        (
+            pbr.get("baseColorTexture"),
+            pbr.get("metallicRoughnessTexture"),
+            material.get("normalTexture"),
+            material.get("occlusionTexture"),
+            material.get("emissiveTexture"),
+        )
+    )
+
+
+def glb_vertex_pbr_problems(gltf: dict, relative: str) -> list[str]:
+    requires_packed_pbr = "/assets/characters/" in f"/{relative}"
+    problems: set[str] = set()
+    for mesh in gltf.get("meshes", []):
+        for primitive in mesh.get("primitives", []):
+            attributes = primitive.get("attributes") or {}
+            if "POSITION" not in attributes:
+                continue
+            if "COLOR_0" not in attributes:
+                problems.add("missing-COLOR_0")
+            if requires_packed_pbr and "TEXCOORD_1" not in attributes:
+                problems.add("missing-TEXCOORD_1")
+    return sorted(problems)
+
+
+def assert_unsoccer_textureless_runtime_assets(dist_root: pathlib.Path) -> None:
+    blocked_files: list[str] = []
+    bad_glbs: list[dict[str, object]] = []
+    for relative_root in TEXTURELESS_RUNTIME_ASSET_DIRS:
+        root = dist_root / relative_root
+        if not root.exists():
+            continue
+        for path in root.rglob("*"):
+            if not path.is_file():
+                continue
+            relative = path.relative_to(dist_root).as_posix()
+            suffix = path.suffix.lower()
+            if suffix in BLOCKED_TEXTURE_FILE_EXTENSIONS:
+                blocked_files.append(relative)
+            if suffix == ".glb":
+                gltf = read_glb_json(path)
+                vertex_pbr_problems = glb_vertex_pbr_problems(gltf, relative)
+                if (
+                    gltf.get("images")
+                    or gltf.get("textures")
+                    or any(material_has_texture_reference(material) for material in gltf.get("materials", []))
+                    or vertex_pbr_problems
+                ):
+                    bad_glbs.append({"file": relative, "vertexPbrProblems": vertex_pbr_problems})
+    if blocked_files or bad_glbs:
+        raise RuntimeError(
+            "UnSoccer runtime 3D assets must be textureless vertex/PBR; "
+            f"texture_files={blocked_files}; textured_glbs={bad_glbs}"
+        )
 
 
 def write_file(archive: zipfile.ZipFile, source: pathlib.Path, root: pathlib.Path) -> None:

@@ -36,6 +36,7 @@ const WEATHER_CHANGE_MAX_MS = DEFAULT_GAME_SETTINGS.weatherChangeMaxMs;
 const KICK_SPEED_MAX = 55;
 const BODY_BUMP_SPEED_MAX = 6;
 const MAX_ACTIVE_PLAYERS = DEFAULT_GAME_SETTINGS.maxActivePlayers;
+const DEFAULT_BOT_TARGET_ACTIVE_PLAYERS = DEFAULT_GAME_SETTINGS.botTargetActivePlayers;
 const CHARACTER_ROSTER = [
   "6299851",
   "6243756",
@@ -371,9 +372,9 @@ async function assertProductionDefaultBotHealth() {
     assert.equal(health.testMode, false, "local play smoke should run without UNSOCCER_TEST_MODE");
     assert.equal(health.botsRuntimeEnabled, true, "non-test default server should have runtime bots enabled");
     assert.equal(health.botFillSuppressionReason, "none", "non-test default server should not suppress bot fill");
-    assert.equal(health.desiredBotPlayers, MAX_ACTIVE_PLAYERS, "non-test default server should desire a full bot match");
-    assert.equal(health.activeBotPlayers, MAX_ACTIVE_PLAYERS, "non-test default server should spawn visible active bots");
-    assert.equal(health.activePlayers, MAX_ACTIVE_PLAYERS, "non-test default server should fill all active slots");
+    assert.equal(health.desiredBotPlayers, DEFAULT_BOT_TARGET_ACTIVE_PLAYERS, "non-test default server should use the configured bot target");
+    assert.equal(health.activeBotPlayers, DEFAULT_BOT_TARGET_ACTIVE_PLAYERS, "non-test default server should spawn the configured active bots");
+    assert.equal(health.activePlayers, DEFAULT_BOT_TARGET_ACTIVE_PLAYERS, "non-test default server should fill to the configured active target");
     assert.equal(health.connectedClients, 0, "default bot fill should not consume connected client capacity");
 
     const joinResponse = await fetch(`${baseUrl}/api/join`, {
@@ -392,11 +393,11 @@ async function assertProductionDefaultBotHealth() {
       statePayload.state,
       activePlayersByController(statePayload.state, "bot").map((player) => player.id),
       "non-test human join bot fill",
-      MAX_ACTIVE_PLAYERS - 1
+      Math.max(0, DEFAULT_BOT_TARGET_ACTIVE_PLAYERS - 1)
     );
     const joinedHealth = await (await fetch(`${baseUrl}/api/health`)).json();
-    assert.equal(joinedHealth.activeBotPlayers, MAX_ACTIVE_PLAYERS - 1, "non-test health should show bot backfill after human join");
-    assert.equal(joinedHealth.activePlayers, MAX_ACTIVE_PLAYERS, "non-test human plus bots should keep the active roster full");
+    assert.equal(joinedHealth.activeBotPlayers, Math.max(0, DEFAULT_BOT_TARGET_ACTIVE_PLAYERS - 1), "non-test health should show bot backfill after human join");
+    assert.equal(joinedHealth.activePlayers, DEFAULT_BOT_TARGET_ACTIVE_PLAYERS, "non-test human plus bots should keep the configured active roster filled");
     assert.equal(joinedHealth.botFillSuppressionReason, "none", "non-test human join should not suppress bot fill");
   } finally {
     await stopServer(child);
@@ -1300,10 +1301,13 @@ async function assertDefaultBotsProduceGoal(api) {
   await api("POST", "/api/test/players", { count: 0 });
   await api("POST", "/api/test/reset", {});
   await api("POST", "/api/test/weather", { kind: "clear" });
+  await api("POST", "/api/game-settings", {
+    settings: { ...DEFAULT_GAME_SETTINGS, botTargetActivePlayers: MAX_ACTIVE_PLAYERS }
+  });
   const defaults = (await api("GET", "/api/bot-settings")).defaults;
   let state = (await api("POST", "/api/test/bots", {
     enabled: true,
-    settings: defaults
+    settings: { ...defaults, targetActivePlayers: MAX_ACTIVE_PLAYERS }
   })).state;
   const initialBotIds = activePlayersByController(state, "bot").map((player) => player.id).sort();
   assert.equal(initialBotIds.length, MAX_ACTIVE_PLAYERS, "default bot scenario should start with ten bot players");
@@ -1330,6 +1334,7 @@ async function assertDefaultBotsProduceGoal(api) {
     (event) => event.kind === "goal",
     "default bot match goal"
   );
+  await api("POST", "/api/game-settings", { settings: DEFAULT_GAME_SETTINGS });
 }
 
 async function assertDefaultBotsCanBrawlWithoutRosterCollapse(api) {
@@ -2653,7 +2658,7 @@ async function assertFriendlyKickAssist(api) {
     input: inputState()
   });
   await api("POST", "/api/test/ball", {
-    position: { x: 0, y: BALL_RADIUS + 0.04, z: 2.45 },
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 1.25 },
     velocity: { x: 0, y: 0, z: 0 }
   });
   await api("POST", "/api/test/player/0", {
@@ -2672,7 +2677,7 @@ async function assertLeftKickInputBuffer(api) {
     input: inputState()
   });
   await api("POST", "/api/test/ball", {
-    position: { x: 0, y: BALL_RADIUS + 0.04, z: 3.2 },
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 2.25 },
     velocity: { x: 0, y: 0, z: 0 }
   });
   await api("POST", "/api/test/player/0", {
@@ -2683,7 +2688,7 @@ async function assertLeftKickInputBuffer(api) {
 
   await api("POST", "/api/test/player/0", { input: inputState() });
   await api("POST", "/api/test/ball", {
-    position: { x: 0, y: BALL_RADIUS + 0.04, z: 2.45 },
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 1.25 },
     velocity: { x: 0, y: 0, z: 0 }
   });
   state = (await api("POST", "/api/test/tick", { frames: 3 })).state;

@@ -270,8 +270,11 @@ Use this root skill when changing, packaging, validating, or publishing the
 
 ## Current Behavior
 
-- Current game release: `v0.0.054`.
-- `unsoccer` current prototype release: `v0.0.054`.
+- Current game release: `v0.0.055`.
+- `unsoccer` current prototype release: `v0.0.055`.
+- `unsoccer` v0.0.055 adds the local `/admin` runtime settings entry, defaults
+  bot fill to three active players, and shortens the active ball-strike trigger
+  ranges while keeping them tunable in the Russian admin.
 - `unsoccer` v0.0.054 mirrors orange-team left/right input in client code
   while preserving the current blue-team mapping and without changing the
   controls GUI.
@@ -353,6 +356,10 @@ Use this root skill when changing, packaging, validating, or publishing the
 - `v0.0.053` keeps that gameplay contract and adds the hosted itch.io/itch.zone
   transport fallback so packaged iframe builds connect to the production
   UnSoccer WebSocket/API endpoints.
+- `v0.0.055` makes `http://127.0.0.1:5195/admin` a first-class local admin
+  entry for runtime tuning, defaults local/production bot fill to three active
+  players, and lowers kickRange/footKickAssistRange/handKickAssistRange/
+  headKickAssistRange to reduce too-distant ball strike triggers.
 - `unsoccer` v0.0.002 has a client-only procedural Web Audio layer driven by
   authoritative server snapshots for kicks, body contacts, goals, countdown,
   roster changes, and ball rolling.

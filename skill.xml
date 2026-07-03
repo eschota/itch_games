@@ -309,7 +309,7 @@
     <rule>Set ITCH_IO_TARGET=owner/game:channel to let the post-commit hook publish UnSoccer to itch.io after production is ready.</rule>
     <rule>Packaging fails if internal skill, role, agent coordination, deploy, or source-control docs leak into the public zip.</rule>
   </tooling>
-  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.054">
+  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.055">
     <client path="unsoccer/client" package="dist/unsoccer-itch.zip" productionPath="/unsoccer/" productionStatic="unsoccer/client/dist" />
     <server path="unsoccer/server" port="8787" health="/api/health" transport="plain-websocket-json" fallback="http-polling" productionApiPath="/unsoccer/api/" productionSocketPath="/unsoccer/socket/" />
     <shared path="unsoccer/shared" />
@@ -371,6 +371,7 @@
     <rule>v0.0.052 fixes point-blank no-ball strikes so overlap-range LMB/RMB contacts apply the same one-hit stamina knockout and ragdoll knockback as visible strikes. Acceptance also validates active bot ids, roles, finite playable-area positions, non-test human join backfill, and LMB+Shift possession shots with Shift remaining a strong-shot modifier.</rule>
     <rule>v0.0.054 mirrors orange-team left/right input in client code while preserving the current blue-team mapping and without changing the controls GUI.</rule>
     <rule>v0.0.053 keeps the v0.0.052 gameplay contract and adds an itch.io/itch.zone hosted-build transport fallback to the production WebSocket/API endpoints.</rule>
+    <rule>v0.0.055 makes /admin a first-class local runtime-settings entry, defaults botTargetActivePlayers to 3, and lowers kickRange/footKickAssistRange/handKickAssistRange/headKickAssistRange to reduce too-distant ball strike triggers while keeping all values adjustable through the Russian admin schema.</rule>
     <rule>Local browser play servers for UnSoccer must run without UNSOCCER_TEST_MODE; that flag is only for isolated acceptance and prevents normal default bot fill unless /api/test/bots enables it.</rule>
     <rule>tools/unsoccer_acceptance.mjs derives the expected version from package.json.games.unsoccer.version and checks HTTP fallback join/input/state.</rule>
     <rule>npm run package:unsoccer rebuilds before writing dist/unsoccer-itch.zip so stale dist output cannot become the release package.</rule>
@@ -417,7 +418,7 @@
     <rule>Orbital Courier itch upload must include vendored Three.js and must not require cdn.jsdelivr.net at runtime.</rule>
     <rule>External itch.io pages remain incomplete until the public URL, uploaded zip, exact live copy, screenshots, publication date, and version match are recorded under ui_designer/public_pages/.</rule>
   </publicSurfaces>
-  <versioning initial="v0.0.001" current="v0.0.054">
+  <versioning initial="v0.0.001" current="v0.0.055">
     <rule>Every created game starts at v0.0.001.</rule>
     <rule>Every shipped bump increments the version.</rule>
     <rule>The current version is visible in the bottom-left corner.</rule>

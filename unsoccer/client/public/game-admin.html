@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>UnSoccer Runtime Admin</title>
+  <title>UnSoccer: админка настроек</title>
   <style>
     :root {
       color-scheme: dark;
@@ -239,13 +239,13 @@
 </head>
 <body>
   <header>
-    <h1>UnSoccer Runtime Admin</h1>
+    <h1>UnSoccer: админка настроек</h1>
     <div class="toolbar">
       <input id="serverUrl" class="server" type="text" autocomplete="off">
-      <button id="loadBtn">Load</button>
-      <button id="applyBtn" class="primary" disabled>Apply</button>
-      <button id="resetBtn" class="warn" disabled>Defaults</button>
-      <button id="reloadBtn" disabled>Reload File</button>
+      <button id="loadBtn">Загрузить</button>
+      <button id="applyBtn" class="primary" disabled>Применить</button>
+      <button id="resetBtn" class="warn" disabled>Сбросить</button>
+      <button id="reloadBtn" disabled>Перезагрузить файл</button>
     </div>
   </header>
   <main>
@@ -266,7 +266,10 @@
     const groupNav = document.querySelector("#groupNav");
     const content = document.querySelector("#content");
     const STORAGE_KEY = "unsoccer-admin-server-url";
-    const defaultServer = qs.get("server") || localStorage.getItem(STORAGE_KEY) || "http://127.0.0.1:8793";
+    const loopbackHost = /^(localhost|127(?:\.\d{1,3}){3}|::1)$/i.test(location.hostname);
+    const routePrefix = location.pathname.startsWith("/unsoccer/") ? `${location.origin}/unsoccer` : location.origin;
+    const defaultLocalServer = loopbackHost ? `http://${location.hostname}:8797` : routePrefix;
+    const defaultServer = qs.get("server") || (loopbackHost ? defaultLocalServer : localStorage.getItem(STORAGE_KEY)) || defaultLocalServer;
     let payload = null;
     let current = {};
     let dirty = false;
@@ -290,7 +293,7 @@
     function setStatus(message, kind = "") {
       document.documentElement.dataset.adminStatus = kind || "info";
       statusPanel.innerHTML = `
-        <div class="status-line"><span>Status</span><strong class="${kind}">${escapeHtml(message)}</strong></div>
+        <div class="status-line"><span>Статус</span><strong class="${kind}">${escapeHtml(message)}</strong></div>
         ${payload ? statusLines() : ""}
       `;
     }
@@ -300,13 +303,13 @@
       const settings = payload.settings || {};
       const info = payload.info || {};
       return `
-        <div class="status-line"><span>Version</span><strong>${escapeHtml(payload.version || "unknown")}</strong></div>
-        <div class="status-line"><span>Revision</span><strong>${payload.revision ?? state.settingsRevision ?? 0}</strong></div>
-        <div class="status-line"><span>Players</span><strong>${info.activePlayers ?? 0}/${info.maxActivePlayers ?? settings.maxActivePlayers ?? 0}</strong></div>
-        <div class="status-line"><span>Day Time</span><strong>${formatDay(state.dayTimeSeconds)}</strong></div>
-        <div class="status-line"><span>Weather</span><strong>${escapeHtml(state.weather?.kind || "unknown")}</strong></div>
-        <div class="status-line"><span>Ball</span><strong>${formatVec(state.ball?.position)}</strong></div>
-        <div class="status-line"><span>Source</span><strong>${escapeHtml(payload.source || "api")}</strong></div>
+        <div class="status-line"><span>Версия</span><strong>${escapeHtml(payload.version || "unknown")}</strong></div>
+        <div class="status-line"><span>Ревизия</span><strong>${payload.revision ?? state.settingsRevision ?? 0}</strong></div>
+        <div class="status-line"><span>Игроки</span><strong>${info.activePlayers ?? 0}/${info.maxActivePlayers ?? settings.maxActivePlayers ?? 0}</strong></div>
+        <div class="status-line"><span>Время</span><strong>${formatDay(state.dayTimeSeconds)}</strong></div>
+        <div class="status-line"><span>Погода</span><strong>${escapeHtml(state.weather?.kind || "unknown")}</strong></div>
+        <div class="status-line"><span>Мяч</span><strong>${formatVec(state.ball?.position)}</strong></div>
+        <div class="status-line"><span>Источник</span><strong>${escapeHtml(payload.source || "api")}</strong></div>
       `;
     }
 
@@ -371,7 +374,7 @@
       applyBtn.disabled = !dirty;
       resetBtn.disabled = false;
       reloadBtn.disabled = false;
-      setStatus(dirty ? "Unsaved changes" : "Loaded", dirty ? "dirty" : "ok");
+      setStatus(dirty ? "Есть несохраненные изменения" : "Загружено", dirty ? "dirty" : "ok");
     }
 
     function settingRow(item) {
@@ -383,7 +386,7 @@
       title.innerHTML = `
         <strong>${escapeHtml(item.label || item.key)}</strong>
         <span>${escapeHtml(item.description || item.key)}</span>
-        ${item.restartPhysics ? '<span class="restart">physics reset</span>' : ""}
+        ${item.restartPhysics ? '<span class="restart">сброс физики</span>' : ""}
       `;
       const control = document.createElement("div");
       control.className = item.input === "checkbox" ? "control checkbox" : "control";
@@ -398,7 +401,7 @@
         checkbox.addEventListener("change", () => setValue(item.key, checkbox.checked));
         control.appendChild(checkbox);
         const flag = document.createElement("span");
-        flag.textContent = checkbox.checked ? "enabled" : "disabled";
+        flag.textContent = checkbox.checked ? "включено" : "выключено";
         control.appendChild(flag);
         valueCell.textContent = "";
       } else {
@@ -442,13 +445,13 @@
       if (rerender) render();
       else {
         applyBtn.disabled = false;
-        setStatus("Unsaved changes", "dirty");
+        setStatus("Есть несохраненные изменения", "dirty");
       }
     }
 
     async function loadSettings() {
       try {
-        setStatus("Loading");
+        setStatus("Загрузка");
         localStorage.setItem(STORAGE_KEY, serverInput.value);
         payload = await requestJson("game-settings");
         current = { ...(payload.settings || {}) };
@@ -465,7 +468,7 @@
     }
 
     async function applySettings(settings) {
-      setStatus("Applying");
+      setStatus("Применение");
       payload = await requestJson("game-settings", {
         method: "POST",
         body: JSON.stringify({ settings })
@@ -485,7 +488,7 @@
     });
     reloadBtn.addEventListener("click", async () => {
       try {
-        setStatus("Reloading");
+        setStatus("Перезагрузка файла");
         payload = await requestJson("game-settings/reload", { method: "POST", body: "{}" });
         current = { ...(payload.settings || {}) };
         dirty = false;

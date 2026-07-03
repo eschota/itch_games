@@ -200,8 +200,11 @@ Use this file for work inside `/itch_games`.
 
 ## Versioning
 
-- Current release: `v0.0.054`.
-- `unsoccer` release: `v0.0.054`.
+- Current release: `v0.0.055`.
+- `unsoccer` release: `v0.0.055`.
+- `unsoccer` v0.0.055 adds the local `/admin` runtime settings entry, defaults
+  bot fill to three active players, and shortens the active ball-strike trigger
+  ranges while keeping them tunable in the Russian admin.
 - `unsoccer` v0.0.054 mirrors orange-team left/right input in client code
   while preserving the current blue-team mapping and without changing the
   controls GUI.

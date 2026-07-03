@@ -270,8 +270,12 @@ Use this root skill when changing, packaging, validating, or publishing the
 
 ## Current Behavior
 
-- Current game release: `v0.0.055`.
-- `unsoccer` current prototype release: `v0.0.055`.
+- Current game release: `v0.0.056`.
+- `unsoccer` current prototype release: `v0.0.056`.
+- `unsoccer` v0.0.056 enforces the textureless runtime asset contract: no
+  image texture files in shipped character/environment/ball assets, no GLB
+  images/textures/material texture maps, no FBX image references, runtime
+  loaders reject texture maps, and acceptance/package gates prove it.
 - `unsoccer` v0.0.055 adds the local `/admin` runtime settings entry, defaults
   bot fill to three active players, and shortens the active ball-strike trigger
   ranges while keeping them tunable in the Russian admin.
@@ -360,6 +364,10 @@ Use this root skill when changing, packaging, validating, or publishing the
   entry for runtime tuning, defaults local/production bot fill to three active
   players, and lowers kickRange/footKickAssistRange/handKickAssistRange/
   headKickAssistRange to reduce too-distant ball strike triggers.
+- `v0.0.056` strips stale Free3D FBX image references from character animation
+  clips, removes the old transparent data-image fallback, rejects runtime
+  texture maps in character/environment/ball loaders, and extends acceptance
+  plus packaging to fail on texture files, GLB texture slots, or FBX image refs.
 - `unsoccer` v0.0.002 has a client-only procedural Web Audio layer driven by
   authoritative server snapshots for kicks, body contacts, goals, countdown,
   roster changes, and ball rolling.

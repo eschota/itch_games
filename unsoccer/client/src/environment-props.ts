@@ -907,6 +907,10 @@ function loadFree3dEnvironmentTemplate(
 }
 
 async function bakeEnvironmentTemplate(scene: THREE.Object3D, asset: Free3dEnvironmentAsset): Promise<void> {
+  const sourceTextureCount = countTextureMaps(scene);
+  if (sourceTextureCount > 0) {
+    throw new Error(`Free3D environment ${asset.guid} is not runtime textureless`);
+  }
   const result: TexturelessPbrBakeResult = await bakeTexturelessPbr(scene, {
     bakeGeometryAo: true,
     aoContrast: 1.35,

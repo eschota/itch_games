@@ -52,12 +52,33 @@ const CHARACTER_ROSTER = [
   "6294728"
 ];
 const CHARACTER_ROSTER_SET = new Set(CHARACTER_ROSTER);
-const TEXTURELESS_RUNTIME_ASSET_DIRS = [
-  path.join(ROOT, "unsoccer", "client", "public", "assets", "characters"),
-  path.join(ROOT, "unsoccer", "client", "public", "assets", "environment"),
-  path.join(ROOT, "unsoccer", "client", "public", "assets", "balls")
-];
-const BLOCKED_TEXTURE_FILE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp", ".ktx2", ".basis"]);
+function existingRuntimeAssetDirs() {
+  return [
+    path.join(ROOT, "unsoccer", "client", "public", "assets", "characters"),
+    path.join(ROOT, "unsoccer", "client", "public", "assets", "environment"),
+    path.join(ROOT, "unsoccer", "client", "public", "assets", "balls"),
+    path.join(ROOT, "unsoccer", "client", "dist", "assets", "characters"),
+    path.join(ROOT, "unsoccer", "client", "dist", "assets", "environment"),
+    path.join(ROOT, "unsoccer", "client", "dist", "assets", "balls")
+  ].filter((entry) => fs.existsSync(entry));
+}
+const BLOCKED_TEXTURE_FILE_EXTENSIONS = new Set([
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".webp",
+  ".ktx2",
+  ".ktx",
+  ".basis",
+  ".bmp",
+  ".tga",
+  ".tif",
+  ".tiff",
+  ".dds",
+  ".hdr",
+  ".exr"
+]);
+const BLOCKED_TEXTURE_REFERENCE_RE = /\.(png|jpe?g|webp|bmp|tga|tiff?|dds|ktx2?|basis|hdr|exr)\b/i;
 
 function listFilesRecursive(root) {
   if (!fs.existsSync(root)) return [];
@@ -110,9 +131,14 @@ function glbVertexPbrProblems(gltf, filePath) {
 }
 
 function assertTexturelessRuntimeAssets() {
-  const files = TEXTURELESS_RUNTIME_ASSET_DIRS.flatMap(listFilesRecursive);
+  const files = existingRuntimeAssetDirs().flatMap(listFilesRecursive);
   const blockedFiles = files.filter((filePath) => BLOCKED_TEXTURE_FILE_EXTENSIONS.has(path.extname(filePath).toLowerCase()));
   assert.deepEqual(blockedFiles, [], "runtime 3D asset folders must not ship image texture files");
+  const texturedFbxFiles = files
+    .filter((entry) => entry.toLowerCase().endsWith(".fbx"))
+    .filter((entry) => BLOCKED_TEXTURE_REFERENCE_RE.test(fs.readFileSync(entry, "latin1")))
+    .map((entry) => path.relative(ROOT, entry));
+  assert.deepEqual(texturedFbxFiles, [], "runtime FBX clips must not contain image texture references");
 
   const badGlbs = [];
   for (const filePath of files.filter((entry) => entry.toLowerCase().endsWith(".glb"))) {

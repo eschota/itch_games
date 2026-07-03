@@ -309,7 +309,7 @@
     <rule>Set ITCH_IO_TARGET=owner/game:channel to let the post-commit hook publish UnSoccer to itch.io after production is ready.</rule>
     <rule>Packaging fails if internal skill, role, agent coordination, deploy, or source-control docs leak into the public zip.</rule>
   </tooling>
-  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.055">
+  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.056">
     <client path="unsoccer/client" package="dist/unsoccer-itch.zip" productionPath="/unsoccer/" productionStatic="unsoccer/client/dist" />
     <server path="unsoccer/server" port="8787" health="/api/health" transport="plain-websocket-json" fallback="http-polling" productionApiPath="/unsoccer/api/" productionSocketPath="/unsoccer/socket/" />
     <shared path="unsoccer/shared" />
@@ -318,7 +318,7 @@
     <assetRules path="unsoccer/assets/licenses/free3d-provenance.json">
       <rule>Free3D authenticated downloads require FREE3D_API_TOKEN/F3D_API_TOKEN and exact format/lod/relativePath tuples.</rule>
       <rule>Tokenless Free3D LowPoly 1k assets may use exact public worker inventory paths.json relativePath entries with provenance.</rule>
-      <rule>Runtime 3D assets must be local optimized textureless GLB files with provenance before shipping: no image texture files in client/public/assets/{characters,environment,balls}, no GLB images/textures, no material texture references, and baked COLOR_0 vertex colors. Character GLBs must also include packed TEXCOORD_1 roughness/metalness. Deleting textures without baking vertex color is not acceptable.</rule>
+      <rule>Runtime 3D assets must be local optimized textureless files with provenance before shipping: no image texture files in client/public/assets/{characters,environment,balls}, no GLB images/textures, no material texture references, no FBX image references, and baked COLOR_0 vertex colors. Character GLBs must also include packed TEXCOORD_1 roughness/metalness. Deleting textures without baking vertex color is not acceptable.</rule>
       <rule>Character runtime roster entries must include a local textureless GLB and FBX idle/walk/run/jump clips before their ids are added to shared/src/index.ts CHARACTER_ROSTER.</rule>
       <rule>AutoRig task character entries must not ship embedded-texture animations.glb in the runtime roster until converted to textureless vertex/PBR assets; record locked bundle/download status in provenance.</rule>
       <rule>Environment runtime GLBs live under client/public/assets/environment/free3d/ with source provenance under assets/models/environment/free3d/provenance.json.</rule>
@@ -372,6 +372,7 @@
     <rule>v0.0.054 mirrors orange-team left/right input in client code while preserving the current blue-team mapping and without changing the controls GUI.</rule>
     <rule>v0.0.053 keeps the v0.0.052 gameplay contract and adds an itch.io/itch.zone hosted-build transport fallback to the production WebSocket/API endpoints.</rule>
     <rule>v0.0.055 makes /admin a first-class local runtime-settings entry, defaults botTargetActivePlayers to 3, and lowers kickRange/footKickAssistRange/handKickAssistRange/headKickAssistRange to reduce too-distant ball strike triggers while keeping all values adjustable through the Russian admin schema.</rule>
+    <rule>v0.0.056 strips stale Free3D FBX image references from character animation clips, removes the transparent data-image fallback, rejects runtime texture maps in character/environment/ball loaders, and makes acceptance/package fail on texture files, GLB texture slots, or FBX image refs.</rule>
     <rule>Local browser play servers for UnSoccer must run without UNSOCCER_TEST_MODE; that flag is only for isolated acceptance and prevents normal default bot fill unless /api/test/bots enables it.</rule>
     <rule>tools/unsoccer_acceptance.mjs derives the expected version from package.json.games.unsoccer.version and checks HTTP fallback join/input/state.</rule>
     <rule>npm run package:unsoccer rebuilds before writing dist/unsoccer-itch.zip so stale dist output cannot become the release package.</rule>
@@ -418,7 +419,7 @@
     <rule>Orbital Courier itch upload must include vendored Three.js and must not require cdn.jsdelivr.net at runtime.</rule>
     <rule>External itch.io pages remain incomplete until the public URL, uploaded zip, exact live copy, screenshots, publication date, and version match are recorded under ui_designer/public_pages/.</rule>
   </publicSurfaces>
-  <versioning initial="v0.0.001" current="v0.0.055">
+  <versioning initial="v0.0.001" current="v0.0.056">
     <rule>Every created game starts at v0.0.001.</rule>
     <rule>Every shipped bump increments the version.</rule>
     <rule>The current version is visible in the bottom-left corner.</rule>

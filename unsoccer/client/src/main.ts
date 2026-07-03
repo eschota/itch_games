@@ -293,7 +293,7 @@ const networkStateEl = requireElement<HTMLElement>("#network-state");
 const testSoundButton = requireElement<HTMLButtonElement>("#test-sound-button");
 const versionBadge = requireElement<HTMLElement>("#version-badge");
 const ART_PASS_VERSION = "v0.0.036";
-const BUILD_WEIGHT_LABEL = "40.05 MB";
+const BUILD_WEIGHT_LABEL = "39.92 MB";
 const DAWN_START_SECONDS = 3 * 60 * 60;
 const DAYLIGHT_START_SECONDS = 5 * 60 * 60;
 const DUSK_START_SECONDS = 21 * 60 * 60;
@@ -1804,7 +1804,37 @@ function resolveClientAsset(src: string): string {
   return new URL(src.replace(/^\/+/, ""), window.location.href).toString();
 }
 
+function countRuntimeTextureMaps(root: THREE.Object3D): number {
+  const textures = new Set<THREE.Texture>();
+  root.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return;
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    for (const material of materials) {
+      if (!material) continue;
+      for (const key of [
+        "map",
+        "normalMap",
+        "roughnessMap",
+        "metalnessMap",
+        "aoMap",
+        "emissiveMap",
+        "alphaMap",
+        "bumpMap",
+        "displacementMap",
+        "lightMap"
+      ] as Array<keyof THREE.MeshStandardMaterial>) {
+        const value = (material as unknown as Record<string, unknown>)[key];
+        if (value instanceof THREE.Texture) textures.add(value);
+      }
+    }
+  });
+  return textures.size;
+}
+
 function prepareFree3dBallScene(model: THREE.Object3D, radius: number): THREE.Object3D {
+  if (countRuntimeTextureMaps(model) > 0) {
+    throw new Error("Free3D ball asset is not runtime textureless");
+  }
   model.traverse((child) => {
     if (!(child instanceof THREE.Mesh)) return;
     child.castShadow = true;

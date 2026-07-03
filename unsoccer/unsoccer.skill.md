@@ -434,11 +434,13 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 - Do not guess asset paths or depend on remote assets at runtime.
 - Runtime 3D assets must be optimized and textureless. The shipped
   `client/public/assets/{characters,environment,balls}` tree must contain no
-  image texture files, and every shipped GLB must have zero `images`, zero
-  `textures`, no material texture references, and baked `COLOR_0` vertex
-  colors. Character GLBs must also carry packed `TEXCOORD_1` roughness/
-  metalness data. Bake or approximate source textures into vertex/PBR before
-  runtime; deleting textures without baking color is a blocker.
+  image texture files, every shipped GLB must have zero `images`, zero
+  `textures`, no material texture references, and every shipped FBX animation
+  clip must have zero image/texture filename references. GLB meshes must carry
+  baked `COLOR_0` vertex colors. Character GLBs must also carry packed
+  `TEXCOORD_1` roughness/metalness data. Bake or approximate source textures
+  into vertex/PBR before runtime; deleting textures without baking color is a
+  blocker.
 - Run `tools/bake_free3d_characters_textureless.py` after changing the Free3D
   character roster or raw source textures. It reads build-time raw
   `albedo.png`/`orm.png` sources and writes runtime GLBs with baked
@@ -456,6 +458,10 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 - Character roster entries must stay synchronized with
   `shared/src/index.ts::CHARACTER_ROSTER`; do not add a character id there until
   the public roster entry has a textureless local GLB and local FBX clips.
+- Run `tools/strip_fbx_texture_refs.py` after replacing Free3D animation clips.
+  `npm run test:unsoccer:acceptance` and `npm run package:unsoccer` must fail
+  if runtime FBX clips still contain `.png`, `.jpg`, `.webp`, `.ktx`, `.basis`,
+  `.tga`, `.dds`, `.hdr`, or equivalent image references.
 - AutoRig task character provenance should record the canonical `/task?id=...`
   page, `/api/task/...` metadata, `/animations.glb` source, whether
   `/bundle.zip` or direct animation downloads were locked, and which local FBX

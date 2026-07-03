@@ -1,6 +1,6 @@
 {
   "name": "@itch-games/unsoccer-client",
-  "version": "0.0.55",
+  "version": "0.0.56",
   "type": "module",
   "private": true,
   "scripts": {
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@itch-games/unsoccer-shared": "0.0.55",
+    "@itch-games/unsoccer-shared": "0.0.56",
     "three": "^0.184.0"
   },
   "devDependencies": {

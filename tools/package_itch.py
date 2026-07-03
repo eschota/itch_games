@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import json
 import pathlib
+import re
 import shutil
 import struct
 import sys
@@ -32,7 +33,26 @@ TEXTURELESS_RUNTIME_ASSET_DIRS = (
     pathlib.Path("assets") / "environment",
     pathlib.Path("assets") / "balls",
 )
-BLOCKED_TEXTURE_FILE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".ktx2", ".basis"}
+BLOCKED_TEXTURE_FILE_EXTENSIONS = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".webp",
+    ".ktx2",
+    ".ktx",
+    ".basis",
+    ".bmp",
+    ".tga",
+    ".tif",
+    ".tiff",
+    ".dds",
+    ".hdr",
+    ".exr",
+}
+BLOCKED_TEXTURE_REFERENCE_RE = re.compile(
+    rb"\.(png|jpe?g|webp|bmp|tga|tiff?|dds|ktx2?|basis|hdr|exr)\b",
+    re.IGNORECASE,
+)
 
 GAMES = {
     ORBITAL_COURIER: {
@@ -122,6 +142,7 @@ def glb_vertex_pbr_problems(gltf: dict, relative: str) -> list[str]:
 
 def assert_unsoccer_textureless_runtime_assets(dist_root: pathlib.Path) -> None:
     blocked_files: list[str] = []
+    textured_fbx_files: list[str] = []
     bad_glbs: list[dict[str, object]] = []
     for relative_root in TEXTURELESS_RUNTIME_ASSET_DIRS:
         root = dist_root / relative_root
@@ -134,6 +155,8 @@ def assert_unsoccer_textureless_runtime_assets(dist_root: pathlib.Path) -> None:
             suffix = path.suffix.lower()
             if suffix in BLOCKED_TEXTURE_FILE_EXTENSIONS:
                 blocked_files.append(relative)
+            if suffix == ".fbx" and BLOCKED_TEXTURE_REFERENCE_RE.search(path.read_bytes()):
+                textured_fbx_files.append(relative)
             if suffix == ".glb":
                 gltf = read_glb_json(path)
                 vertex_pbr_problems = glb_vertex_pbr_problems(gltf, relative)
@@ -144,10 +167,10 @@ def assert_unsoccer_textureless_runtime_assets(dist_root: pathlib.Path) -> None:
                     or vertex_pbr_problems
                 ):
                     bad_glbs.append({"file": relative, "vertexPbrProblems": vertex_pbr_problems})
-    if blocked_files or bad_glbs:
+    if blocked_files or textured_fbx_files or bad_glbs:
         raise RuntimeError(
             "UnSoccer runtime 3D assets must be textureless vertex/PBR; "
-            f"texture_files={blocked_files}; textured_glbs={bad_glbs}"
+            f"texture_files={blocked_files}; textured_fbx={textured_fbx_files}; textured_glbs={bad_glbs}"
         )
 
 

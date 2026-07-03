@@ -99,12 +99,12 @@ type HandStrikeSide = "left" | "right";
 type FootStrikeSide = "left" | "right";
 type JumpStyle = "standing" | "run";
 
-const transparentFbxTexture =
-  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=";
 const gltfLoader = new GLTFLoader();
 const characterAnimationManager = new THREE.LoadingManager();
 characterAnimationManager.setURLModifier((url) => {
-  if (/\.(png|jpe?g|webp|bmp|tga)(\?.*)?$/i.test(url)) return transparentFbxTexture;
+  if (/\.(png|jpe?g|webp|bmp|tga|tiff?|dds|ktx2?|basis|hdr|exr)(\?.*)?$/i.test(url)) {
+    throw new Error(`Blocked texture request from textureless character animation asset: ${url}`);
+  }
   return url;
 });
 const fbxLoader = new FBXLoader(characterAnimationManager);
@@ -280,8 +280,11 @@ export function loadFree3dCharacter(
       for (const clip of gltf.animations) {
         if (!clips.idle) clips.idle = clip;
       }
-      const preparedScene = prepareCharacterScene(gltf.scene, asset);
       const sourceTextureCount = countMaterialTextures(gltf.scene, []);
+      if (sourceTextureCount > 0 || (asset.textureCount || 0) > 0) {
+        throw new Error(`Free3D character ${asset.guid} is not runtime textureless`);
+      }
+      const preparedScene = prepareCharacterScene(gltf.scene, asset);
       const texturelessPbr = await bakeTexturelessPbr(preparedScene, {
         bakeGeometryAo: true,
         aoContrast: 1.2,

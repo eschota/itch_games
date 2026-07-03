@@ -1,5 +1,15 @@
 # Changelog
 
+## unsoccer v0.0.056
+
+- Enforce the textureless vertex/PBR runtime asset contract for UnSoccer:
+  runtime character/environment/ball assets must not ship image texture files,
+  GLB texture slots, material texture maps, or FBX image references.
+- Strip stale Free3D image references from all shipped character FBX animation
+  clips and remove the previous transparent data-image fallback.
+- Add loader, acceptance, and packaging gates so textured runtime assets fail
+  before release.
+
 ## unsoccer v0.0.055
 
 - Add a local `/admin` entry for the runtime settings page so tuning can start

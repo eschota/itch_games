@@ -200,8 +200,11 @@ Use this file for work inside `/itch_games`.
 
 ## Versioning
 
-- Current release: `v0.0.055`.
-- `unsoccer` release: `v0.0.055`.
+- Current release: `v0.0.056`.
+- `unsoccer` release: `v0.0.056`.
+- `unsoccer` v0.0.056 enforces textureless vertex/PBR runtime assets: no
+  shipped image texture files, no GLB texture slots/material texture maps, no
+  FBX image references, and release gates in acceptance/package.
 - `unsoccer` v0.0.055 adds the local `/admin` runtime settings entry, defaults
   bot fill to three active players, and shortens the active ball-strike trigger
   ranges while keeping them tunable in the Russian admin.

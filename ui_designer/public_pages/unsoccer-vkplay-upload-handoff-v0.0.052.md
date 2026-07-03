@@ -30,8 +30,8 @@ Use this URL for the current release candidate after the Moscow deploy is live:
 
 `https://moscow-io-games.mecharulez.com/unsoccer/?source=vkplay&version=v0.0.052`
 
-Current live gate: primary and Moscow now both report `v0.0.052`, commit
-`c6408d6`, and Moscow public `/unsoccer/` contains `v0.0.052 / 40.05 MB`.
+Current live gate: primary and Moscow now both report `v0.0.052`, matching
+main commits, and Moscow public `/unsoccer/` contains `v0.0.052 / 40.05 MB`.
 The iframe URL is no longer blocked by live-version drift.
 
 Dashboard save status: `IFrame link to the game` and `iFrame link to the test
@@ -137,8 +137,8 @@ Use the numbered files from `dist/vkplay-upload-9572-v0.0.052/`.
 - `node ui_designer/public_pages/prepare-vkplay-upload-pack.mjs`: OK for
   `v0.0.052`, `40.05 MB`, `105` archive entries.
 - `node ai_chat/deploy/verify-moscow-relay.mjs --mode=report`: OK for primary
-  and Moscow `v0.0.052`, commit `c6408d6`, public version/weight, API health,
-  and deploy-relay route.
+  and Moscow `v0.0.052`, matching main commits, public version/weight, API
+  health, and deploy-relay route.
 - Browser project audit found file inputs for horizontal/vertical/art/video/icon
   assets, but no callable file-upload API in the in-app browser.
 - Browser form update attempts on `iframe_landing_url` failed through

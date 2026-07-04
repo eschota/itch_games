@@ -1,11 +1,11 @@
-export const GAME_VERSION = "v0.0.056";
+export const GAME_VERSION = "v0.0.064";
 export const ROOM_ID = "unsoccer-default-room";
 export const MAX_ACTIVE_PLAYERS = 10;
 export const MAX_ROOM_CLIENTS = 32;
 export const SERVER_TICK_RATE = 60;
 export const SNAPSHOT_RATE = 20;
 export const DAY_CYCLE_SECONDS = 300;
-export const DAY_START_SECONDS = 6 * 60 * 60;
+export const DAY_START_SECONDS = 9 * 60 * 60;
 export const FIELD_WIDTH = 48;
 export const FIELD_LENGTH = 72;
 export const GOAL_WIDTH = 12;
@@ -39,8 +39,11 @@ export const PLAYER_RAGDOLL_VERTICAL_KNOCKBACK = 4.4;
 export const BALL_RADIUS = 0.24;
 export const BALL_DENSITY = 3.6;
 export const BALL_RESTITUTION = 1.05;
-export const KICK_RANGE = 1.25;
-export const FOOT_KICK_ASSIST_RANGE = 1.35;
+export const BALL_LINEAR_DAMPING = 0.08;
+export const BALL_GROUND_DRAG = 0.997;
+export const BALL_AIR_DRAG = 0.9997;
+export const KICK_RANGE = 0.72;
+export const FOOT_KICK_ASSIST_RANGE = 1.05;
 export const HAND_KICK_ASSIST_RANGE = 1.15;
 export const HEAD_KICK_ASSIST_RANGE = 1.05;
 export const FOOT_KICK_STRENGTH = 2.4;
@@ -64,18 +67,20 @@ export const PLAYER_BALL_COLLISION_RESTITUTION = 1.08;
 export const PLAYER_BALL_COLLISION_PUSH = 0.42;
 export const PLAYER_BALL_COLLISION_SKIN = 0.035;
 export const BALL_POSSESSION_RANGE = 0.98;
-export const BALL_POSSESSION_CARRY_DISTANCE = 0.86;
+export const BALL_POSSESSION_CARRY_DISTANCE = 0.73;
 export const BALL_POSSESSION_CARRY_HEIGHT = 0.04;
 export const BALL_POSSESSION_MAX_CAPTURE_SPEED = 8.5;
 export const BALL_POSSESSION_MAX_CAPTURE_HEIGHT = 0.72;
 export const BALL_POSSESSION_RECAPTURE_DELAY_MS = 360;
-export const BALL_POSSESSION_LOW_SHOT_SPEED = 11.2;
-export const BALL_POSSESSION_UPPER_SHOT_SPEED = 10.2;
-export const BALL_POSSESSION_LOW_SHOT_LIFT = 0.22;
-export const BALL_POSSESSION_UPPER_SHOT_LIFT = 4.2;
-export const BALL_POSSESSION_STRONG_MULTIPLIER = 1.85;
-export const BALL_POSSESSION_BASE_POWER_MULTIPLIER = 1.2;
-export const BALL_POSSESSION_FULL_POWER_MULTIPLIER = 8;
+export const BALL_POSSESSION_LOW_SHOT_SPEED = 8.2;
+export const BALL_POSSESSION_UPPER_SHOT_SPEED = 6.4;
+export const BALL_POSSESSION_LOW_SHOT_LIFT = 0.16;
+export const BALL_POSSESSION_UPPER_SHOT_LIFT = 1.7;
+export const BALL_POSSESSION_STRONG_MULTIPLIER = 1.4;
+export const BALL_POSSESSION_BASE_POWER_MULTIPLIER = 0.8;
+export const BALL_POSSESSION_FULL_POWER_MULTIPLIER = 2;
+export const BALL_POSSESSION_MAX_SHOT_SPEED = 18;
+export const BALL_POSSESSION_MAX_SHOT_LIFT = 5.4;
 export const JUMP_KICK_DASH_SPEED = 7.4;
 export const JUMP_KICK_HIT_RANGE_BONUS = 0.95;
 export const POST_GOAL_CELEBRATION_MS = 5000;
@@ -83,6 +88,7 @@ export const POST_GOAL_BALL_RETURN_MS = 1000;
 export const KICKOFF_COUNTDOWN_MS = 1200;
 export const CELEBRATION_WINDOW_MS = POST_GOAL_CELEBRATION_MS;
 export const CELEBRATION_DURATION_MS = 2600;
+export const MATCH_DURATION_MS = 5 * 60 * 1000;
 
 export type TeamId = 0 | 1;
 export type PlayerRole = "player" | "spectator";
@@ -146,6 +152,7 @@ export interface InputState {
   head: number;
   jump: number;
   exitVehicle: number;
+  switchTeam: number;
   sprint: boolean;
   yaw: number;
 }
@@ -332,6 +339,8 @@ export interface ServerState {
   vehicles: VehicleSnapshot[];
   ball: BallSnapshot;
   score: ScoreState;
+  matchDurationMs: number;
+  matchRemainingMs: number;
   message: string;
   countdown: number;
   goalReset: GoalResetSnapshot;
@@ -393,6 +402,7 @@ export const DEFAULT_INPUT: InputState = {
   head: 0,
   jump: 0,
   exitVehicle: 0,
+  switchTeam: 0,
   sprint: false,
   yaw: 0
 };
@@ -542,7 +552,13 @@ export interface GameSettings {
   goalPostRadius: number;
   goalCrossbarHeight: number;
   goalCrossbarRadius: number;
+  goalNetCatchDepthPadding: number;
+  goalNetCatchSidePadding: number;
+  goalNetCatchSettleMs: number;
+  goalNetCatchStiffness: number;
+  goalNetCatchVelocityDamping: number;
   maxActivePlayers: number;
+  matchDurationMs: number;
   dayCycleSeconds: number;
   dayStartSeconds: number;
   sunIntensity: number;
@@ -588,6 +604,9 @@ export interface GameSettings {
   ballRadius: number;
   ballDensity: number;
   ballRestitution: number;
+  ballLinearDamping: number;
+  ballGroundDrag: number;
+  ballAirDrag: number;
   kickRange: number;
   footKickAssistRange: number;
   handKickAssistRange: number;
@@ -627,6 +646,8 @@ export interface GameSettings {
   ballPossessionStrongMultiplier: number;
   ballPossessionBasePowerMultiplier: number;
   ballPossessionFullPowerMultiplier: number;
+  ballPossessionMaxShotSpeed: number;
+  ballPossessionMaxShotLift: number;
   friendlyFireEnabled: boolean;
   playerHitFullKnockoutEnabled: boolean;
   jumpKickDashSpeed: number;
@@ -798,7 +819,13 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   goalPostRadius: 0.19,
   goalCrossbarHeight: 2.18,
   goalCrossbarRadius: 0.16,
+  goalNetCatchDepthPadding: 0.42,
+  goalNetCatchSidePadding: 0.46,
+  goalNetCatchSettleMs: 1500,
+  goalNetCatchStiffness: 0.34,
+  goalNetCatchVelocityDamping: 0.18,
   maxActivePlayers: MAX_ACTIVE_PLAYERS,
+  matchDurationMs: MATCH_DURATION_MS,
   dayCycleSeconds: DAY_CYCLE_SECONDS,
   dayStartSeconds: DAY_START_SECONDS,
   sunIntensity: 1,
@@ -806,7 +833,7 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   ambientIntensity: 1,
   floodlightIntensity: 1,
   toneMappingExposure: 1,
-  cameraDistance: 12.4,
+  cameraDistance: 10,
   visual: DEFAULT_VISUAL_SETTINGS,
   weatherChangeMinMs: 60000,
   weatherChangeMaxMs: 120000,
@@ -844,6 +871,9 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   ballRadius: BALL_RADIUS,
   ballDensity: BALL_DENSITY,
   ballRestitution: BALL_RESTITUTION,
+  ballLinearDamping: BALL_LINEAR_DAMPING,
+  ballGroundDrag: BALL_GROUND_DRAG,
+  ballAirDrag: BALL_AIR_DRAG,
   kickRange: KICK_RANGE,
   footKickAssistRange: FOOT_KICK_ASSIST_RANGE,
   handKickAssistRange: HAND_KICK_ASSIST_RANGE,
@@ -883,6 +913,8 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   ballPossessionStrongMultiplier: BALL_POSSESSION_STRONG_MULTIPLIER,
   ballPossessionBasePowerMultiplier: BALL_POSSESSION_BASE_POWER_MULTIPLIER,
   ballPossessionFullPowerMultiplier: BALL_POSSESSION_FULL_POWER_MULTIPLIER,
+  ballPossessionMaxShotSpeed: BALL_POSSESSION_MAX_SHOT_SPEED,
+  ballPossessionMaxShotLift: BALL_POSSESSION_MAX_SHOT_LIFT,
   friendlyFireEnabled: true,
   playerHitFullKnockoutEnabled: true,
   jumpKickDashSpeed: JUMP_KICK_DASH_SPEED,
@@ -938,7 +970,13 @@ export const GAME_SETTINGS_SCHEMA: GameSettingSchemaItem[] = [
   { key: "goalPostRadius", group: "Поле", label: "Толщина штанг", description: "Радиус физического коллайдера штанг. Чем выше значение, тем сильнее отскок от штанги.", input: "range", min: 0.05, max: 0.35, step: 0.01, restartPhysics: true },
   { key: "goalCrossbarHeight", group: "Поле", label: "Высота перекладины", description: "Высота перекладины и верхней границы легального створа ворот.", input: "range", min: 1.5, max: 3.2, step: 0.01, restartPhysics: true },
   { key: "goalCrossbarRadius", group: "Поле", label: "Толщина перекладины", description: "Радиус физического коллайдера перекладины.", input: "range", min: 0.04, max: 0.28, step: 0.01, restartPhysics: true },
+  { key: "goalNetCatchDepthPadding", group: "Поле", label: "Карман сетки", description: "Отступ мяча от задней сетки после гола. Меньше значение держит мяч глубже в воротах.", input: "range", min: 0.1, max: 1.5, step: 0.01 },
+  { key: "goalNetCatchSidePadding", group: "Поле", label: "Боковой запас сетки", description: "Отступ от боковых сеток при удержании мяча после гола, чтобы мяч не дрожал в углах.", input: "range", min: 0, max: 2, step: 0.01 },
+  { key: "goalNetCatchSettleMs", group: "Поле", label: "Оседание мяча в сетке", description: "Миллисекунды, за которые мяч мягко оседает вниз внутри сетки во время празднования гола.", input: "number", min: 100, max: 5000, step: 50 },
+  { key: "goalNetCatchStiffness", group: "Поле", label: "Жесткость сетки", description: "Насколько быстро сетка притягивает мяч к точке удержания после гола.", input: "range", min: 0.05, max: 1, step: 0.01 },
+  { key: "goalNetCatchVelocityDamping", group: "Поле", label: "Гашение скорости сеткой", description: "Доля скорости мяча, которая сохраняется каждый тик во время удержания в сетке.", input: "range", min: 0, max: 0.8, step: 0.01 },
   { key: "maxActivePlayers", group: "Матч", label: "Активные игроки", description: "Максимум активных игроков на поле, включая ботов.", input: "range", min: 1, max: MAX_ACTIVE_PLAYERS, step: 1 },
+  { key: "matchDurationMs", group: "Матч", label: "Длительность матча", description: "Сколько миллисекунд длится матч до автоматического сброса счета и нового розыгрыша.", input: "number", min: 60000, max: 1800000, step: 10000 },
   { key: "dayCycleSeconds", group: "Мир", label: "Длина суток", description: "Сколько реальных секунд длится полный цикл день/ночь.", input: "range", min: 60, max: 900, step: 5 },
   { key: "dayStartSeconds", group: "Мир", label: "Стартовое время", description: "Время суток при запуске сервера в секундах от полуночи. 21600 значит 06:00, рассвет.", input: "number", min: 0, max: 86399, step: 60 },
   { key: "sunIntensity", group: "Мир", label: "Яркость солнца", description: "Множитель прямого солнечного света и видимого свечения солнца.", input: "range", min: 0, max: 4, step: 0.01 },
@@ -984,6 +1022,9 @@ export const GAME_SETTINGS_SCHEMA: GameSettingSchemaItem[] = [
   { key: "ballRadius", group: "Мяч", label: "Радиус мяча", description: "Авторитетный радиус коллайдера мяча. Требует пересброса физики.", input: "range", min: 0.12, max: 0.8, step: 0.01, restartPhysics: true },
   { key: "ballDensity", group: "Мяч", label: "Плотность мяча", description: "Плотность массы мяча. Чем выше значение, тем труднее его разогнать.", input: "range", min: 0.2, max: 12, step: 0.1, restartPhysics: true },
   { key: "ballRestitution", group: "Мяч", label: "Прыгучесть мяча", description: "Коэффициент отскока от земли, стен, штанг и коллайдера мяча.", input: "range", min: 0, max: 1.8, step: 0.01, restartPhysics: true },
+  { key: "ballLinearDamping", group: "Мяч", label: "Сопротивление мяча", description: "Глобальное физическое демпфирование мяча. Малое значение сохраняет полет, большое делает мяч ватным.", input: "range", min: 0, max: 1.2, step: 0.01, restartPhysics: true },
+  { key: "ballGroundDrag", group: "Мяч", label: "Трение мяча по земле", description: "Горизонтальное затухание мяча, когда он катится по полю.", input: "range", min: 0.94, max: 1, step: 0.0005 },
+  { key: "ballAirDrag", group: "Мяч", label: "Торможение мяча в воздухе", description: "Горизонтальное затухание мяча в полете. Должно быть почти 1, чтобы мяч не стопорился как перо.", input: "range", min: 0.98, max: 1, step: 0.0001 },
   { key: "kickRange", group: "Удары", label: "Точная дистанция удара по мячу", description: "Близкий радиус вокруг рассчитанной точки ноги, руки или головы. Уменьшай, если удар срабатывает слишком далеко.", input: "range", min: 0.4, max: 4, step: 0.05 },
   { key: "footKickAssistRange", group: "Удары", label: "Дальность ЛКМ-удара по мячу", description: "Прощающая горизонтальная дистанция для контакта ЛКМ-ударом ногой по мячу.", input: "range", min: 0.6, max: 5, step: 0.05 },
   { key: "handKickAssistRange", group: "Удары", label: "Дальность ПКМ-удара по мячу", description: "Прощающая горизонтальная дистанция для контакта ПКМ-ударом рукой по мячу.", input: "range", min: 0.4, max: 4, step: 0.05 },
@@ -1021,8 +1062,10 @@ export const GAME_SETTINGS_SCHEMA: GameSettingSchemaItem[] = [
   { key: "ballPossessionLowShotLift", group: "Мяч", label: "Подъем низкого удара", description: "Вертикальная скорость ЛКМ-удара при владении.", input: "range", min: 0, max: 5, step: 0.05 },
   { key: "ballPossessionUpperShotLift", group: "Мяч", label: "Подъем верхнего удара", description: "Вертикальная скорость ПКМ-удара верхом при владении.", input: "range", min: 0, max: 12, step: 0.05 },
   { key: "ballPossessionStrongMultiplier", group: "Мяч", label: "Множитель Shift-удара", description: "Множитель скорости низкого и верхнего удара, если во время удара зажат Shift.", input: "range", min: 1, max: 4, step: 0.05 },
-  { key: "ballPossessionBasePowerMultiplier", group: "Мяч", label: "База удара владения", description: "Множитель силы ЛКМ/ПКМ-удара, когда игрок владеет мячом и бьет без заряда.", input: "range", min: 1, max: 12, step: 0.05 },
+  { key: "ballPossessionBasePowerMultiplier", group: "Мяч", label: "База удара владения", description: "Множитель силы ЛКМ/ПКМ-удара, когда игрок владеет мячом и бьет без заряда.", input: "range", min: 0.2, max: 12, step: 0.05 },
   { key: "ballPossessionFullPowerMultiplier", group: "Мяч", label: "Полный удар владения", description: "Множитель силы ЛКМ/ПКМ-удара при полном заряде или Shift.", input: "range", min: 1, max: 16, step: 0.05 },
+  { key: "ballPossessionMaxShotSpeed", group: "Мяч", label: "Лимит скорости удара", description: "Жесткий потолок горизонтальной скорости мяча при ударе из владения, чтобы один удар не превращался в ракету через много полей.", input: "range", min: 4, max: 45, step: 0.1 },
+  { key: "ballPossessionMaxShotLift", group: "Мяч", label: "Лимит подъема удара", description: "Жесткий потолок вертикальной скорости мяча при навесном ударе из владения.", input: "range", min: 0.5, max: 16, step: 0.1 },
   { key: "friendlyFireEnabled", group: "Удары", label: "Бить своих", description: "Разрешает ударами без мяча вырубать игроков своей команды.", input: "checkbox" },
   { key: "playerHitFullKnockoutEnabled", group: "Удары", label: "Нокаут с одного удара", description: "Если включено, любой точный удар по игроку сразу сбивает всю стамину и включает ragdoll.", input: "checkbox" },
   { key: "jumpKickDashSpeed", group: "Удары", label: "Dash удара в прыжке", description: "Дополнительная скорость вперед для удара ногой в воздухе.", input: "range", min: 0, max: 20, step: 0.1 },

@@ -20,7 +20,8 @@
     <child path="ui_designer/public_pages/unsoccer-itch-publication-v0.0.053.md" role="unsoccer-itch-publication-v0.0.053-evidence" />
     <child path="ui_designer/public_pages/unsoccer-itch-assets" role="unsoccer-itch-storefront-assets" />
     <child path="ui_designer/public_pages/unsoccer-yandex-games-assets" role="unsoccer-yandex-games-media-pack" />
-    <child path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="unsoccer-yandex-games-upload-handoff-current" />
+    <child path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.056.md" role="unsoccer-yandex-games-upload-handoff-current" />
+    <child path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="unsoccer-yandex-games-upload-handoff-v0.0.052-archive" />
     <child path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md" role="unsoccer-yandex-games-upload-handoff-v0.0.033-archive" />
     <child path="ui_designer/public_pages/verify-yandex-upload-pack.mjs" role="unsoccer-yandex-games-upload-pack-verifier" />
     <child path="ui_designer/public_pages/unsoccer-vkplay-release-gate.md" role="unsoccer-vkplay-release-gate" />
@@ -88,6 +89,7 @@
     <child path="unsoccer/client/src/input-map.ts" role="unsoccer-input-remap-resolution" />
     <child path="unsoccer/client/src/audio.ts" role="unsoccer-procedural-audio-runtime" />
     <child path="unsoccer/client/src/weather.ts" role="unsoccer-weather-graphics-options" />
+    <child path="unsoccer/client/src/water-puddle.ts" role="unsoccer-textureless-procedural-water-puddle-shader" />
     <child path="unsoccer/server" role="unsoccer-authoritative-server" />
     <child path="unsoccer/shared" role="unsoccer-shared-protocol" />
     <child path="unsoccer/assets" role="unsoccer-assets-provenance" />
@@ -137,7 +139,8 @@
           <node path="ui_designer/public_pages/unsoccer-itch-assets" role="itch-storefront-assets" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-yandex-games-assets" role="yandex-games-media-pack" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md" role="yandex-games-upload-handoff" owner="UI Designer" />
-          <node path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="yandex-games-upload-handoff-current" owner="UI Designer" />
+          <node path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.056.md" role="yandex-games-upload-handoff-current" owner="UI Designer" />
+          <node path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="yandex-games-upload-handoff-v0.0.052-archive" owner="UI Designer" />
           <node path="ui_designer/public_pages/verify-yandex-upload-pack.mjs" role="yandex-games-upload-pack-verifier" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-vkplay-release-gate.md" role="vkplay-release-gate" owner="UI Designer" />
           <node path="ui_designer/public_pages/unsoccer-vkplay-assets" role="vkplay-store-assets" owner="UI Designer" />
@@ -255,7 +258,8 @@
       <artifact path="ui_designer/public_pages/unsoccer-itch-assets" role="unsoccer-itch-storefront-assets" />
       <artifact path="ui_designer/public_pages/unsoccer-yandex-games-assets" role="unsoccer-yandex-games-media-pack" />
       <artifact path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md" role="unsoccer-yandex-games-upload-handoff" />
-      <artifact path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="unsoccer-yandex-games-upload-handoff-current" />
+      <artifact path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.056.md" role="unsoccer-yandex-games-upload-handoff-current" />
+      <artifact path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="unsoccer-yandex-games-upload-handoff-v0.0.052-archive" />
       <artifact path="ui_designer/public_pages/verify-yandex-upload-pack.mjs" role="unsoccer-yandex-games-upload-pack-verifier" />
       <artifact path="ui_designer/public_pages/unsoccer-vkplay-release-gate.md" role="unsoccer-vkplay-release-gate" />
       <artifact path="ui_designer/public_pages/unsoccer-vkplay-assets" role="unsoccer-vkplay-store-assets" />
@@ -312,7 +316,7 @@
     <rule>Set ITCH_IO_TARGET=owner/game:channel to let the post-commit hook publish UnSoccer to itch.io after production is ready.</rule>
     <rule>Packaging fails if internal skill, role, agent coordination, deploy, or source-control docs leak into the public zip.</rule>
   </tooling>
-  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.056">
+  <game name="unsoccer" title="Ragdoll Soccer II" version="v0.0.064">
     <client path="unsoccer/client" package="dist/unsoccer-itch.zip" productionPath="/unsoccer/" productionStatic="unsoccer/client/dist" />
     <server path="unsoccer/server" port="8787" health="/api/health" transport="plain-websocket-json" fallback="http-polling" productionApiPath="/unsoccer/api/" productionSocketPath="/unsoccer/socket/" />
     <shared path="unsoccer/shared" />
@@ -321,7 +325,7 @@
     <assetRules path="unsoccer/assets/licenses/free3d-provenance.json">
       <rule>Free3D authenticated downloads require FREE3D_API_TOKEN/F3D_API_TOKEN and exact format/lod/relativePath tuples.</rule>
       <rule>Tokenless Free3D LowPoly 1k assets may use exact public worker inventory paths.json relativePath entries with provenance.</rule>
-      <rule>Runtime 3D assets must be local optimized textureless files with provenance before shipping: no image texture files in client/public/assets/{characters,environment,balls}, no GLB images/textures, no material texture references, no FBX image references, and baked COLOR_0 vertex colors. Character GLBs must also include packed TEXCOORD_1 roughness/metalness. Deleting textures without baking vertex color is not acceptable.</rule>
+      <rule>Runtime 3D assets must be local optimized textureless files with provenance before shipping: no image texture files in client/public/assets/{characters,environment,balls,vehicles}, no GLB images/textures, no material texture references, no FBX image references, and baked COLOR_0 vertex colors. Character and vehicle GLBs must also include packed TEXCOORD_1 roughness/metalness. Deleting textures without baking vertex color is not acceptable.</rule>
       <rule>Character runtime roster entries must include a local textureless GLB and FBX idle/walk/run/jump clips before their ids are added to shared/src/index.ts CHARACTER_ROSTER.</rule>
       <rule>AutoRig task character entries must not ship embedded-texture animations.glb in the runtime roster until converted to textureless vertex/PBR assets; record locked bundle/download status in provenance.</rule>
       <rule>Environment runtime GLBs live under client/public/assets/environment/free3d/ with source provenance under assets/models/environment/free3d/provenance.json.</rule>
@@ -376,6 +380,17 @@
     <rule>v0.0.053 keeps the v0.0.052 gameplay contract and adds an itch.io/itch.zone hosted-build transport fallback to the production WebSocket/API endpoints.</rule>
     <rule>v0.0.055 makes /admin a first-class local runtime-settings entry, defaults botTargetActivePlayers to 3, and lowers kickRange/footKickAssistRange/handKickAssistRange/headKickAssistRange to reduce too-distant ball strike triggers while keeping all values adjustable through the Russian admin schema.</rule>
     <rule>v0.0.056 strips stale Free3D FBX image references from character animation clips, removes the transparent data-image fallback, rejects runtime texture maps in character/environment/ball loaders, and makes acceptance/package fail on texture files, GLB texture slots, or FBX image refs.</rule>
+    <rule>v0.0.056 supports one-computer local co-op: keyboard/mouse keeps the primary joined player, and up to four browser Gamepad API controllers auto-join as separate local HTTP player slots that submit normal server-authoritative InputState counters, held kick charge, sprint, jump, head-hit, and vehicle-exit actions. Gamepad stick directions stay physical on both axes for both teams: side input is direct, and orange-team vertical input is pre-compensated because the authoritative server applies team attack-direction to up/down. Local gamepads rumble on incoming hit damage/ragdoll from authoritative stamina snapshots, but not on gradual sprint stamina drain.</rule>
+    <rule>v0.0.057 lowers ballLinearDamping, separates ballGroundDrag from near-lossless ballAirDrag, and applies weather hazard surface drag only while the ball is near the ground so aerial shots do not brake like a feather. These values live in game-settings.json and GAME_SETTINGS_SCHEMA.</rule>
+    <rule>v0.0.057 renders puddles with a textureless procedural water shader in client/src/water-puddle.ts: irregular meshes, wave displacement, glints, caustic highlights, and edge shimmer; do not add image textures for puddles.</rule>
+    <rule>v0.0.057 adds server-authoritative team switching through InputState.switchTeam: keyboard Tab switches the primary player, gamepad R2 switches that local co-op slot, and R2 is reserved away from lower kick.</rule>
+    <rule>v0.0.058 freezes UnSoccer daylight at the 09:00 sun angle instead of running the day/night timelapse, keeps periodic rain/clouds/puddles, makes mounted vehicle controls direct and vehicle bounds tighter, sets cameraDistance to 10m and ballPossessionCarryDistance to 0.43, localizes/repositions the skin shop next to the score, and adds a five-minute match timer/reset in the score widget.</rule>
+    <rule>v0.0.059 adds the left-side local controller HUD for keyboard plus four gamepads: inactive controller cards are semi-transparent, active slots show full color, team accent, and their own stamina ring, and the controls settings tab exposes the visible gamepad button mapping.</rule>
+    <rule>v0.0.060 makes default ownership deterministic: human and local controller players spawn with the first character and first ball skin, bots randomize from the character roster excluding the first character, narrows default ball-kick trigger distance so early LMB clicks buffer instead of firing too far, and acceptance must prove goals plus selected character and ball profile updates before release.</rule>
+    <rule>v0.0.061 keeps connected local gamepads dormant until real input activity: connecting a gamepad may show a semi-transparent connected controller card, but it must not join a local co-op player or become active/full-color until stick/D-pad movement beyond deadzone or an action/sprint/team-switch button.</rule>
+    <rule>v0.0.062 moves the possessed dribble ball 0.3m farther in front of the owner by raising ballPossessionCarryDistance from 0.43 to 0.73 in runtime JSON and shared defaults while keeping the value editable in the Russian admin schema.</rule>
+    <rule>v0.0.063 tames possessed-ball shots: tap LMB/PKM must be pass/chip strength, full charge/Shift must remain below the one-field launch budget, and ballPossessionMaxShotSpeed plus ballPossessionMaxShotLift are hard runtime-admin caps against runaway shot settings.</rule>
+    <rule>v0.0.064 increases only the applied emotion visualization above players: the emotion wheel size stays unchanged, while replicated emotion sprites are larger, higher, more opaque, and rendered from a sharper canvas texture.</rule>
     <rule>Local browser play servers for UnSoccer must run without UNSOCCER_TEST_MODE; that flag is only for isolated acceptance and prevents normal default bot fill unless /api/test/bots enables it.</rule>
     <rule>tools/unsoccer_acceptance.mjs derives the expected version from package.json.games.unsoccer.version and checks HTTP fallback join/input/state.</rule>
     <rule>npm run package:unsoccer rebuilds before writing dist/unsoccer-itch.zip so stale dist output cannot become the release package.</rule>
@@ -403,7 +418,8 @@
     <surface path="ui_designer/public_pages/unsoccer-itch-assets" role="unsoccer-itch-storefront-assets" />
     <surface path="ui_designer/public_pages/unsoccer-yandex-games-assets" role="unsoccer-yandex-games-media-pack" />
     <surface path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.033.md" role="unsoccer-yandex-games-upload-handoff" />
-    <surface path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="unsoccer-yandex-games-upload-handoff-current" />
+    <surface path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.056.md" role="unsoccer-yandex-games-upload-handoff-current" />
+    <surface path="ui_designer/public_pages/unsoccer-yandex-games-upload-handoff-v0.0.052.md" role="unsoccer-yandex-games-upload-handoff-v0.0.052-archive" />
     <surface path="ui_designer/public_pages/verify-yandex-upload-pack.mjs" role="unsoccer-yandex-games-upload-pack-verifier" />
     <surface path="ui_designer/public_pages/unsoccer-vkplay-release-gate.md" role="unsoccer-vkplay-release-gate" />
     <surface path="ui_designer/public_pages/unsoccer-vkplay-assets" role="unsoccer-vkplay-store-assets" />
@@ -422,7 +438,7 @@
     <rule>Orbital Courier itch upload must include vendored Three.js and must not require cdn.jsdelivr.net at runtime.</rule>
     <rule>External itch.io pages remain incomplete until the public URL, uploaded zip, exact live copy, screenshots, publication date, and version match are recorded under ui_designer/public_pages/.</rule>
   </publicSurfaces>
-  <versioning initial="v0.0.001" current="v0.0.056">
+  <versioning initial="v0.0.001" current="v0.0.064">
     <rule>Every created game starts at v0.0.001.</rule>
     <rule>Every shipped bump increments the version.</rule>
     <rule>The current version is visible in the bottom-left corner.</rule>

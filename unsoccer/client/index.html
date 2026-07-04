@@ -171,6 +171,7 @@
           <b>:</b>
           <strong id="orange-score">0</strong>
           <span class="team-score-strip team-score-strip-orange" aria-label="&#1054;&#1088;&#1072;&#1085;&#1078;&#1077;&#1074;&#1099;&#1077;" title="&#1054;&#1088;&#1072;&#1085;&#1078;&#1077;&#1074;&#1099;&#1077;"></span>
+          <span id="match-timer" class="match-timer" aria-label="&#1058;&#1072;&#1081;&#1084;&#1077;&#1088; &#1084;&#1072;&#1090;&#1095;&#1072;">05:00</span>
         </div>
         <div id="network-panel" class="hud-panel network-panel" hidden aria-hidden="true">
           <span id="transport-status">offline</span>
@@ -183,11 +184,37 @@
         <div id="roster" class="hud-panel roster-panel"></div>
         <div id="offscreen-indicators" class="offscreen-indicators" aria-hidden="true">
           <div id="ball-offscreen-indicator" class="offscreen-indicator ball" hidden>
-            <i class="indicator-arrow"></i><b>МЯЧ</b>
+            <i class="indicator-arrow"></i><span class="ball-target-icon" aria-hidden="true"></span>
           </div>
           <div id="players-offscreen-indicators"></div>
         </div>
       </section>
+      <div id="goal-banner" class="goal-banner" role="status" aria-live="assertive" hidden>
+        <span class="goal-banner-main">GOAL!!!</span>
+        <span class="goal-banner-sub">&#1043;&#1054;&#1051;!!!</span>
+      </div>
+      <aside id="controller-panel" class="controller-panel" aria-label="&#1050;&#1086;&#1085;&#1090;&#1088;&#1086;&#1083;&#1083;&#1077;&#1088;&#1099;">
+        <article class="controller-card" data-controller-slot="keyboard" data-active="false" data-controller-state="inactive" data-team="none">
+          <span class="controller-icon controller-icon-keyboard" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M4 8.5h24a2.5 2.5 0 0 1 2.5 2.5v10A2.5 2.5 0 0 1 28 23.5H4A2.5 2.5 0 0 1 1.5 21V11A2.5 2.5 0 0 1 4 8.5Zm2.5 4v3h3v-3h-3Zm4.5 0v3h3v-3h-3Zm4.5 0v3h3v-3h-3Zm4.5 0v3h3v-3h-3Zm4.5 0v3h3v-3h-3Zm-18 5v3h3v-3h-3Zm4.5 0v3h12v-3H11Zm13.5 0v3h3v-3h-3Z"/></svg></span>
+          <span class="controller-stamina" aria-hidden="true"><i></i><b>--</b></span>
+        </article>
+        <article class="controller-card" data-controller-slot="pad-1" data-active="false" data-controller-state="inactive" data-team="none">
+          <span class="controller-icon controller-icon-gamepad" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M10.2 10h11.6c4.1 0 7.2 3.2 7.7 8l.5 4.6c.2 2.2-1.2 4.1-3.2 4.1-1.4 0-2.6-.7-3.5-2.1l-1.6-2.3H10.3l-1.6 2.3c-.9 1.4-2.1 2.1-3.5 2.1-2 0-3.4-1.9-3.2-4.1l.5-4.6c.5-4.8 3.6-8 7.7-8Zm-1 5.2v2.2H7v2.2h2.2v2.2h2.2v-2.2h2.2v-2.2h-2.2v-2.2H9.2Zm12.8 1.4a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm4.1 3a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Z"/></svg></span>
+          <span class="controller-stamina" aria-hidden="true"><i></i><b>--</b></span>
+        </article>
+        <article class="controller-card" data-controller-slot="pad-2" data-active="false" data-controller-state="inactive" data-team="none">
+          <span class="controller-icon controller-icon-gamepad" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M10.2 10h11.6c4.1 0 7.2 3.2 7.7 8l.5 4.6c.2 2.2-1.2 4.1-3.2 4.1-1.4 0-2.6-.7-3.5-2.1l-1.6-2.3H10.3l-1.6 2.3c-.9 1.4-2.1 2.1-3.5 2.1-2 0-3.4-1.9-3.2-4.1l.5-4.6c.5-4.8 3.6-8 7.7-8Zm-1 5.2v2.2H7v2.2h2.2v2.2h2.2v-2.2h2.2v-2.2h-2.2v-2.2H9.2Zm12.8 1.4a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm4.1 3a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Z"/></svg></span>
+          <span class="controller-stamina" aria-hidden="true"><i></i><b>--</b></span>
+        </article>
+        <article class="controller-card" data-controller-slot="pad-3" data-active="false" data-controller-state="inactive" data-team="none">
+          <span class="controller-icon controller-icon-gamepad" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M10.2 10h11.6c4.1 0 7.2 3.2 7.7 8l.5 4.6c.2 2.2-1.2 4.1-3.2 4.1-1.4 0-2.6-.7-3.5-2.1l-1.6-2.3H10.3l-1.6 2.3c-.9 1.4-2.1 2.1-3.5 2.1-2 0-3.4-1.9-3.2-4.1l.5-4.6c.5-4.8 3.6-8 7.7-8Zm-1 5.2v2.2H7v2.2h2.2v2.2h2.2v-2.2h2.2v-2.2h-2.2v-2.2H9.2Zm12.8 1.4a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm4.1 3a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Z"/></svg></span>
+          <span class="controller-stamina" aria-hidden="true"><i></i><b>--</b></span>
+        </article>
+        <article class="controller-card" data-controller-slot="pad-4" data-active="false" data-controller-state="inactive" data-team="none">
+          <span class="controller-icon controller-icon-gamepad" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M10.2 10h11.6c4.1 0 7.2 3.2 7.7 8l.5 4.6c.2 2.2-1.2 4.1-3.2 4.1-1.4 0-2.6-.7-3.5-2.1l-1.6-2.3H10.3l-1.6 2.3c-.9 1.4-2.1 2.1-3.5 2.1-2 0-3.4-1.9-3.2-4.1l.5-4.6c.5-4.8 3.6-8 7.7-8Zm-1 5.2v2.2H7v2.2h2.2v2.2h2.2v-2.2h2.2v-2.2h-2.2v-2.2H9.2Zm12.8 1.4a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm4.1 3a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Z"/></svg></span>
+          <span class="controller-stamina" aria-hidden="true"><i></i><b>--</b></span>
+        </article>
+      </aside>
       <div id="control-hints" class="control-hints" aria-live="polite"></div>
       <section id="mobile-controls" class="mobile-controls" aria-label="&#1052;&#1086;&#1073;&#1080;&#1083;&#1100;&#1085;&#1086;&#1077; &#1091;&#1087;&#1088;&#1072;&#1074;&#1083;&#1077;&#1085;&#1080;&#1077;" hidden>
         <div class="mobile-move-pad" aria-label="&#1044;&#1074;&#1080;&#1078;&#1077;&#1085;&#1080;&#1077;">
@@ -228,23 +255,23 @@
         </button>
         <button id="camera-reset-button" class="icon-button" type="button" title="Camera reset" aria-label="Camera reset" hidden aria-hidden="true"></button>
       </div>
-      <div id="version-badge">v0.0.056 / 39.92 MB</div>
-      <button id="skin-shop-button" class="skin-shop-button" type="button" aria-label="Skin shop">SKINS <b id="skin-shop-balance">0</b></button>
+      <div id="version-badge">v0.0.064 / 56.54 MB</div>
+      <button id="skin-shop-button" class="skin-shop-button" type="button" aria-label="&#1052;&#1072;&#1075;&#1072;&#1079;&#1080;&#1085; &#1089;&#1082;&#1080;&#1085;&#1086;&#1074;"><span id="skin-shop-button-label">&#1057;&#1082;&#1080;&#1085;&#1099;</span><b id="skin-shop-balance">0</b></button>
       <section id="skin-shop-panel" class="skin-shop-panel" aria-modal="true" role="dialog" aria-labelledby="skin-shop-title" hidden>
         <div class="skin-shop-shell">
           <header class="skin-shop-header">
             <div>
-              <p class="eyebrow">GOALS</p>
-              <h1 id="skin-shop-title">Skin Shop</h1>
+              <p id="skin-shop-eyebrow" class="eyebrow">&#1043;&#1086;&#1083;&#1099;</p>
+              <h1 id="skin-shop-title">&#1052;&#1072;&#1075;&#1072;&#1079;&#1080;&#1085; &#1089;&#1082;&#1080;&#1085;&#1086;&#1074;</h1>
             </div>
             <div class="skin-shop-actions">
-              <span id="skin-shop-status">0 goals</span>
-              <button id="skin-shop-close-button" type="button">Game</button>
+              <span id="skin-shop-status">0 &#1075;&#1086;&#1083;&#1086;&#1074;</span>
+              <button id="skin-shop-close-button" type="button">&#1048;&#1075;&#1088;&#1072;</button>
             </div>
           </header>
-          <nav class="skin-shop-tabs" aria-label="Skin shop tabs">
-            <button type="button" data-skin-shop-tab="players" aria-selected="true">Players</button>
-            <button type="button" data-skin-shop-tab="balls">Balls</button>
+          <nav class="skin-shop-tabs" aria-label="&#1042;&#1082;&#1083;&#1072;&#1076;&#1082;&#1080; &#1084;&#1072;&#1075;&#1072;&#1079;&#1080;&#1085;&#1072; &#1089;&#1082;&#1080;&#1085;&#1086;&#1074;">
+            <button type="button" data-skin-shop-tab="players" aria-selected="true">&#1048;&#1075;&#1088;&#1086;&#1082;&#1080;</button>
+            <button type="button" data-skin-shop-tab="balls">&#1052;&#1103;&#1095;&#1080;</button>
           </nav>
           <div class="skin-shop-body">
             <section id="skin-shop-players" class="skin-shop-grid" data-skin-shop-panel="players"></section>
@@ -280,6 +307,19 @@
                 <label><input id="setting-mirror-team" type="checkbox" /> <span>&#1047;&#1077;&#1088;&#1082;&#1072;&#1083;&#1086; &#1089;&#1090;&#1086;&#1088;&#1086;&#1085;&#1099;</span></label>
               </div>
               <div class="input-test-pad" id="input-test-pad" aria-hidden="true"><span data-pad="moveForward">W</span><span data-pad="moveLeft">A</span><span data-pad="moveBack">S</span><span data-pad="moveRight">D</span><span data-pad="leftKick">L</span><span data-pad="rightKick">R</span><span data-pad="headHit">H</span><span data-pad="jump">J</span><span data-pad="sprint">S</span></div>
+              <section class="gamepad-map" aria-labelledby="gamepad-map-title">
+                <h2 id="gamepad-map-title">&#1052;&#1072;&#1087;&#1087;&#1080;&#1085;&#1075; &#1075;&#1077;&#1081;&#1084;&#1087;&#1072;&#1076;&#1072;</h2>
+                <div class="gamepad-map-grid">
+                  <div><span data-gamepad-map-label="move">&#1044;&#1074;&#1080;&#1078;&#1077;&#1085;&#1080;&#1077;</span><b>Left Stick / D-Pad</b></div>
+                  <div><span data-gamepad-map-label="jump">&#1055;&#1088;&#1099;&#1078;&#1086;&#1082;</span><b>A</b></div>
+                  <div><span data-gamepad-map-label="lower">&#1053;&#1080;&#1079;&#1086;&#1084;</span><b>X</b></div>
+                  <div><span data-gamepad-map-label="upper">&#1042;&#1077;&#1088;&#1093;&#1086;&#1084;</span><b>B / LT</b></div>
+                  <div><span data-gamepad-map-label="head">&#1043;&#1086;&#1083;&#1086;&#1074;&#1072;</span><b>Y / RB</b></div>
+                  <div><span data-gamepad-map-label="sprint">&#1057;&#1087;&#1088;&#1080;&#1085;&#1090;</span><b>LB / L3</b></div>
+                  <div><span data-gamepad-map-label="team">&#1057;&#1084;&#1077;&#1085;&#1072; &#1082;&#1086;&#1084;&#1072;&#1085;&#1076;&#1099;</span><b>RT / R2</b></div>
+                  <div><span data-gamepad-map-label="vehicle">&#1042;&#1099;&#1081;&#1090;&#1080; &#1080;&#1079; &#1090;&#1088;&#1072;&#1085;&#1089;&#1087;&#1086;&#1088;&#1090;&#1072;</span><b>A / B / X / Y</b></div>
+                </div>
+              </section>
               <div class="binding-grid"><button type="button" data-rebind-action="moveForward"></button><button type="button" data-rebind-action="moveBack"></button><button type="button" data-rebind-action="moveLeft"></button><button type="button" data-rebind-action="moveRight"></button><button type="button" data-rebind-action="leftKick"></button><button type="button" data-rebind-action="rightKick"></button><button type="button" data-rebind-action="headHit"></button><button type="button" data-rebind-action="jump"></button><button type="button" data-rebind-action="sprint"></button><button type="button" data-rebind-action="settings"></button><button type="button" data-rebind-action="cameraReset"></button><button type="button" data-rebind-action="muteAudio"></button></div>
               <p id="binding-conflicts" class="settings-note"></p>
             </section>

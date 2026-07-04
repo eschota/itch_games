@@ -278,8 +278,8 @@ Use this root skill when changing, packaging, validating, or publishing the
 
 ## Current Behavior
 
-- Current game release: `v0.0.056`.
-- `unsoccer` current prototype release: `v0.0.056`.
+- Current game release: `v0.0.064`.
+- `unsoccer` current prototype release: `v0.0.064`.
 - `unsoccer` v0.0.056 enforces the textureless runtime asset contract: no
   image texture files in shipped character/environment/ball assets, no GLB
   images/textures/material texture maps, no FBX image references, runtime
@@ -376,6 +376,61 @@ Use this root skill when changing, packaging, validating, or publishing the
   clips, removes the old transparent data-image fallback, rejects runtime
   texture maps in character/environment/ball loaders, and extends acceptance
   plus packaging to fail on texture files, GLB texture slots, or FBX image refs.
+- `v0.0.056` also supports one-computer local co-op: keyboard/mouse keeps the
+  primary joined player, while up to four browser Gamepad API controllers
+  auto-join as separate local HTTP player slots and submit the normal
+  server-authoritative `InputState` counters, held kick charge, sprint, jump,
+  head-hit, and vehicle-exit actions. Gamepad stick directions stay physical on
+  both axes for both teams: side input is direct, and orange-team vertical input
+  is pre-compensated because the authoritative server applies team
+  attack-direction to up/down. Local gamepads rumble on incoming hit
+  damage/ragdoll from authoritative stamina snapshots, but not on gradual
+  sprint stamina drain.
+- `v0.0.057` fixes airborne ball feel by lowering global ball damping and
+  separating ground drag from near-lossless air drag. `ballLinearDamping`,
+  `ballGroundDrag`, and `ballAirDrag` live in `game-settings.json` and the
+  Russian admin schema. Weather hazards only apply surface drag while the ball
+  is near the ground, so aerial shots no longer stop like a feather.
+- `v0.0.057` upgrades puddles to a textureless procedural water shader:
+  irregular puddle meshes render wave displacement, glints, caustic highlights,
+  and edge shimmer through `client/src/water-puddle.ts`, without image
+  textures.
+- `v0.0.057` adds server-authoritative team switching through
+  `InputState.switchTeam`: keyboard `Tab` switches the primary player, and
+  gamepad `R2` switches that local co-op slot. `R2` is reserved for team switch,
+  so lower kick remains on the normal gamepad face button.
+- `v0.0.058` freezes the visual day/night cycle at bright daylight with the
+  sun at the configured `dayStartSeconds` 09:00 angle, while periodic rain,
+  cloudiness, and procedural puddles remain active. It also makes mounted
+  vehicle controls direct instead of team-mirrored, clamps vehicles inside the
+  playable location, sets the follow camera to 10m, halves possession carry
+  distance, localizes and repositions the skin shop next to the score, and adds
+  a five-minute match timer that resets the score and starts a new match.
+- `v0.0.059` adds the left-side local controller HUD for keyboard plus four
+  gamepads. Inactive controller cards stay semi-transparent; active slots show
+  full color, team accent, and their own stamina ring. The controls settings
+  tab must expose the visible gamepad button mapping.
+- `v0.0.060` makes default ownership deterministic: human/local controller
+  players spawn with the first character and first ball skin, bots randomize
+  from the character roster excluding the first character, narrows default
+  ball-kick trigger distance so early LMB clicks buffer instead of firing too
+  far, and acceptance must prove goals plus selected character/ball profile
+  updates before release.
+- `v0.0.061` keeps connected local gamepads dormant until real input activity:
+  connecting a gamepad may show a semi-transparent connected controller card,
+  but it must not join a local co-op player or become active/full-color until
+  stick/D-pad movement beyond deadzone or an action/sprint/team-switch button.
+- `v0.0.062` moves the possessed dribble ball 0.3m farther in front of the
+  owner by raising `ballPossessionCarryDistance` from 0.43 to 0.73 in the
+  runtime JSON and shared defaults; keep it tunable through the Russian admin
+  schema.
+- `v0.0.063` tames possessed-ball shots: tap LMB/ПКМ must be pass/chip
+  strength, full charge/Shift must remain below the one-field launch budget,
+  and `ballPossessionMaxShotSpeed` plus `ballPossessionMaxShotLift` are hard
+  runtime-admin caps against runaway shot settings.
+- `v0.0.064` increases only the applied emotion visualization above players:
+  the emotion wheel size stays unchanged, while replicated emotion sprites are
+  larger, higher, more opaque, and rendered from a sharper canvas texture.
 - `unsoccer` v0.0.002 has a client-only procedural Web Audio layer driven by
   authoritative server snapshots for kicks, body contacts, goals, countdown,
   roster changes, and ball rolling.

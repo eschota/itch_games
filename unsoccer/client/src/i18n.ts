@@ -43,7 +43,29 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     "team.spectator.short": "S",
     "controller.bot": "AI",
     "controller.test": "TEST",
+    "controller.panel": "Local controllers",
+    "controller.keyboard": "Keyboard",
+    "controller.gamepad": "Gamepad {index}",
+    "controller.inactive": "inactive",
+    "controller.connected": "connected",
+    "controller.joining": "joining",
+    "controller.active": "active",
+    "controller.staminaValue": "{value}% stamina, {state}",
     "score.goals": "Goals",
+    "match.timerTitle": "Match time left: {time}",
+    "shop.button": "Skins",
+    "shop.title": "Skin shop",
+    "shop.eyebrow": "Goals",
+    "shop.close": "Game",
+    "shop.tabs": "Skin shop tabs",
+    "shop.players": "Players",
+    "shop.balls": "Balls",
+    "shop.statusGoals": "{goals} goals",
+    "shop.priceGoals": "{goals} goals",
+    "shop.selected": "Selected",
+    "shop.select": "Select",
+    "shop.buyFor": "Buy for {goals} goals",
+    "shop.need": "Need {goals} goals",
     "status.connecting": "Connecting",
     "status.connected": "Connected.",
     "status.disconnected": "Disconnected. Check the game server.",
@@ -141,6 +163,15 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     "settings.rebindPending": "{action}: press a key",
     "settings.rebindDuplicate": "Duplicates are replaced.",
     "settings.conflicts": "Conflicts: {codes}",
+    "gamepad.mappingTitle": "Gamepad mapping",
+    "gamepad.map.move": "Move",
+    "gamepad.map.jump": "Jump",
+    "gamepad.map.lower": "Low kick",
+    "gamepad.map.upper": "Upper kick",
+    "gamepad.map.head": "Head",
+    "gamepad.map.sprint": "Sprint",
+    "gamepad.map.team": "Switch team",
+    "gamepad.map.vehicle": "Exit vehicle",
     "chat.label": "Player chat",
     "chat.placeholder": "Enter - chat",
     "chat.messageLabel": "Chat message",
@@ -241,7 +272,29 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     "team.spectator.short": "З",
     "controller.bot": "ИИ",
     "controller.test": "ТЕСТ",
+    "controller.panel": "Локальные контроллеры",
+    "controller.keyboard": "Клавиатура",
+    "controller.gamepad": "Геймпад {index}",
+    "controller.inactive": "не активен",
+    "controller.connected": "подключен",
+    "controller.joining": "подключается",
+    "controller.active": "активен",
+    "controller.staminaValue": "{value}% стамины, {state}",
     "score.goals": "Голы",
+    "match.timerTitle": "\u041e\u0441\u0442\u0430\u043b\u043e\u0441\u044c \u0432\u0440\u0435\u043c\u0435\u043d\u0438: {time}",
+    "shop.button": "\u0421\u043a\u0438\u043d\u044b",
+    "shop.title": "\u041c\u0430\u0433\u0430\u0437\u0438\u043d \u0441\u043a\u0438\u043d\u043e\u0432",
+    "shop.eyebrow": "\u0413\u043e\u043b\u044b",
+    "shop.close": "\u0418\u0433\u0440\u0430",
+    "shop.tabs": "\u0412\u043a\u043b\u0430\u0434\u043a\u0438 \u043c\u0430\u0433\u0430\u0437\u0438\u043d\u0430 \u0441\u043a\u0438\u043d\u043e\u0432",
+    "shop.players": "\u0418\u0433\u0440\u043e\u043a\u0438",
+    "shop.balls": "\u041c\u044f\u0447\u0438",
+    "shop.statusGoals": "{goals} \u0433\u043e\u043b\u043e\u0432",
+    "shop.priceGoals": "{goals} \u0433\u043e\u043b\u043e\u0432",
+    "shop.selected": "\u0412\u044b\u0431\u0440\u0430\u043d\u043e",
+    "shop.select": "\u0412\u044b\u0431\u0440\u0430\u0442\u044c",
+    "shop.buyFor": "\u041a\u0443\u043f\u0438\u0442\u044c \u0437\u0430 {goals} \u0433\u043e\u043b\u043e\u0432",
+    "shop.need": "\u041d\u0443\u0436\u043d\u043e {goals} \u0433\u043e\u043b\u043e\u0432",
     "status.connecting": "Подключение",
     "status.connected": "Подключено.",
     "status.disconnected": "Отключено. Проверьте игровой сервер.",
@@ -339,6 +392,15 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     "settings.rebindPending": "{action}: нажмите клавишу",
     "settings.rebindDuplicate": "Дубли заменяются.",
     "settings.conflicts": "Конфликты: {codes}",
+    "gamepad.mappingTitle": "Маппинг геймпада",
+    "gamepad.map.move": "Движение",
+    "gamepad.map.jump": "Прыжок",
+    "gamepad.map.lower": "Нижний удар",
+    "gamepad.map.upper": "Верхний удар",
+    "gamepad.map.head": "Голова",
+    "gamepad.map.sprint": "Спринт",
+    "gamepad.map.team": "Смена команды",
+    "gamepad.map.vehicle": "Выйти из транспорта",
     "chat.label": "Чат игроков",
     "chat.placeholder": "Enter - чат",
     "chat.messageLabel": "Сообщение чата",
@@ -503,7 +565,6 @@ export function applyStaticLocalization(version: string, buildWeightLabel: strin
   setText("#stamina-state", "stamina.waiting");
   setText("#status", "status.connecting");
   setText("#weather", "weather.pending");
-  setText("#ball-offscreen-indicator b", "ball.label");
   setAttr("#mobile-controls", "aria-label", "mobile.controls");
   setAttr(".mobile-move-pad", "aria-label", "mobile.move");
   setAttr(".mobile-action-pad", "aria-label", "mobile.actions");
@@ -516,10 +577,20 @@ export function applyStaticLocalization(version: string, buildWeightLabel: strin
   setAttr("#chat-input", "aria-label", "chat.messageLabel");
   setAttr("#emotion-wheel", "aria-label", "emotion.wheel");
   setAttr("#toolbar", "aria-label", "toolbar.controls");
+  setAttr("#controller-panel", "aria-label", "controller.panel");
   setButtonTitle("#settings-button", "toolbar.settings");
   setButtonTitle("#mute-button", "toolbar.mute");
   setButtonTitle("#fullscreen-button", "toolbar.fullscreen");
   setButtonTitle("#camera-reset-button", "toolbar.camera");
+  setAttr("#match-timer", "aria-label", "match.timerTitle");
+  setAttr("#skin-shop-button", "aria-label", "shop.title");
+  setText("#skin-shop-button-label", "shop.button");
+  setAttr("#skin-shop-panel", "aria-label", "shop.title");
+  setText("#skin-shop-eyebrow", "shop.eyebrow");
+  setText("#skin-shop-title", "shop.title");
+  setText("#skin-shop-status", "shop.statusGoals", { goals: 0 });
+  setText("#skin-shop-close-button", "shop.close");
+  setAttr(".skin-shop-tabs", "aria-label", "shop.tabs");
   setText("#settings-title", "settings.title");
   setText("#settings-save-state", "settings.saved");
   setText("#settings-close-button", "settings.play");
@@ -544,6 +615,15 @@ export function applyStaticLocalization(version: string, buildWeightLabel: strin
 
   for (const button of document.querySelectorAll<HTMLButtonElement>("button[data-settings-tab]")) {
     button.textContent = settingsTabLabel(button.dataset.settingsTab || "");
+  }
+
+  for (const button of document.querySelectorAll<HTMLButtonElement>("button[data-skin-shop-tab]")) {
+    button.textContent = t(button.dataset.skinShopTab === "balls" ? "shop.balls" : "shop.players");
+  }
+
+  setText("#gamepad-map-title", "gamepad.mappingTitle");
+  for (const label of document.querySelectorAll<HTMLElement>("[data-gamepad-map-label]")) {
+    label.textContent = t(`gamepad.map.${label.dataset.gamepadMapLabel || ""}`);
   }
 
   setLabel("#setting-movement-mode", "settings.mode");

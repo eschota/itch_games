@@ -28,6 +28,9 @@ const BALL_POSSESSION_UPPER_SHOT_SPEED = DEFAULT_GAME_SETTINGS.ballPossessionUpp
 const BALL_POSSESSION_UPPER_SHOT_LIFT = DEFAULT_GAME_SETTINGS.ballPossessionUpperShotLift;
 const BALL_POSSESSION_STRONG_MULTIPLIER = DEFAULT_GAME_SETTINGS.ballPossessionStrongMultiplier;
 const BALL_POSSESSION_BASE_POWER_MULTIPLIER = DEFAULT_GAME_SETTINGS.ballPossessionBasePowerMultiplier;
+const BALL_POSSESSION_FULL_POWER_MULTIPLIER = DEFAULT_GAME_SETTINGS.ballPossessionFullPowerMultiplier;
+const BALL_POSSESSION_MAX_SHOT_SPEED = DEFAULT_GAME_SETTINGS.ballPossessionMaxShotSpeed;
+const BALL_POSSESSION_MAX_SHOT_LIFT = DEFAULT_GAME_SETTINGS.ballPossessionMaxShotLift;
 const KICK_COOLDOWN_MS = DEFAULT_GAME_SETTINGS.kickCooldownMs;
 const DAY_CYCLE_SECONDS = DEFAULT_GAME_SETTINGS.dayCycleSeconds;
 const DAY_START_SECONDS = DEFAULT_GAME_SETTINGS.dayStartSeconds;
@@ -41,17 +44,32 @@ const MAX_ACTIVE_PLAYERS = DEFAULT_GAME_SETTINGS.maxActivePlayers;
 const DEFAULT_BOT_TARGET_ACTIVE_PLAYERS = DEFAULT_GAME_SETTINGS.botTargetActivePlayers;
 const CHARACTER_ROSTER = [
   "6299851",
+  "6288738",
   "6243756",
   "6270571",
   "6324128",
   "6244727",
-  "6288738",
   "6304269",
   "6298522",
   "6255142",
   "6294728"
 ];
 const CHARACTER_ROSTER_SET = new Set(CHARACTER_ROSTER);
+const DEFAULT_CHARACTER_SKIN_ID = CHARACTER_ROSTER[0];
+const BOT_CHARACTER_ROSTER_SET = new Set(CHARACTER_ROSTER.slice(1));
+const BALL_SKIN_ROSTER = [
+  "6493457",
+  "6493379",
+  "6493403",
+  "6493239",
+  "6493488",
+  "6493371",
+  "6493256",
+  "6493342",
+  "6493507",
+  "6493481"
+];
+const DEFAULT_BALL_SKIN_ID = BALL_SKIN_ROSTER[0];
 
 function existingRuntimeAssetDirs() {
   return [
@@ -321,6 +339,15 @@ function assertActiveBotRoster(state, expectedIds, label, expectedCount = expect
   }
 }
 
+function assertBotCharactersExcludeDefault(state, label) {
+  const activeBots = activePlayersByController(state, "bot");
+  assert.ok(activeBots.length > 0, `${label}: should have active bots`);
+  for (const bot of activeBots) {
+    assert.ok(BOT_CHARACTER_ROSTER_SET.has(bot.characterId), `${label}: ${bot.id} should use a bot-only random character, got ${bot.characterId}`);
+    assert.notEqual(bot.characterId, DEFAULT_CHARACTER_SKIN_ID, `${label}: ${bot.id} must not use the default human character`);
+  }
+}
+
 function maxAudioEventId(state) {
   const ids = (state.audioEvents || []).map((event) => event.id || 0);
   return ids.length ? Math.max(...ids) : 0;
@@ -457,16 +484,22 @@ async function assertProductionDefaultBotHealth() {
     const joinPayload = await joinResponse.json();
     assert.equal(joinResponse.ok, true, "non-test human join should succeed");
     assert.equal(joinPayload.joined.version, EXPECTED_GAME_VERSION, "non-test human join should expose the current game version");
+    assert.equal(joinPayload.joined.profile.skinId, DEFAULT_CHARACTER_SKIN_ID, "non-test human should start with the default first character");
+    assert.equal(joinPayload.joined.profile.ballSkinId, DEFAULT_BALL_SKIN_ID, "non-test human should start with the default first ball");
     const stateResponse = await fetch(`${baseUrl}/api/state?clientId=${encodeURIComponent(joinPayload.joined.id)}`);
     const statePayload = await stateResponse.json();
     assert.equal(stateResponse.ok, true, "non-test state should be available for the joined human");
-    assert.equal(activePlayersByController(statePayload.state, "human").length, 1, "non-test human should occupy one active slot");
+    const human = activePlayersByController(statePayload.state, "human")[0];
+    assert.ok(human, "non-test human should occupy one active slot");
+    assert.equal(human.characterId, DEFAULT_CHARACTER_SKIN_ID, "non-test human snapshot should use the default first character");
+    assert.equal(human.profile.ballSkinId, DEFAULT_BALL_SKIN_ID, "non-test human snapshot should use the default first ball");
     assertActiveBotRoster(
       statePayload.state,
       activePlayersByController(statePayload.state, "bot").map((player) => player.id),
       "non-test human join bot fill",
       Math.max(0, DEFAULT_BOT_TARGET_ACTIVE_PLAYERS - 1)
     );
+    assertBotCharactersExcludeDefault(statePayload.state, "non-test human join bot fill");
     const joinedHealth = await (await fetch(`${baseUrl}/api/health`)).json();
     assert.equal(joinedHealth.activeBotPlayers, Math.max(0, DEFAULT_BOT_TARGET_ACTIVE_PLAYERS - 1), "non-test health should show bot backfill after human join");
     assert.equal(joinedHealth.activePlayers, DEFAULT_BOT_TARGET_ACTIVE_PLAYERS, "non-test human plus bots should keep the configured active roster filled");
@@ -622,12 +655,17 @@ async function assertHttpFingerprintAndPlayerGoals(api) {
     clientFingerprint,
     profile: {
       nickname: "GoalOwner",
-      skinId: CHARACTER_ROSTER[0],
+      skinId: DEFAULT_CHARACTER_SKIN_ID,
+      ballSkinId: DEFAULT_BALL_SKIN_ID,
       userPic: "GO"
     }
   });
   const playerId = join.joined.id;
+  assert.equal(join.joined.profile.skinId, DEFAULT_CHARACTER_SKIN_ID, "new HTTP player should start with the first character");
+  assert.equal(join.joined.profile.ballSkinId, DEFAULT_BALL_SKIN_ID, "new HTTP player should start with the first ball");
   assert.equal(playerAt(join.state, join.joined.index).goals, 0, "new player should start with zero personal goals");
+  assert.equal(playerAt(join.state, join.joined.index).characterId, DEFAULT_CHARACTER_SKIN_ID, "new player snapshot should start with the first character");
+  assert.equal(playerAt(join.state, join.joined.index).profile.ballSkinId, DEFAULT_BALL_SKIN_ID, "new player snapshot should start with the first ball");
 
   await api("POST", "/api/test/reset", {});
   await api("POST", `/api/test/player/${join.joined.index}`, {
@@ -651,13 +689,31 @@ async function assertHttpFingerprintAndPlayerGoals(api) {
   assert.ok(player, "scoring player should remain in state");
   assert.equal(player.goals, 1, "scoring player should receive a personal goal");
 
+  const profileSkin = CHARACTER_ROSTER[1];
+  const profileBallSkin = BALL_SKIN_ROSTER[1];
+  const profilePayload = await api("POST", "/api/profile", {
+    clientId: playerId,
+    profile: {
+      nickname: "GoalOwner",
+      skinId: profileSkin,
+      ballSkinId: profileBallSkin,
+      userPic: "GO"
+    }
+  });
+  assert.equal(profilePayload.joined.profile.skinId, profileSkin, "profile update should allow a bought character skin");
+  assert.equal(profilePayload.joined.profile.ballSkinId, profileBallSkin, "profile update should allow a bought ball skin");
+  player = profilePayload.state.players.find((candidate) => candidate.id === playerId);
+  assert.equal(player.characterId, profileSkin, "player snapshot characterId should follow bought/selected skin");
+  assert.equal(player.profile.ballSkinId, profileBallSkin, "player profile should follow bought/selected ball skin");
+
   await api("POST", "/api/leave", { clientId: playerId });
   const rejoin = await api("POST", "/api/join", {
     name: "GoalOwner",
     clientFingerprint,
     profile: {
       nickname: "GoalOwner",
-      skinId: CHARACTER_ROSTER[0],
+      skinId: profileSkin,
+      ballSkinId: profileBallSkin,
       userPic: "GO"
     }
   });
@@ -665,6 +721,8 @@ async function assertHttpFingerprintAndPlayerGoals(api) {
   player = rejoin.state.players.find((candidate) => candidate.id === playerId);
   assert.ok(player, "fingerprint-restored player should be visible after rejoin");
   assert.equal(player.goals, 1, "same browser fingerprint should preserve personal goal count");
+  assert.equal(player.characterId, profileSkin, "same browser fingerprint rejoin should keep selected character when profile sends it");
+  assert.equal(player.profile.ballSkinId, profileBallSkin, "same browser fingerprint rejoin should keep selected ball when profile sends it");
   await api("POST", "/api/leave", { clientId: playerId });
 }
 
@@ -1671,13 +1729,10 @@ async function main() {
     assert.equal(state.players.filter((player) => player.role === "spectator").length, 1);
     assert.equal(playerAt(state, MAX_ACTIVE_PLAYERS).team, null);
     const assignedCharacters = state.players.map((player) => player.characterId);
-    assert.ok(
-      assignedCharacters.every((characterId) => CHARACTER_ROSTER_SET.has(characterId)),
-      "all players should receive a character from the ready runtime roster"
-    );
-    assert.ok(
-      new Set(assignedCharacters).size >= Math.min(assignedCharacters.length, 6),
-      "new players should draw varied random characters from the ready roster deck"
+    assert.deepEqual(
+      assignedCharacters,
+      Array.from({ length: MAX_ACTIVE_PLAYERS + 1 }, () => DEFAULT_CHARACTER_SKIN_ID),
+      "human/test players should start with only the first default character"
     );
     assert.ok(Array.isArray(state.audioEvents), "state should expose server audioEvents");
     assert.ok(
@@ -1750,6 +1805,17 @@ async function main() {
     assert.ok(scoredBallDistance > FIELD_LENGTH / 2 - 2, "ball should stay near the scored goal during celebration");
     assert.equal(state.goalReset.phase, "celebration", "goal reset should start with a celebration phase");
     assert.equal(state.goalReset.scoringTeam, 0, "goal reset should expose the scoring team");
+    const scoredGoalSide = state.goalReset.scoringTeam === 0 ? 1 : -1;
+    const scoredBallSpeed = speed3(state.ball.velocity);
+    assert.ok(
+      Math.abs(state.ball.position.z) > FIELD_LENGTH / 2 + GOAL_DEPTH - 1.5,
+      "ball should be caught deep in the goal net during celebration"
+    );
+    assert.ok(scoredBallSpeed < 3.4, `goal net should damp scored ball speed, got ${scoredBallSpeed.toFixed(2)}`);
+    assert.ok(
+      state.ball.velocity.z * scoredGoalSide > -0.6,
+      "scored ball should not rebound hard out of the goal net"
+    );
     assert.ok(state.goalReset.remainingMs > POST_GOAL_CELEBRATION_MS - 500, "celebration phase should keep the ball in play briefly");
     assert.equal(state.ball.variant, beforeGoalVariant, "ball variant should not rotate before the kickoff return completes");
     assert.equal(state.countdown, 0, "kickoff countdown should wait until the ball returns to center");
@@ -2492,6 +2558,36 @@ async function assertBallPossessionAndContextShots(api) {
   });
   state = (await api("POST", "/api/test/tick", { frames: 6 })).state;
   assert.equal(state.ball.ownerPlayerId, ownerId, "player should be able to regain possession for an upper shot");
+  await api("POST", "/api/test/player/0", { input: inputState({ kickRight: 1 }) });
+  state = (await api("POST", "/api/test/tick", { frames: 2 })).state;
+  assert.equal(state.ball.ownerPlayerId, null, "tap RMB upper shot should release possession");
+  assert.equal(playerAt(state, 0).lastAction, "hand", "tap RMB possession shot should keep the right-button action channel");
+  assert.ok(
+    state.ball.velocity.z > BALL_POSSESSION_UPPER_SHOT_SPEED * BALL_POSSESSION_BASE_POWER_MULTIPLIER * 0.65,
+    `tap RMB upper shot should still travel forward, got vz=${state.ball.velocity.z}`
+  );
+  assert.ok(
+    state.ball.velocity.z < BALL_POSSESSION_UPPER_SHOT_SPEED * BALL_POSSESSION_BASE_POWER_MULTIPLIER * 1.35,
+    `tap RMB upper shot should stay chip-like instead of max power, got vz=${state.ball.velocity.z}`
+  );
+  assert.ok(
+    state.ball.velocity.y < BALL_POSSESSION_UPPER_SHOT_LIFT * 1.35,
+    `tap RMB upper shot should not launch like full charge, got vy=${state.ball.velocity.y}`
+  );
+
+  await api("POST", "/api/test/reset", {});
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: 70,
+    yaw: 0,
+    input: inputState({ up: true })
+  });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 0.72 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 6 })).state;
+  assert.equal(state.ball.ownerPlayerId, ownerId, "player should be able to regain possession for a strong upper shot");
   await api("POST", "/api/test/player/0", { input: inputState({ kickRight: 1, sprint: true }) });
   state = (await api("POST", "/api/test/tick", { frames: 2 })).state;
   assert.equal(state.ball.ownerPlayerId, null, "RMB upper shot should release possession");
@@ -2526,6 +2622,19 @@ async function assertBallPossessionAndContextShots(api) {
   state = (await api("POST", "/api/test/tick", { frames: 2 })).state;
   assert.equal(state.ball.ownerPlayerId, null, "releasing charged RMB should release possession");
   assert.equal(playerAt(state, 0).lastAction, "hand", "charged RMB possession shot should keep the existing right-button action channel");
+  const chargedUpperHorizontalSpeed = Math.hypot(state.ball.velocity.x, state.ball.velocity.z);
+  assert.ok(
+    chargedUpperHorizontalSpeed <= Math.min(BALL_POSSESSION_UPPER_SHOT_SPEED * BALL_POSSESSION_FULL_POWER_MULTIPLIER, BALL_POSSESSION_MAX_SHOT_SPEED) + 0.5,
+    `charged RMB upper shot should stay under the configured horizontal cap, got speed=${chargedUpperHorizontalSpeed}`
+  );
+  assert.ok(
+    chargedUpperHorizontalSpeed <= FIELD_LENGTH / 4 + 0.5,
+    `charged RMB upper shot should stay below the one-field launch budget, got speed=${chargedUpperHorizontalSpeed}`
+  );
+  assert.ok(
+    state.ball.velocity.y <= BALL_POSSESSION_MAX_SHOT_LIFT + 0.2,
+    `charged RMB upper shot should stay under the configured lift cap, got vy=${state.ball.velocity.y}`
+  );
   assert.ok(
     state.ball.velocity.z > BALL_POSSESSION_UPPER_SHOT_SPEED * BALL_POSSESSION_BASE_POWER_MULTIPLIER * 0.9,
     `charged RMB upper shot should travel farther than a tap, got vz=${state.ball.velocity.z}`
@@ -2533,6 +2642,40 @@ async function assertBallPossessionAndContextShots(api) {
   assert.ok(
     state.ball.velocity.y > BALL_POSSESSION_UPPER_SHOT_LIFT * 1.45,
     `charged RMB upper shot should arc higher than a tap, got vy=${state.ball.velocity.y}`
+  );
+
+  await api("POST", "/api/game-settings", {
+    settings: {
+      ballPossessionUpperShotSpeed: 100,
+      ballPossessionUpperShotLift: 40,
+      ballPossessionFullPowerMultiplier: 16,
+      ballPossessionMaxShotSpeed: BALL_POSSESSION_MAX_SHOT_SPEED,
+      ballPossessionMaxShotLift: BALL_POSSESSION_MAX_SHOT_LIFT
+    }
+  });
+  await api("POST", "/api/test/reset", {});
+  await api("POST", "/api/test/player/0", {
+    position: { x: 0, y: PLAYER_HEIGHT / 2, z: 0 },
+    stamina: 70,
+    yaw: 0,
+    input: inputState({ up: true })
+  });
+  await api("POST", "/api/test/ball", {
+    position: { x: 0, y: BALL_RADIUS + 0.04, z: 0.72 },
+    velocity: { x: 0, y: 0, z: 0 }
+  });
+  state = (await api("POST", "/api/test/tick", { frames: 6 })).state;
+  assert.equal(state.ball.ownerPlayerId, ownerId, "player should be able to regain possession for capped pathological upper shot");
+  await api("POST", "/api/test/player/0", { input: inputState({ kickRight: 1, kickRightCharge: 1 }) });
+  state = (await api("POST", "/api/test/tick", { frames: 2 })).state;
+  const cappedHorizontalSpeed = Math.hypot(state.ball.velocity.x, state.ball.velocity.z);
+  assert.ok(
+    cappedHorizontalSpeed <= BALL_POSSESSION_MAX_SHOT_SPEED + 0.5,
+    `pathological upper shot should be clamped by ballPossessionMaxShotSpeed, got speed=${cappedHorizontalSpeed}`
+  );
+  assert.ok(
+    state.ball.velocity.y <= BALL_POSSESSION_MAX_SHOT_LIFT + 0.2,
+    `pathological upper shot should be clamped by ballPossessionMaxShotLift, got vy=${state.ball.velocity.y}`
   );
 }
 

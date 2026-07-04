@@ -17,6 +17,8 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 - `client/src/environment-props.ts`: Art Director courtyard extension, dense
   procedural dressing, local Free3D environment GLB roster hydration, and
   model-count QA datasets.
+- `client/src/water-puddle.ts`: textureless procedural water shader for
+  weather puddles and slush surfaces.
 - `server/`: Node authoritative game server using the MavonEngine stack shape:
   headless simulation, Rapier3D physics, and WebSocket transport.
 - `shared/`: protocol constants, message types, and gameplay tuning shared by
@@ -25,10 +27,63 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
 
 ## Rules
 
-- Current release: `v0.0.054`.
+- Current release: `v0.0.064`.
 - `v0.0.054` mirrors orange-team left/right input in client code while
   preserving the current blue-team mapping and without changing the controls
   GUI.
+- `v0.0.056` adds one-computer local co-op input: the keyboard/mouse keeps the
+  primary joined player, and up to four connected browser Gamepad API devices
+  auto-join as separate local HTTP player slots. Keep gamepad movement mapped
+  with physical stick directions preserved on both axes for both teams:
+  preserve side input directly, but pre-compensate orange-team vertical input
+  because the authoritative server applies team attack-direction to up/down.
+  Gamepad kicks stay held charge/counter `InputState` updates so server
+  physics, stamina, vehicle exit, and combat remain authoritative. Local
+  gamepads should rumble on incoming hit damage/ragdoll by comparing
+  authoritative stamina snapshots; do not rumble on gradual sprint stamina
+  drain.
+- `v0.0.057` keeps aerial ball flight from braking like a feather by lowering
+  Rapier ball damping and separating `ballGroundDrag` from near-lossless
+  `ballAirDrag`; all new ball drag values are tunable through
+  `game-settings.json` and the Russian admin schema.
+- `v0.0.057` renders puddles through a textureless procedural water shader with
+  wave displacement, glints, caustic highlights, and edge shimmer. Do not add
+  image textures for puddle visuals.
+- `v0.0.057` adds server-authoritative team switching through
+  `InputState.switchTeam`: `Tab` switches the keyboard player and gamepad `R2`
+  switches that local co-op slot. Keep `R2` reserved for team switch; lower
+  gamepad kick stays on the face button.
+- `v0.0.058` freezes daylight at the 09:00 sun angle instead of running the
+  day/night timelapse, while keeping periodic rain/clouds/puddles. Mounted
+  vehicles use direct physical controls and are clamped inside the playable
+  location. Camera distance is 10m, ball possession carry distance is 0.73,
+  the skin shop is localized and placed next to the score, and the score widget
+  owns the five-minute match timer/reset.
+- `v0.0.059` adds the left-side local controller HUD for keyboard plus four
+  gamepads. Inactive controller cards stay semi-transparent; active slots show
+  full color, team accent, and their own stamina ring. The controls settings
+  tab must expose the visible gamepad button mapping.
+- `v0.0.060` makes default ownership deterministic: human/local controller
+  players spawn with the first character and first ball skin, bots randomize
+  from the character roster excluding the first character, narrows default
+  ball-kick trigger distance so early LMB clicks buffer instead of firing too
+  far, and acceptance must prove goals plus selected character/ball profile
+  updates before release.
+- `v0.0.061` keeps connected local gamepads dormant until real input activity:
+  connecting a gamepad may show a semi-transparent connected controller card,
+  but it must not join a local co-op player or become active/full-color until
+  stick/D-pad movement beyond deadzone or an action/sprint/team-switch button.
+- `v0.0.062` moves the possessed dribble ball 0.3m farther in front of the
+  owner by raising `ballPossessionCarryDistance` from 0.43 to 0.73 in
+  `game-settings.json` and shared defaults while keeping the value editable in
+  the Russian runtime admin.
+- `v0.0.063` tames possessed-ball shots: tap LMB/ПКМ must be pass/chip
+  strength, full charge/Shift must remain below the one-field launch budget,
+  and `ballPossessionMaxShotSpeed` plus `ballPossessionMaxShotLift` are hard
+  runtime-admin caps against runaway shot settings.
+- `v0.0.064` increases only the applied emotion visualization above players:
+  the emotion wheel size stays unchanged, while replicated emotion sprites are
+  larger, higher, more opaque, and rendered from a sharper canvas texture.
 - Keep client and server separated; browser bundles must not import server-only
   modules.
 - The server is authoritative for room assignment, teams, player physics, ball
@@ -433,14 +488,14 @@ Use this file when changing `unsoccer`, the Ragdoll Soccer II prototype.
   inventory files whose exact `paths.json` relative path is recorded.
 - Do not guess asset paths or depend on remote assets at runtime.
 - Runtime 3D assets must be optimized and textureless. The shipped
-  `client/public/assets/{characters,environment,balls}` tree must contain no
+  `client/public/assets/{characters,environment,balls,vehicles}` tree must contain no
   image texture files, every shipped GLB must have zero `images`, zero
   `textures`, no material texture references, and every shipped FBX animation
   clip must have zero image/texture filename references. GLB meshes must carry
-  baked `COLOR_0` vertex colors. Character GLBs must also carry packed
-  `TEXCOORD_1` roughness/metalness data. Bake or approximate source textures
-  into vertex/PBR before runtime; deleting textures without baking color is a
-  blocker.
+  baked `COLOR_0` vertex colors. Character and vehicle GLBs must also carry
+  packed `TEXCOORD_1` roughness/metalness data. Bake or approximate source
+  textures into vertex/PBR before runtime; deleting textures without baking
+  color is a blocker.
 - Run `tools/bake_free3d_characters_textureless.py` after changing the Free3D
   character roster or raw source textures. It reads build-time raw
   `albedo.png`/`orm.png` sources and writes runtime GLBs with baked

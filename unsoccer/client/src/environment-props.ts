@@ -10,6 +10,12 @@ import {
   type VisualSettings
 } from "@itch-games/unsoccer-shared";
 import { bakeTexturelessPbr, type TexturelessPbrBakeResult } from "./textureless-pbr-converter";
+import {
+  createIrregularPuddleEdgeGeometry,
+  createIrregularPuddleGeometry,
+  createWaterPuddleMaterial,
+  updateWaterPuddleMaterial
+} from "./water-puddle";
 
 interface Free3dEnvironmentAsset {
   guid: string;
@@ -76,8 +82,9 @@ const leafMaterial = new THREE.MeshStandardMaterial({ color: 0x3d8c58, roughness
 const metalMaterial = new THREE.MeshStandardMaterial({ color: 0x28302f, roughness: 0.62, metalness: 0.22 });
 const brightMetalMaterial = new THREE.MeshStandardMaterial({ color: 0xb8c5c7, roughness: 0.38, metalness: 0.34 });
 const chalkMaterial = new THREE.MeshBasicMaterial({ color: 0xe7eee1, transparent: true, opacity: 0.5 });
-const puddleMaterial = new THREE.MeshBasicMaterial({ color: 0x5f90a0, transparent: true, opacity: 0.26 });
 const glowMaterial = new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: 0.74, toneMapped: false });
+const courtyardPuddleMaterials: THREE.Material[] = [];
+let courtyardPuddleTime = 0;
 
 function applyMaterialSettings(material: THREE.Material, settings: VisualColorMaterialSettings): void {
   const target = material as THREE.Material & {
@@ -155,8 +162,12 @@ class LocalCourtyardEnvironmentRuntime implements CourtyardEnvironmentRuntime {
   }
 
   update(state: ServerState, deltaSeconds: number): void {
-    if (this.bodies.length === 0) return;
     const dt = THREE.MathUtils.clamp(deltaSeconds, 0.001, 0.05);
+    courtyardPuddleTime += dt;
+    for (const material of courtyardPuddleMaterials) {
+      updateWaterPuddleMaterial(material, courtyardPuddleTime, 1, 0.34);
+    }
+    if (this.bodies.length === 0) return;
     const propImpulseMultiplier = state.settings?.propImpulseMultiplier ?? 1;
     const propDamping = state.settings?.propDamping ?? 2.4;
     const propReturnStrength = state.settings?.propReturnStrength ?? 1.25;
@@ -819,11 +830,46 @@ function addGroundDecal(root: THREE.Group, x: number, z: number, rotation: numbe
 }
 
 function addPuddle(root: THREE.Group, x: number, z: number, scale: number): void {
-  const puddle = new THREE.Mesh(new THREE.CircleGeometry(scale, 28), puddleMaterial);
-  puddle.rotation.x = -Math.PI / 2;
-  puddle.position.set(x, 0.025, z);
-  puddle.scale.z = 0.42;
-  registerProceduralEnvironmentInstance(root, puddle, "puddle");
+  const group = new THREE.Group();
+  group.position.set(x, 0.026, z);
+  group.scale.set(scale, 1, scale);
+  const geometry = createIrregularPuddleGeometry(`courtyard-${x.toFixed(2)}-${z.toFixed(2)}`, 48, 0.28);
+  const shore = new THREE.Mesh(
+    geometry,
+    new THREE.MeshBasicMaterial({
+      color: 0x172f2d,
+      transparent: true,
+      opacity: 0.14,
+      depthWrite: false
+    })
+  );
+  shore.scale.set(1.06, 1, 1.06);
+  shore.position.y = 0.001;
+  const material = createWaterPuddleMaterial({
+    deepColor: 0x0a3340,
+    shallowColor: 0x78cde8,
+    highlightColor: 0xe4ffff,
+    opacity: 0.42,
+    strength: 0.34
+  });
+  courtyardPuddleMaterials.push(material);
+  const water = new THREE.Mesh(geometry, material);
+  water.name = "courtyard-water-surface";
+  water.position.y = 0.01;
+  const edge = new THREE.LineLoop(
+    createIrregularPuddleEdgeGeometry(geometry),
+    new THREE.LineBasicMaterial({
+      color: 0xc9f4ff,
+      transparent: true,
+      opacity: 0.34,
+      depthWrite: false
+    })
+  );
+  edge.name = "courtyard-water-edge";
+  edge.position.y = 0.016;
+  edge.renderOrder = 6;
+  group.add(shore, water, edge);
+  registerProceduralEnvironmentInstance(root, group, "puddle");
 }
 
 async function hydrateFree3dEnvironment(

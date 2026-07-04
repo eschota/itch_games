@@ -83,7 +83,7 @@ const CHAT_MESSAGE_MAX_LENGTH = 160;
 const USER_PIC_MAX_LENGTH = 96;
 const EMOTION_VISIBLE_MS = 4200;
 const STANCE_MIN_SPEED = 0.22;
-const VEHICLE_WORLD_MARGIN = 42;
+const VEHICLE_WORLD_MARGIN = 18;
 
 interface VehicleSpawnTemplate {
   id: string;
@@ -255,6 +255,7 @@ interface PlayerRuntime {
   name: string;
   role: PlayerRole;
   team: TeamId | null;
+  teamPreference: TeamId | null;
   index: number;
   goals: number;
   joinOrder: number;
@@ -267,6 +268,7 @@ interface PlayerRuntime {
   transport: "websocket" | "http" | "test" | "bot";
   input: InputState;
   inputSequence: number;
+  lastSwitchTeam: number;
   vehicleId: string | null;
   vehicleEnterCandidateId: string | null;
   vehicleEnterCandidateSince: number;
@@ -331,6 +333,7 @@ interface GoalResetRuntime {
   returnEndAt: number;
   returnStarted: boolean;
   returnFrom: Vec3;
+  netCatch: Vec3;
 }
 
 interface PersistedPlayerSession {
@@ -392,7 +395,8 @@ const PHYSICS_SETTING_KEYS = new Set<keyof GameSettings>([
   "playerHeight",
   "ballRadius",
   "ballDensity",
-  "ballRestitution"
+  "ballRestitution",
+  "ballLinearDamping"
 ]);
 
 let activeGameSettings: GameSettings = { ...DEFAULT_GAME_SETTINGS };
@@ -659,6 +663,7 @@ function cloneInput(input: InputState): InputState {
     head: Number(input.head || 0),
     jump: Number(input.jump || 0),
     exitVehicle: Number(input.exitVehicle || 0),
+    switchTeam: Number(input.switchTeam || 0),
     sprint: Boolean(input.sprint),
     yaw: Number.isFinite(input.yaw) ? input.yaw : 0
   };
@@ -779,6 +784,7 @@ class UnsoccerServer {
   private readonly persistedPlayers = new Map<string, PersistedPlayerSession>();
   private characterDeck: string[] = [];
   private readonly score: ScoreState = { blue: 0, orange: 0 };
+  private matchStartedAt = Date.now();
   private tickCount = 0;
   private joinCounter = 0;
   private message = "\u0416\u0434\u0451\u043c \u0438\u0433\u0440\u043e\u043a\u043e\u0432";
@@ -1026,6 +1032,7 @@ class UnsoccerServer {
         player.input = cloneInput(message.input || DEFAULT_INPUT);
         player.inputSequence = message.sequence;
         player.lastSeenAt = Date.now();
+        this.applyTeamSwitchInput(player, player.lastSeenAt);
       }
       response.json({ ok: true });
     });
@@ -1452,14 +1459,18 @@ class UnsoccerServer {
   private resetBotRuntimeForReuse(bot: PlayerRuntime, now: number): void {
     bot.role = "spectator";
     bot.team = null;
+    bot.teamPreference = null;
     bot.index = this.players.size;
     bot.joinOrder = this.joinCounter++;
     bot.goals = 0;
     bot.clientFingerprint = null;
+    bot.characterId = this.nextBotCharacterId();
+    bot.ballSkinId = DEFAULT_BALL_SKIN_ID;
     bot.channel = null;
     bot.transport = "bot";
     bot.input = { ...DEFAULT_INPUT };
     bot.inputSequence = 0;
+    bot.lastSwitchTeam = 0;
     bot.body = null;
     bot.moveAxis = { x: 0, z: 0 };
     bot.moveVelocity = zeroVec();
@@ -1609,10 +1620,26 @@ class UnsoccerServer {
 
   private dayTimeSeconds(now: number): number {
     if (this.testDayTimeOverrideSeconds !== null) return this.testDayTimeOverrideSeconds;
-    const cycleStartedAt = TEST_MODE ? this.testDayCycleStartedAt : this.startedAt;
-    const elapsedSeconds = Math.max(0, (now - cycleStartedAt) / 1000);
-    const dayAdvanceSeconds = elapsedSeconds / Math.max(1, this.settings.dayCycleSeconds) * 24 * 60 * 60;
-    return (this.settings.dayStartSeconds + dayAdvanceSeconds) % (24 * 60 * 60);
+    return this.settings.dayStartSeconds % (24 * 60 * 60);
+  }
+
+  private matchDurationMs(): number {
+    return Math.max(1000, this.settings.matchDurationMs);
+  }
+
+  private matchElapsedMs(now: number): number {
+    return Math.max(0, now - this.matchStartedAt);
+  }
+
+  private matchRemainingMs(now: number): number {
+    return Math.max(0, this.matchDurationMs() - this.matchElapsedMs(now));
+  }
+
+  private updateMatchClock(now: number): void {
+    if (this.goalReset || this.countdownUntil > now) return;
+    if (this.matchElapsedMs(now) < this.matchDurationMs()) return;
+    this.resetMatch(now);
+    this.message = "\u041c\u0430\u0442\u0447 \u043e\u043a\u043e\u043d\u0447\u0435\u043d. \u041d\u043e\u0432\u044b\u0439 \u043c\u0430\u0442\u0447.";
   }
 
   private pushRosterAudioEvent(player: PlayerRuntime, change: "join" | "leave" | "spectator", now = Date.now()): void {
@@ -1661,16 +1688,18 @@ class UnsoccerServer {
   }): PlayerRuntime {
     const botSeed = this.joinCounter + this.nextBotId + 1;
     const persisted = options.clientFingerprint ? this.persistedPlayers.get(options.clientFingerprint) : undefined;
+    const isBot = options.transport === "bot";
     return {
       id: persisted?.id || options.id,
       name: persisted?.name || options.name,
       role: "spectator",
       team: null,
+      teamPreference: null,
       index: this.players.size,
       joinOrder: this.joinCounter++,
       goals: persisted?.goals || 0,
-      characterId: persisted?.characterId || this.nextCharacterId(),
-      ballSkinId: sanitizeBallSkinId(persisted?.ballSkinId),
+      characterId: isBot ? this.nextBotCharacterId() : CHARACTER_ROSTER[0],
+      ballSkinId: DEFAULT_BALL_SKIN_ID,
       clientFingerprint: options.clientFingerprint || null,
       userPic: DEFAULT_USER_PICS[botSeed % DEFAULT_USER_PICS.length] || DEFAULT_USER_PICS[0] || "⚽",
       emotion: null,
@@ -1678,6 +1707,7 @@ class UnsoccerServer {
       transport: options.transport,
       input: { ...DEFAULT_INPUT },
       inputSequence: 0,
+      lastSwitchTeam: 0,
       vehicleId: null,
       vehicleEnterCandidateId: null,
       vehicleEnterCandidateSince: 0,
@@ -1776,6 +1806,7 @@ class UnsoccerServer {
   }
 
   private resetMatch(now: number): void {
+    this.matchStartedAt = now;
     this.score.blue = 0;
     this.score.orange = 0;
     this.goalReset = null;
@@ -1799,6 +1830,7 @@ class UnsoccerServer {
       player.lastExitVehicle = 0;
       player.goals = 0;
       player.inputSequence = 0;
+      player.lastSwitchTeam = 0;
       player.lastKickAt = ACTION_READY_AT;
       player.lastHeadAt = ACTION_READY_AT;
       player.lastKickLeft = 0;
@@ -1921,6 +1953,7 @@ class UnsoccerServer {
     if (body.input !== undefined) {
       const patch = typeof body.input === "object" && body.input !== null ? body.input as Partial<InputState> : {};
       player.input = cloneInput({ ...player.input, ...patch });
+      this.applyTeamSwitchInput(player);
     }
   }
 
@@ -1937,7 +1970,7 @@ class UnsoccerServer {
     this.ballBody = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
         .setTranslation(0, this.settings.ballRadius + 0.04, 0)
-        .setLinearDamping(0.8)
+        .setLinearDamping(this.settings.ballLinearDamping)
         .setAngularDamping(0.45)
         .setCanSleep(false)
     );
@@ -2139,6 +2172,7 @@ class UnsoccerServer {
       runtime.input = cloneInput(message.input || DEFAULT_INPUT);
       runtime.inputSequence = message.sequence;
       runtime.lastSeenAt = Date.now();
+      this.applyTeamSwitchInput(runtime, runtime.lastSeenAt);
     });
 
     channel.on("chat", (data: unknown) => {
@@ -2193,7 +2227,7 @@ class UnsoccerServer {
       const active = orderIndex < this.settings.maxActivePlayers;
       player.role = active ? "player" : "spectator";
       player.index = orderIndex;
-      player.team = active ? ((orderIndex % 2) as TeamId) : null;
+      player.team = active ? (player.teamPreference ?? ((orderIndex % 2) as TeamId)) : null;
       if (active) {
         const teamSlot = Math.floor(orderIndex / 2);
         player.botFlank = teamSlot % 2 === 0 ? -1 : 1;
@@ -2215,6 +2249,17 @@ class UnsoccerServer {
       }
       this.sendJoin(player);
     });
+  }
+
+  private applyTeamSwitchInput(player: PlayerRuntime, now = Date.now()): void {
+    if (player.input.switchTeam <= player.lastSwitchTeam) return;
+    player.lastSwitchTeam = player.input.switchTeam;
+    const nextTeam: TeamId = player.team === 1 ? 0 : 1;
+    player.teamPreference = nextTeam;
+    if (player.role === "player") player.team = nextTeam;
+    this.message = `${player.name} сменил команду на ${nextTeam === 0 ? "Синие" : "Оранжевые"}`;
+    this.pushRosterAudioEvent(player, "join", now);
+    this.rebalanceRoles();
   }
 
   private createBody(player: PlayerRuntime): void {
@@ -2711,13 +2756,14 @@ class UnsoccerServer {
         skipPlayerId: ownerBeforePostStepSync,
         dropOwnerOnHit: true
       });
-      this.containBall();
+      if (!this.goalReset) this.containBall();
     } else {
       this.resolvePlayerBallCollision(previousBallPosition, now, previousPlayerPositions);
-      this.containBall();
+      if (!this.goalReset) this.containBall();
     }
     const goalResetActive = this.updateGoalReset(now);
     if (!goalResetActive) this.checkGoal(previousBallPosition, now);
+    this.updateMatchClock(now);
     this.emitCountdownAudio(now);
 
     if (emitSnapshot && now - this.lastSnapshotAt >= 1000 / SNAPSHOT_RATE) {
@@ -2757,18 +2803,18 @@ class UnsoccerServer {
     return changed;
   }
 
-  private nextCharacterId(): string {
+  private nextBotCharacterId(): string {
     if (this.characterDeck.length === 0) {
-      this.characterDeck = [...CHARACTER_ROSTER];
+      this.characterDeck = [...CHARACTER_ROSTER.slice(1)];
       for (let index = this.characterDeck.length - 1; index > 0; index -= 1) {
         const swapIndex = crypto.randomInt(index + 1);
-        const value = this.characterDeck[index] || CHARACTER_ROSTER[0];
-        const swapValue = this.characterDeck[swapIndex] || CHARACTER_ROSTER[0];
+        const value = this.characterDeck[index] || CHARACTER_ROSTER[1] || CHARACTER_ROSTER[0];
+        const swapValue = this.characterDeck[swapIndex] || CHARACTER_ROSTER[1] || CHARACTER_ROSTER[0];
         this.characterDeck[index] = swapValue;
         this.characterDeck[swapIndex] = value;
       }
     }
-    return this.characterDeck.pop() || CHARACTER_ROSTER[0];
+    return this.characterDeck.pop() || CHARACTER_ROSTER[1] || CHARACTER_ROSTER[0];
   }
 
   private beginRagdoll(player: PlayerRuntime, now: number, impulse: Vec3 = zeroVec()): void {
@@ -3181,24 +3227,35 @@ class UnsoccerServer {
     const strong = Boolean(player.input.sprint);
     const chargeFraction = strong ? 1 : clamp(charge, 0, 1);
     const multiplier = this.possessionShotPowerMultiplier(charge, strong);
-    const shotSpeed = (shot === "upper" ? this.settings.ballPossessionUpperShotSpeed : this.settings.ballPossessionLowShotSpeed) * multiplier;
+    const maxShotSpeed = Math.max(1, this.settings.ballPossessionMaxShotSpeed);
+    const rawShotSpeed = (shot === "upper" ? this.settings.ballPossessionUpperShotSpeed : this.settings.ballPossessionLowShotSpeed) * multiplier;
+    const shotSpeed = Math.min(rawShotSpeed, maxShotSpeed);
     const upperLiftMultiplier = Math.max(
       1,
       this.settings.ballPossessionStrongMultiplier,
       this.settings.ballPossessionFullPowerMultiplier / Math.max(0.001, this.settings.ballPossessionBasePowerMultiplier)
     );
     const liftChargeMultiplier = shot === "upper" ? lerp(1, upperLiftMultiplier, chargeFraction) : 1;
-    const lift = (shot === "upper" ? this.settings.ballPossessionUpperShotLift : this.settings.ballPossessionLowShotLift)
+    const rawLift = (shot === "upper" ? this.settings.ballPossessionUpperShotLift : this.settings.ballPossessionLowShotLift)
       * liftChargeMultiplier
       * (strong && shot === "upper" ? 1.08 : 1);
+    const lift = Math.min(rawLift, Math.max(0.1, this.settings.ballPossessionMaxShotLift));
     const carryPosition = this.ballCarryPosition(player);
     this.ballOwnerPlayerId = null;
     this.ballPossessionReleasedUntil = now + this.settings.ballPossessionRecaptureDelayMs;
     this.ballBody.setTranslation(carryPosition, true);
+    let velocityX = forwardX * shotSpeed + player.velocity.x * 0.18;
+    let velocityZ = forwardZ * shotSpeed + player.velocity.z * 0.18;
+    const horizontalSpeed = Math.hypot(velocityX, velocityZ);
+    if (horizontalSpeed > maxShotSpeed) {
+      const speedScale = maxShotSpeed / Math.max(0.001, horizontalSpeed);
+      velocityX *= speedScale;
+      velocityZ *= speedScale;
+    }
     this.ballBody.setLinvel({
-      x: forwardX * shotSpeed + player.velocity.x * 0.18,
+      x: velocityX,
       y: lift,
-      z: forwardZ * shotSpeed + player.velocity.z * 0.18
+      z: velocityZ
     }, true);
     this.recordBallTouch(player, now);
     player.lastAction = shot === "upper" ? "hand" : "left";
@@ -3632,6 +3689,74 @@ class UnsoccerServer {
     return { x: 0, y: this.settings.ballRadius + 0.04, z: 0 };
   }
 
+  private scoringGoalSide(scoringTeam: TeamId): -1 | 1 {
+    return scoringTeam === 0 ? 1 : -1;
+  }
+
+  private goalNetCatchPosition(scoringTeam: TeamId): Vec3 {
+    const side = this.scoringGoalSide(scoringTeam);
+    const position = vec3FromRapier(this.ballBody.translation());
+    const velocity = vec3FromRapier(this.ballBody.linvel());
+    const maxX = Math.max(
+      0.2,
+      this.settings.goalWidth / 2 - this.settings.ballRadius - this.settings.goalNetCatchSidePadding
+    );
+    const lowY = this.settings.ballRadius + this.settings.ballRadius * 0.22;
+    const highY = Math.max(lowY, this.settings.goalCrossbarHeight - this.settings.ballRadius * 1.15);
+    const insideFace = this.settings.fieldLength / 2 + this.settings.ballRadius + 0.1;
+    const backLimit = this.settings.fieldLength / 2 + Math.max(
+      this.settings.ballRadius + 0.1,
+      this.settings.goalDepth - this.settings.ballRadius * 0.7
+    );
+    const targetDepth = this.settings.fieldLength / 2 + this.settings.goalDepth
+      - this.settings.ballRadius
+      - this.settings.goalNetCatchDepthPadding;
+    return {
+      x: clamp(position.x + velocity.x * 0.035, -maxX, maxX),
+      y: clamp(position.y + Math.max(0, velocity.y) * 0.025, lowY, highY),
+      z: side * clamp(targetDepth, insideFace, Math.max(insideFace, backLimit))
+    };
+  }
+
+  private settleBallInGoalNet(sequence: GoalResetRuntime, now: number): void {
+    const position = vec3FromRapier(this.ballBody.translation());
+    const velocity = vec3FromRapier(this.ballBody.linvel());
+    const settleDuration = Math.max(100, this.settings.goalNetCatchSettleMs);
+    const settle = easeOutCubic((now - sequence.scoredAt) / settleDuration);
+    const lowY = this.settings.ballRadius + this.settings.ballRadius * 0.22;
+    const target = {
+      x: sequence.netCatch.x,
+      y: lerp(sequence.netCatch.y, lowY, settle),
+      z: sequence.netCatch.z
+    };
+    const stiffness = clamp(this.settings.goalNetCatchStiffness, 0.01, 1);
+    const damping = clamp(this.settings.goalNetCatchVelocityDamping, 0, 0.95);
+    const nextPosition = {
+      x: lerp(position.x, target.x, stiffness),
+      y: Math.max(this.settings.ballRadius, lerp(position.y, target.y, stiffness)),
+      z: lerp(position.z, target.z, stiffness)
+    };
+    const nextVelocity = {
+      x: velocity.x * damping + (target.x - nextPosition.x) * 0.75,
+      y: Math.min(0, velocity.y * damping) + (target.y - nextPosition.y) * 0.65,
+      z: velocity.z * damping + (target.z - nextPosition.z) * 0.75
+    };
+    const speed = Math.hypot(nextVelocity.x, nextVelocity.y, nextVelocity.z);
+    if (speed > 3.2) {
+      const scale = 3.2 / speed;
+      nextVelocity.x *= scale;
+      nextVelocity.y *= scale;
+      nextVelocity.z *= scale;
+    }
+    this.ballBody.setTranslation(nextPosition, true);
+    this.ballBody.setLinvel(nextVelocity, true);
+    this.ballBody.setAngvel({
+      x: nextVelocity.z * -0.18,
+      y: 0,
+      z: nextVelocity.x * 0.18
+    }, true);
+  }
+
   private resetPlayersForKickoff(): void {
     for (const player of this.players.values()) {
       if (!player.body) continue;
@@ -3653,14 +3778,18 @@ class UnsoccerServer {
   private startGoalReset(scoringTeam: TeamId, now: number): void {
     this.openCelebrationWindow(scoringTeam, now);
     this.lastCountdownAudioSecond = null;
+    this.ballOwnerPlayerId = null;
+    this.ballPossessionReleasedUntil = now + this.settings.postGoalCelebrationMs + this.settings.postGoalBallReturnMs;
     this.goalReset = {
       scoringTeam,
       scoredAt: now,
       returnStartAt: now + this.settings.postGoalCelebrationMs,
       returnEndAt: now + this.settings.postGoalCelebrationMs + this.settings.postGoalBallReturnMs,
       returnStarted: false,
-      returnFrom: vec3FromRapier(this.ballBody.translation())
+      returnFrom: vec3FromRapier(this.ballBody.translation()),
+      netCatch: this.goalNetCatchPosition(scoringTeam)
     };
+    this.settleBallInGoalNet(this.goalReset, now);
   }
 
   private updateGoalReset(now: number): boolean {
@@ -3668,6 +3797,7 @@ class UnsoccerServer {
     if (!sequence) return false;
 
     if (now < sequence.returnStartAt) {
+      this.settleBallInGoalNet(sequence, now);
       return true;
     }
 
@@ -3713,13 +3843,16 @@ class UnsoccerServer {
     const position = this.ballBody.translation();
     const velocity = this.ballBody.linvel();
     let nextPosition = { x: position.x, y: Math.max(position.y, this.settings.ballRadius), z: position.z };
-    let nextVelocity = { x: velocity.x * 0.997, y: velocity.y, z: velocity.z * 0.997 };
+    const airborne = nextPosition.y > this.settings.ballRadius + 0.12;
+    const baseDrag = airborne ? this.settings.ballAirDrag : this.settings.ballGroundDrag;
+    let nextVelocity = { x: velocity.x * baseDrag, y: velocity.y, z: velocity.z * baseDrag };
     const halfWidth = this.settings.fieldWidth / 2 - this.settings.ballRadius;
     const halfLength = this.settings.fieldLength / 2 + this.settings.goalDepth;
     const environment = this.environmentAt(nextPosition);
     const weather = this.currentWeather();
-    nextVelocity.x = nextVelocity.x * environment.ballDrag + weather.wind.x * weather.intensity * 0.004;
-    nextVelocity.z = nextVelocity.z * environment.ballDrag + weather.wind.z * weather.intensity * 0.004;
+    const surfaceDrag = airborne ? 1 : environment.ballDrag;
+    nextVelocity.x = nextVelocity.x * surfaceDrag + weather.wind.x * weather.intensity * (airborne ? 0.0015 : 0.004);
+    nextVelocity.z = nextVelocity.z * surfaceDrag + weather.wind.z * weather.intensity * (airborne ? 0.0015 : 0.004);
 
     if (Math.abs(nextPosition.x) > halfWidth) {
       nextPosition.x = clamp(nextPosition.x, -halfWidth, halfWidth);
@@ -4025,6 +4158,8 @@ class UnsoccerServer {
         .map((vehicle) => this.snapshotVehicle(vehicle)),
       ball,
       score: { ...this.score },
+      matchDurationMs: this.matchDurationMs(),
+      matchRemainingMs: this.matchRemainingMs(now),
       message: this.message,
       countdown: Math.max(0, this.countdownUntil - now),
       goalReset: this.snapshotGoalReset(now),

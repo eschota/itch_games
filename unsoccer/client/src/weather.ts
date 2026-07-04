@@ -1,5 +1,11 @@
 import * as THREE from "three";
 import type { HazardSnapshot, WeatherSnapshot } from "@itch-games/unsoccer-shared";
+import {
+  createIrregularPuddleEdgeGeometry,
+  createIrregularPuddleGeometry,
+  createWaterPuddleMaterial,
+  updateWaterPuddleMaterial
+} from "./water-puddle";
 
 interface WeatherVisualLayerOptions {
   scene: THREE.Scene;
@@ -62,6 +68,7 @@ export class WeatherVisualLayer {
   update(weather: WeatherSnapshot | undefined, time: number): void {
     if (!weather) {
       this.group.visible = false;
+      document.documentElement.dataset.weatherWaterSurfaces = "0";
       return;
     }
     this.group.visible = true;
@@ -78,6 +85,7 @@ export class WeatherVisualLayer {
 
   private syncHazards(hazards: HazardSnapshot[], time: number): void {
     const seen = new Set<string>();
+    let waterSurfaceCount = 0;
     for (const hazard of hazards) {
       seen.add(hazard.id);
       let group = this.hazardGroups.get(hazard.id);
@@ -86,15 +94,24 @@ export class WeatherVisualLayer {
         this.hazardGroups.set(hazard.id, group);
         this.group.add(group);
       }
-      group.position.set(hazard.position.x, 0.055, hazard.position.z);
-      group.scale.setScalar(hazard.radius);
+      group.position.set(hazard.position.x, hazard.type === "snowbank" ? 0.055 : 0.038, hazard.position.z);
+      if (hazard.type === "snowbank") {
+        group.scale.setScalar(hazard.radius);
+      } else {
+        group.scale.set(hazard.radius, 1, hazard.radius);
+      }
       group.rotation.y = Math.sin(time * 0.22 + hazard.radius) * 0.05;
       group.userData.strength = hazard.strength;
+      let groupHasWaterSurface = false;
       for (const child of group.children) {
         if (child instanceof THREE.Mesh) {
           child.renderOrder = hazard.type === "snowbank" ? 5 : 4;
+          const materials = Array.isArray(child.material) ? child.material : [child.material];
+          for (const material of materials) updateWaterPuddleMaterial(material, time, this.opacityScale, hazard.strength);
+          if (materials.some((material) => Boolean(material.userData.puddleUniforms))) groupHasWaterSurface = true;
         }
       }
+      if (groupHasWaterSurface) waterSurfaceCount += 1;
     }
 
     for (const [id, group] of this.hazardGroups) {
@@ -103,6 +120,7 @@ export class WeatherVisualLayer {
         this.hazardGroups.delete(id);
       }
     }
+    document.documentElement.dataset.weatherWaterSurfaces = String(waterSurfaceCount);
   }
 
   private createHazardGroup(hazard: HazardSnapshot): THREE.Group {
@@ -134,25 +152,62 @@ export class WeatherVisualLayer {
       return group;
     }
 
-    const decalMaterial = new THREE.MeshBasicMaterial({
-      color,
-      transparent: true,
-      opacity: hazard.type === "puddle" ? 0.22 + hazard.strength * 0.18 : 0.16 + hazard.strength * 0.14,
-      depthWrite: false
-    });
-    const ringMaterial = new THREE.MeshBasicMaterial({
-      color: hazard.type === "puddle" ? 0xd1f7ff : 0xf7ffff,
-      transparent: true,
-      opacity: hazard.type === "puddle" ? 0.34 : 0.22,
-      depthWrite: false
-    });
-    const decal = new THREE.Mesh(new THREE.CircleGeometry(1, 48), decalMaterial);
-    decal.rotation.x = -Math.PI / 2;
-    decal.position.y = 0.006;
-    const ring = new THREE.Mesh(new THREE.RingGeometry(0.78, 1, 48), ringMaterial);
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.012;
-    group.add(decal, ring);
+    const isPuddle = hazard.type === "puddle";
+    const geometry = createIrregularPuddleGeometry(hazard.id, isPuddle ? 56 : 42, isPuddle ? 0.26 : 0.18);
+    const shore = new THREE.Mesh(
+      geometry,
+      new THREE.MeshBasicMaterial({
+        color: isPuddle ? 0x173431 : 0xe8f0ee,
+        transparent: true,
+        opacity: isPuddle ? 0.16 : 0.2,
+        depthWrite: false
+      })
+    );
+    shore.name = `${hazard.type}-shore`;
+    shore.scale.set(1.06, 1, 1.06);
+    shore.position.y = 0.002;
+
+    const water = new THREE.Mesh(
+      geometry,
+      createWaterPuddleMaterial({
+        deepColor: isPuddle ? 0x07394a : 0xb9d6d4,
+        shallowColor: isPuddle ? 0x73d5ff : 0xf4fffb,
+        highlightColor: isPuddle ? 0xe7ffff : 0xffffff,
+        opacity: isPuddle ? 0.46 + hazard.strength * 0.14 : 0.28 + hazard.strength * 0.08,
+        strength: hazard.strength
+      })
+    );
+    water.name = `${hazard.type}-water-surface`;
+    water.position.y = 0.012;
+    water.receiveShadow = false;
+    const glint = new THREE.Mesh(
+      geometry,
+      createWaterPuddleMaterial({
+        deepColor: isPuddle ? 0x0d5a65 : 0xcff0eb,
+        shallowColor: isPuddle ? 0xa4ecff : 0xffffff,
+        highlightColor: 0xffffff,
+        opacity: isPuddle ? 0.22 + hazard.strength * 0.06 : 0.14 + hazard.strength * 0.05,
+        strength: Math.min(1, hazard.strength + 0.25)
+      })
+    );
+    glint.name = `${hazard.type}-water-glint`;
+    glint.scale.set(0.72, 1, 0.46);
+    glint.position.set(0.08, 0.023, -0.05);
+    glint.rotation.y = 0.38;
+    glint.receiveShadow = false;
+    const edge = new THREE.LineLoop(
+      createIrregularPuddleEdgeGeometry(geometry),
+      new THREE.LineBasicMaterial({
+        color: isPuddle ? 0xbcefff : 0xf7ffff,
+        transparent: true,
+        opacity: isPuddle ? 0.38 : 0.24,
+        depthWrite: false
+      })
+    );
+    edge.name = `${hazard.type}-water-edge`;
+    edge.position.y = 0.018;
+    edge.renderOrder = 6;
+    group.add(shore, water, glint, edge);
     return group;
   }
 

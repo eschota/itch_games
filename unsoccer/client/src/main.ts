@@ -274,6 +274,7 @@ function requireElement<T extends Element>(selector: string): T {
 const canvas = requireElement<HTMLCanvasElement>("#game-canvas");
 const blueScoreEl = requireElement<HTMLElement>("#blue-score");
 const orangeScoreEl = requireElement<HTMLElement>("#orange-score");
+const matchTimerEl = requireElement<HTMLElement>("#match-timer");
 const statusEl = requireElement<HTMLElement>("#status");
 const weatherEl = requireElement<HTMLElement>("#weather");
 const rosterEl = requireElement<HTMLElement>("#roster");
@@ -290,6 +291,8 @@ const snapshotAgeEl = requireElement<HTMLElement>("#snapshot-age");
 const eventFeedEl = requireElement<HTMLElement>("#event-feed");
 const ballOffscreenIndicatorEl = requireElement<HTMLElement>("#ball-offscreen-indicator");
 const playersOffscreenIndicatorsEl = requireElement<HTMLElement>("#players-offscreen-indicators");
+const goalBannerEl = requireElement<HTMLElement>("#goal-banner");
+const controllerPanelEl = requireElement<HTMLElement>("#controller-panel");
 const controlHintsEl = requireElement<HTMLElement>("#control-hints");
 const mobileControlsEl = requireElement<HTMLElement>("#mobile-controls");
 const mobileMovePadEl = requireElement<HTMLElement>(".mobile-move-pad");
@@ -329,7 +332,7 @@ const networkStateEl = requireElement<HTMLElement>("#network-state");
 const testSoundButton = requireElement<HTMLButtonElement>("#test-sound-button");
 const versionBadge = requireElement<HTMLElement>("#version-badge");
 const ART_PASS_VERSION = "v0.0.036";
-const BUILD_WEIGHT_LABEL = "39.92 MB";
+const BUILD_WEIGHT_LABEL = "56.54 MB";
 const DAWN_START_SECONDS = 3 * 60 * 60;
 const DAYLIGHT_START_SECONDS = 5 * 60 * 60;
 const DUSK_START_SECONDS = 21 * 60 * 60;
@@ -736,8 +739,9 @@ const BALL_SKIN_PREVIEW_SRC_BY_ID: Record<string, string> = {
 const BROWSER_FINGERPRINT_STORAGE_KEY = "unsoccer.browserFingerprint.v1";
 const EMOTION_WHEEL_IDLE_MS = 2000;
 const APPLIED_EMOTION_FALLBACK_MS = 4200;
-const APPLIED_EMOTION_LABEL_SCALE = 1.44;
-const APPLIED_EMOTION_LABEL_Y = 3.08;
+const APPLIED_EMOTION_LABEL_SCALE = 2.25;
+const APPLIED_EMOTION_LABEL_Y = 3.32;
+const APPLIED_EMOTION_MIN_OPACITY = 0.72;
 
 const players = new Map<string, PlayerVisual>();
 const vehicleVisuals = new Map<string, VehicleVisual>();
@@ -833,6 +837,68 @@ const MOBILE_DIRECTION_ACTIONS: Record<MobileDirection, InputAction> = {
 const mobilePointerMedia = matchMedia("(pointer: coarse)");
 const mobileWidthMedia = matchMedia("(max-width: 840px)");
 const forceMobileControls = new URLSearchParams(location.search).get("mobileControls") === "1";
+const LOCAL_GAMEPAD_MAX_PLAYERS = 4;
+const LOCAL_GAMEPAD_INPUT_INTERVAL_MS = 34;
+const LOCAL_GAMEPAD_JOIN_RETRY_MS = 1500;
+const LOCAL_GAMEPAD_DEAD_ZONE = 0.22;
+const LOCAL_GAMEPAD_ACTIVITY_MOVE_THRESHOLD = 0.08;
+const LOCAL_GAMEPAD_TRIGGER_THRESHOLD = 0.35;
+const LOCAL_GAMEPAD_DAMAGE_RUMBLE_MS = 180;
+const LOCAL_GAMEPAD_DAMAGE_RUMBLE_MIN_INTERVAL_MS = 260;
+const LOCAL_GAMEPAD_DAMAGE_STAMINA_DROP_THRESHOLD = 8;
+
+interface LocalGamepadVibrationActuator {
+  playEffect?: (
+    type: "dual-rumble",
+    params: {
+      duration: number;
+      startDelay?: number;
+      strongMagnitude?: number;
+      weakMagnitude?: number;
+    }
+  ) => Promise<unknown>;
+}
+
+interface LocalGamepadHapticActuator {
+  pulse?: (value: number, duration: number) => Promise<unknown>;
+}
+
+type LocalGamepadWithHaptics = Gamepad & {
+  vibrationActuator?: LocalGamepadVibrationActuator | null;
+  hapticActuators?: LocalGamepadHapticActuator[];
+};
+
+interface LocalGamepadButtonState {
+  lower: boolean;
+  upper: boolean;
+  jump: boolean;
+  head: boolean;
+  sprint: boolean;
+  switchTeam: boolean;
+  anyAction: boolean;
+}
+
+interface LocalGamepadSlot {
+  index: number;
+  gamepadId: string;
+  clientId: string | null;
+  join: JoinAccepted | null;
+  input: InputState;
+  sequence: number;
+  lastSentAt: number;
+  lastJoinAttemptAt: number;
+  lastActiveAt: number;
+  activitySeen: boolean;
+  joining: boolean;
+  prev: LocalGamepadButtonState;
+  leftChargeStartedAt: number;
+  rightChargeStartedAt: number;
+  lastObservedStamina: number | null;
+  lastObservedRagdollAt: number;
+  lastDamageRumbleAt: number;
+}
+
+const localGamepadSlots = new Map<number, LocalGamepadSlot>();
 
 function inputEl(selector: string): HTMLInputElement {
   return requireElement<HTMLInputElement>(selector);
@@ -1078,6 +1144,446 @@ function joinRequestPayload(name = localProfile.nickname) {
   };
 }
 
+function cloneLocalInput(): InputState {
+  return { ...DEFAULT_INPUT };
+}
+
+function emptyLocalGamepadButtons(): LocalGamepadButtonState {
+  return {
+    lower: false,
+    upper: false,
+    jump: false,
+    head: false,
+    sprint: false,
+    switchTeam: false,
+    anyAction: false
+  };
+}
+
+function localGamepadSupported(): boolean {
+  return typeof navigator.getGamepads === "function";
+}
+
+function connectedLocalGamepads(): Gamepad[] {
+  if (!localGamepadSupported()) return [];
+  return Array.from(navigator.getGamepads())
+    .filter((gamepad): gamepad is Gamepad => Boolean(gamepad && gamepad.connected))
+    .sort((a, b) => a.index - b.index)
+    .slice(0, LOCAL_GAMEPAD_MAX_PLAYERS);
+}
+
+function createLocalGamepadSlot(gamepad: Gamepad): LocalGamepadSlot {
+  return {
+    index: gamepad.index,
+    gamepadId: gamepad.id || `gamepad-${gamepad.index}`,
+    clientId: null,
+    join: null,
+    input: cloneLocalInput(),
+    sequence: 0,
+    lastSentAt: 0,
+    lastJoinAttemptAt: -LOCAL_GAMEPAD_JOIN_RETRY_MS,
+    lastActiveAt: 0,
+    activitySeen: false,
+    joining: false,
+    prev: emptyLocalGamepadButtons(),
+    leftChargeStartedAt: 0,
+    rightChargeStartedAt: 0,
+    lastObservedStamina: null,
+    lastObservedRagdollAt: 0,
+    lastDamageRumbleAt: 0
+  };
+}
+
+function localGamepadName(slot: LocalGamepadSlot): string {
+  return `Pad ${slot.index + 1}`;
+}
+
+function localGamepadFingerprint(slot: LocalGamepadSlot): string {
+  return `${localBrowserFingerprint}:pad:${slot.index}:${fingerprintHash(slot.gamepadId)}`;
+}
+
+function localGamepadProfile(slot: LocalGamepadSlot): LocalPlayerProfile {
+  const picIndex = (slot.index + 1) % Math.max(1, DEFAULT_USER_PICS.length);
+  return {
+    nickname: localGamepadName(slot),
+    skinId: rosterSkinFallback(),
+    ballSkinId: DEFAULT_BALL_SKIN_ID,
+    userPic: DEFAULT_USER_PICS[picIndex] || defaultUserPic()
+  };
+}
+
+function localGamepadPlayerSnapshot(slot: LocalGamepadSlot, state = latestState): PlayerSnapshot | null {
+  if (!slot.clientId || !state) return null;
+  return state.players.find((player) => player.id === slot.clientId && player.role === "player") || null;
+}
+
+function localGamepadTeam(slot: LocalGamepadSlot): TeamId | null {
+  return localGamepadPlayerSnapshot(slot)?.team ?? slot.join?.team ?? null;
+}
+
+function localGamepadMounted(slot: LocalGamepadSlot): boolean {
+  return Boolean(localGamepadPlayerSnapshot(slot)?.vehicleId);
+}
+
+function resetLocalGamepadCharges(slot: LocalGamepadSlot): void {
+  slot.leftChargeStartedAt = 0;
+  slot.rightChargeStartedAt = 0;
+  slot.input.kickLeftHeld = false;
+  slot.input.kickRightHeld = false;
+}
+
+function localGamepadByIndex(index: number): Gamepad | null {
+  return connectedLocalGamepads().find((gamepad) => gamepad.index === index) || null;
+}
+
+function localGamepadHasHaptics(gamepad: Gamepad): boolean {
+  const hapticGamepad = gamepad as LocalGamepadWithHaptics;
+  return Boolean(
+    hapticGamepad.vibrationActuator?.playEffect
+    || hapticGamepad.hapticActuators?.some((actuator) => Boolean(actuator?.pulse))
+  );
+}
+
+function playLocalGamepadDamageRumble(slot: LocalGamepadSlot, intensity: number): void {
+  const gamepad = localGamepadByIndex(slot.index) as LocalGamepadWithHaptics | null;
+  if (!gamepad) return;
+  const magnitude = THREE.MathUtils.clamp(intensity, 0.35, 1);
+  const duration = Math.round(LOCAL_GAMEPAD_DAMAGE_RUMBLE_MS * (0.75 + magnitude * 0.45));
+  const vibration = gamepad.vibrationActuator;
+  if (vibration?.playEffect) {
+    void vibration.playEffect("dual-rumble", {
+      duration,
+      strongMagnitude: magnitude,
+      weakMagnitude: Math.max(0.2, magnitude * 0.55)
+    }).catch((error) => {
+      console.warn("unsoccer local gamepad rumble failed", error);
+    });
+  } else {
+    const pulseActuator = gamepad.hapticActuators?.find((actuator) => Boolean(actuator?.pulse));
+    if (!pulseActuator?.pulse) return;
+    void pulseActuator.pulse(magnitude, duration).catch((error) => {
+      console.warn("unsoccer local gamepad pulse failed", error);
+    });
+  }
+  document.documentElement.dataset.localCoopLastRumblePad = String(slot.index + 1);
+  document.documentElement.dataset.localCoopLastRumbleAt = String(Math.round(performance.now()));
+  document.documentElement.dataset.localCoopLastRumbleIntensity = magnitude.toFixed(2);
+}
+
+function observeLocalGamepadDamage(state: ServerState): void {
+  const now = performance.now();
+  const playersById = new Map(state.players.map((player) => [player.id, player]));
+  const maxStamina = Math.max(1, Number(state.settings?.playerStaminaMax || PLAYER_STAMINA_MAX));
+  const damageDropThreshold = Math.max(
+    LOCAL_GAMEPAD_DAMAGE_STAMINA_DROP_THRESHOLD,
+    maxStamina * 0.12
+  );
+  for (const slot of localGamepadSlots.values()) {
+    const player = slot.clientId ? playersById.get(slot.clientId) : null;
+    if (!player) continue;
+    const previousStamina = slot.lastObservedStamina;
+    const staminaDrop = previousStamina === null ? 0 : previousStamina - player.stamina;
+    const ragdollStarted = player.ragdoll && player.ragdollAt > 0 && player.ragdollAt !== slot.lastObservedRagdollAt;
+    if (
+      (staminaDrop >= damageDropThreshold || ragdollStarted)
+      && now - slot.lastDamageRumbleAt >= LOCAL_GAMEPAD_DAMAGE_RUMBLE_MIN_INTERVAL_MS
+    ) {
+      const intensity = ragdollStarted ? 1 : staminaDrop / maxStamina;
+      slot.lastDamageRumbleAt = now;
+      playLocalGamepadDamageRumble(slot, intensity);
+    }
+    slot.lastObservedStamina = player.stamina;
+    slot.lastObservedRagdollAt = player.ragdollAt;
+  }
+}
+
+function gamepadButtonPressed(gamepad: Gamepad, indexes: number[], threshold = LOCAL_GAMEPAD_TRIGGER_THRESHOLD): boolean {
+  return indexes.some((index) => {
+    const button = gamepad.buttons[index];
+    return Boolean(button && (button.pressed || button.value >= threshold));
+  });
+}
+
+function readLocalGamepadButtons(gamepad: Gamepad): LocalGamepadButtonState {
+  const lower = gamepadButtonPressed(gamepad, [2]);
+  const upper = gamepadButtonPressed(gamepad, [1, 6]);
+  const jump = gamepadButtonPressed(gamepad, [0]);
+  const head = gamepadButtonPressed(gamepad, [3, 5]);
+  const sprint = gamepadButtonPressed(gamepad, [4, 10]);
+  const switchTeam = gamepadButtonPressed(gamepad, [7]);
+  return {
+    lower,
+    upper,
+    jump,
+    head,
+    sprint,
+    switchTeam,
+    anyAction: lower || upper || jump || head
+  };
+}
+
+function gamepadAxis(value: number | undefined): number {
+  const raw = Number(value || 0);
+  const absolute = Math.abs(raw);
+  if (absolute <= LOCAL_GAMEPAD_DEAD_ZONE) return 0;
+  return Math.sign(raw) * THREE.MathUtils.clamp((absolute - LOCAL_GAMEPAD_DEAD_ZONE) / (1 - LOCAL_GAMEPAD_DEAD_ZONE), 0, 1);
+}
+
+function localGamepadMoveVector(gamepad: Gamepad): { x: number; y: number } {
+  let x = gamepadAxis(gamepad.axes[0]);
+  let y = gamepadAxis(gamepad.axes[1]);
+  const dpadX = (gamepadButtonPressed(gamepad, [15], 0.5) ? 1 : 0) - (gamepadButtonPressed(gamepad, [14], 0.5) ? 1 : 0);
+  const dpadY = (gamepadButtonPressed(gamepad, [13], 0.5) ? 1 : 0) - (gamepadButtonPressed(gamepad, [12], 0.5) ? 1 : 0);
+  if (dpadX !== 0) x = dpadX;
+  if (dpadY !== 0) y = dpadY;
+  return { x, y };
+}
+
+function observeLocalGamepadActivationActivity(slot: LocalGamepadSlot, gamepad: Gamepad, now: number): boolean {
+  const move = localGamepadMoveVector(gamepad);
+  const buttons = readLocalGamepadButtons(gamepad);
+  const active = Math.hypot(move.x, move.y) > LOCAL_GAMEPAD_ACTIVITY_MOVE_THRESHOLD
+    || buttons.anyAction
+    || buttons.sprint
+    || buttons.switchTeam;
+  if (!active) return slot.activitySeen;
+  slot.activitySeen = true;
+  slot.lastActiveAt = now;
+  slot.prev = buttons;
+  return true;
+}
+
+function applyLocalGamepadMovement(slot: LocalGamepadSlot, gamepad: Gamepad): number {
+  const move = localGamepadMoveVector(gamepad);
+  const mounted = localGamepadMounted(slot);
+  let forward = -move.y;
+  let side = move.x;
+  side *= -1;
+  if (settings.controls.invertForwardBack) forward *= -1;
+  if (settings.controls.invertLeftRight) side *= -1;
+
+  let xAxis = side;
+  let zAxis = -forward;
+  if (!mounted && localGamepadTeam(slot) === 1) zAxis *= -1;
+
+  slot.input.left = xAxis < -0.05;
+  slot.input.right = xAxis > 0.05;
+  slot.input.up = zAxis < -0.05;
+  slot.input.down = zAxis > 0.05;
+  if (xAxis !== 0 || zAxis !== 0) slot.input.yaw = Math.atan2(xAxis, zAxis);
+  document.documentElement.dataset.localGamepadVehicleControls = mounted ? "direct" : "team-relative";
+  return Math.hypot(xAxis, zAxis);
+}
+
+function updateLocalGamepadKickCharge(
+  slot: LocalGamepadSlot,
+  pressed: boolean,
+  previous: boolean,
+  side: "left" | "right",
+  now: number
+): boolean {
+  const startedKey = side === "left" ? "leftChargeStartedAt" : "rightChargeStartedAt";
+  const heldKey = side === "left" ? "kickLeftHeld" : "kickRightHeld";
+  const chargeKey = side === "left" ? "kickLeftCharge" : "kickRightCharge";
+  const counterKey = side === "left" ? "kickLeft" : "kickRight";
+  if (pressed && !previous) {
+    slot[startedKey] = now;
+    slot.input[heldKey] = true;
+    slot.input[chargeKey] = 0;
+    return true;
+  }
+  if (pressed) {
+    const startedAt = slot[startedKey] || now;
+    slot[startedKey] = startedAt;
+    slot.input[heldKey] = true;
+    slot.input[chargeKey] = THREE.MathUtils.clamp((now - startedAt) / (LEFT_KICK_CHARGE_SECONDS * 1000), 0, 1);
+    return false;
+  }
+  if (!pressed && previous) {
+    const startedAt = slot[startedKey] || now;
+    slot.input[counterKey] += 1;
+    slot.input[heldKey] = false;
+    slot.input[chargeKey] = THREE.MathUtils.clamp((now - startedAt) / (LEFT_KICK_CHARGE_SECONDS * 1000), 0, 1);
+    slot[startedKey] = 0;
+    return true;
+  }
+  slot.input[heldKey] = false;
+  return false;
+}
+
+function updateLocalGamepadInput(slot: LocalGamepadSlot, gamepad: Gamepad, now: number): boolean {
+  const previousDirections = `${slot.input.left}:${slot.input.right}:${slot.input.up}:${slot.input.down}`;
+  const previousSprint = slot.input.sprint;
+  const moveMagnitude = applyLocalGamepadMovement(slot, gamepad);
+  const buttons = readLocalGamepadButtons(gamepad);
+  let forceSend = previousDirections !== `${slot.input.left}:${slot.input.right}:${slot.input.up}:${slot.input.down}`;
+  if (moveMagnitude > 0.05) {
+    slot.lastActiveAt = now;
+    markControlHintsUsed("move");
+  }
+  slot.input.sprint = buttons.sprint;
+  if (buttons.sprint) {
+    slot.lastActiveAt = now;
+    markControlHintsUsed("sprint");
+  }
+  forceSend = forceSend || previousSprint !== slot.input.sprint;
+  if (buttons.switchTeam && !slot.prev.switchTeam) {
+    slot.input.switchTeam += 1;
+    slot.lastActiveAt = now;
+    document.documentElement.dataset.teamSwitchSource = `gamepad-${slot.index + 1}`;
+    document.documentElement.dataset.teamSwitchCount = String(slot.input.switchTeam);
+    pushEventFeed(`${localGamepadName(slot)} switched team`);
+    forceSend = true;
+  }
+
+  if (buttons.anyAction && localGamepadMounted(slot)) {
+    resetLocalGamepadCharges(slot);
+    if (!slot.prev.anyAction) {
+      slot.input.exitVehicle += 1;
+      forceSend = true;
+    }
+  } else {
+    if (updateLocalGamepadKickCharge(slot, buttons.lower, slot.prev.lower, "left", now)) {
+      markControlHintsUsed("leftKick");
+      forceSend = true;
+    }
+    if (updateLocalGamepadKickCharge(slot, buttons.upper, slot.prev.upper, "right", now)) {
+      markControlHintsUsed("rightKick");
+      forceSend = true;
+    }
+    if (buttons.jump && !slot.prev.jump) {
+      slot.input.jump += 1;
+      markControlHintsUsed("jump");
+      forceSend = true;
+    }
+    if (buttons.head && !slot.prev.head) {
+      slot.input.head += 1;
+      markControlHintsUsed("headHit");
+      forceSend = true;
+    }
+  }
+
+  if (buttons.anyAction || buttons.sprint) slot.lastActiveAt = now;
+  slot.prev = buttons;
+  return forceSend;
+}
+
+function sendLocalGamepadInput(slot: LocalGamepadSlot, force: boolean, now: number): void {
+  if (!connected || !slot.clientId) return;
+  if (!force && now - slot.lastSentAt < LOCAL_GAMEPAD_INPUT_INTERVAL_MS) return;
+  slot.lastSentAt = now;
+  slot.sequence += 1;
+  void postJson<{ ok: boolean }>("input", {
+    clientId: slot.clientId,
+    input: slot.input,
+    sequence: slot.sequence
+  }).catch((error) => {
+    console.warn("unsoccer local gamepad input failed", error);
+    if (String(error).includes("404")) {
+      slot.clientId = null;
+      slot.join = null;
+      slot.sequence = 0;
+      slot.lastJoinAttemptAt = -LOCAL_GAMEPAD_JOIN_RETRY_MS;
+    }
+  });
+}
+
+async function joinLocalGamepadSlot(slot: LocalGamepadSlot, gamepad: Gamepad, now: number): Promise<void> {
+  if (!connected || slot.clientId || slot.joining) return;
+  if (now - slot.lastJoinAttemptAt < LOCAL_GAMEPAD_JOIN_RETRY_MS) return;
+  slot.gamepadId = gamepad.id || slot.gamepadId;
+  slot.lastJoinAttemptAt = now;
+  slot.joining = true;
+  try {
+    const profile = localGamepadProfile(slot);
+    const payload = await postJson<{ ok: boolean; joined: JoinAccepted; state: ServerState }>("join", {
+      ...joinRequestPayload(profile.nickname),
+      clientFingerprint: localGamepadFingerprint(slot),
+      profile
+    });
+    slot.clientId = payload.joined.id;
+    slot.join = payload.joined;
+    slot.input = cloneLocalInput();
+    slot.sequence = 0;
+    slot.lastSentAt = 0;
+    slot.lastObservedStamina = null;
+    slot.lastObservedRagdollAt = 0;
+    slot.lastDamageRumbleAt = 0;
+    receiveState(payload.state);
+    pushEventFeed(`${localGamepadName(slot)} joined local co-op`);
+  } catch (error) {
+    console.warn("unsoccer local gamepad join failed", error);
+  } finally {
+    slot.joining = false;
+    syncLocalGamepadDataset();
+  }
+}
+
+function leaveLocalGamepadSlot(slot: LocalGamepadSlot): void {
+  const clientId = slot.clientId;
+  slot.clientId = null;
+  slot.join = null;
+  slot.sequence = 0;
+  slot.lastSentAt = 0;
+  slot.lastObservedStamina = null;
+  slot.lastObservedRagdollAt = 0;
+  slot.lastDamageRumbleAt = 0;
+  resetLocalGamepadCharges(slot);
+  slot.prev = emptyLocalGamepadButtons();
+  if (!clientId) return;
+  void postJson<{ ok: boolean }>("leave", { clientId }).catch((error) => {
+    console.warn("unsoccer local gamepad leave failed", error);
+  });
+}
+
+function syncLocalGamepadDataset(): void {
+  const connectedPads = connectedLocalGamepads();
+  const joinedSlots = [...localGamepadSlots.values()].filter((slot) => Boolean(slot.clientId));
+  document.documentElement.dataset.localCoopSupported = String(localGamepadSupported());
+  document.documentElement.dataset.localCoopMaxGamepads = String(LOCAL_GAMEPAD_MAX_PLAYERS);
+  document.documentElement.dataset.localCoopGamepads = String(connectedPads.length);
+  document.documentElement.dataset.localCoopPlayers = String(joinedSlots.length);
+  document.documentElement.dataset.localCoopSlotIds = joinedSlots.map((slot) => slot.clientId).filter(Boolean).join(",");
+  document.documentElement.dataset.localCoopTransport = "http-slots";
+  document.documentElement.dataset.localCoopHaptics = String(connectedPads.filter(localGamepadHasHaptics).length);
+}
+
+function updateLocalGamepads(now = performance.now()): void {
+  if (!localGamepadSupported()) {
+    syncLocalGamepadDataset();
+    return;
+  }
+  const gamepads = connectedLocalGamepads();
+  const activeIndexes = new Set(gamepads.map((gamepad) => gamepad.index));
+  for (const [index, slot] of localGamepadSlots) {
+    if (!activeIndexes.has(index)) {
+      leaveLocalGamepadSlot(slot);
+      localGamepadSlots.delete(index);
+    }
+  }
+  if (!connected) {
+    for (const slot of localGamepadSlots.values()) leaveLocalGamepadSlot(slot);
+    syncLocalGamepadDataset();
+    return;
+  }
+  for (const gamepad of gamepads) {
+    let slot = localGamepadSlots.get(gamepad.index);
+    if (!slot) {
+      slot = createLocalGamepadSlot(gamepad);
+      localGamepadSlots.set(gamepad.index, slot);
+    }
+    if (!slot.clientId) {
+      if (observeLocalGamepadActivationActivity(slot, gamepad, now)) {
+        void joinLocalGamepadSlot(slot, gamepad, now);
+      }
+      continue;
+    }
+    const forceSend = updateLocalGamepadInput(slot, gamepad, now);
+    sendLocalGamepadInput(slot, forceSend, now);
+  }
+  syncLocalGamepadDataset();
+}
+
 function isImageUserPic(value: string): boolean {
   return /^https?:\/\//i.test(value);
 }
@@ -1215,6 +1721,7 @@ function setSkinShopTab(tab: "players" | "balls"): void {
   skinShopTab = tab;
   for (const button of skinShopPanel.querySelectorAll<HTMLButtonElement>("[data-skin-shop-tab]")) {
     button.setAttribute("aria-selected", String(button.dataset.skinShopTab === tab));
+    button.textContent = t(button.dataset.skinShopTab === "balls" ? "shop.balls" : "shop.players");
   }
   skinShopPlayerGrid.hidden = tab !== "players";
   skinShopBallGrid.hidden = tab !== "balls";
@@ -1249,7 +1756,7 @@ function renderSkinShop(force = false): void {
   if (!force && signature === skinShopRenderSignature) return;
   skinShopRenderSignature = signature;
   skinShopBalanceEl.textContent = String(balance);
-  skinShopStatusEl.textContent = `${balance} goals`;
+  skinShopStatusEl.textContent = t("shop.statusGoals", { goals: balance });
   document.documentElement.dataset.skinShopGoals = String(localGoalsEarned());
   document.documentElement.dataset.skinShopBalance = String(balance);
   document.documentElement.dataset.skinShopSpentGoals = String(skinStore.spentGoals);
@@ -1405,13 +1912,20 @@ function renderSkinShopGrid(root: HTMLElement, items: SkinCatalogItem[], kind: "
     const isSelected = item.id === selectedId;
     const canBuy = localGoalBalance() >= item.price;
     const state = isSelected ? "selected" : isOwned ? "select" : canBuy ? "buy" : "locked";
-    const actionLabel = isSelected ? "Selected" : isOwned ? "Select" : canBuy ? `Buy for ${item.price} goals` : `Need ${item.price} goals`;
+    const actionLabel = isSelected
+      ? t("shop.selected")
+      : isOwned
+        ? t("shop.select")
+        : canBuy
+          ? t("shop.buyFor", { goals: item.price })
+          : t("shop.need", { goals: item.price });
     const disabled = isSelected || (!isOwned && !canBuy) ? " disabled" : "";
     const classes = `skin-card${isSelected ? " is-selected" : ""}${isOwned ? "" : " is-locked"}`;
+    const priceLabel = t("shop.priceGoals", { goals: item.price });
     return (
       `<article class="${classes}" data-skin-kind="${kind}" data-skin-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.title)}">` +
       `<div class="skin-preview" data-preview-kind="${kind}"><img class="skin-preview-image" alt="" aria-hidden="true" /></div>` +
-      `<div class="skin-card-footer"><span class="skin-price" aria-label="${escapeHtml(`${item.price} goals`)}"><i></i><b>${item.price}</b></span>` +
+      `<div class="skin-card-footer"><span class="skin-price" aria-label="${escapeHtml(priceLabel)}"><i></i><b>${item.price}</b></span>` +
       `<button type="button" data-skin-action="${kind}" data-skin-id="${escapeHtml(item.id)}" data-action-state="${state}" aria-label="${escapeHtml(actionLabel)}"${disabled}></button></div>` +
       `</article>`
     );
@@ -1444,7 +1958,7 @@ function buyOrSelectSkin(kind: "character" | "ball", id: string): void {
   const ownedList = kind === "character" ? skinStore.ownedCharacters : skinStore.ownedBalls;
   if (!ownedList.includes(id)) {
     if (localGoalBalance() < item.price) {
-      skinShopStatusEl.textContent = `Need ${item.price} goals`;
+      skinShopStatusEl.textContent = t("shop.need", { goals: item.price });
       return;
     }
     ownedList.push(id);
@@ -1924,6 +2438,7 @@ function updatePlayerChip(state: ServerState | null = renderedState ?? latestSta
   playerTeamEl.textContent = localJoin ? teamNameLabel(localJoin.team) : teamLabel(null, true);
   playerInputModeEl.textContent = settings.controls.movementMode === "team-goal" ? "Team-goal" : settings.controls.movementMode === "camera" ? "Camera" : "Screen";
   updateStaminaHud(findLocalPlayer(state));
+  updateControllerHud(state);
 }
 
 function findLocalPlayer(state: ServerState | null | undefined): PlayerSnapshot | null {
@@ -1974,6 +2489,77 @@ function staminaUiState(player: PlayerSnapshot, staminaPercent: number): Stamina
 
 function staminaUiLabel(state: StaminaUiState): string {
   return staminaLabel(state);
+}
+
+function playerStaminaMetrics(player: PlayerSnapshot | null, state: ServerState | null | undefined): { percent: number; uiState: StaminaUiState; label: string } {
+  if (!player) return { percent: 0, uiState: "hidden", label: t("stamina.waiting") };
+  const maxStamina = Math.max(1, state?.settings?.playerStaminaMax ?? PLAYER_STAMINA_MAX);
+  const stamina = THREE.MathUtils.clamp(player.stamina, 0, maxStamina);
+  const percent = Math.round(stamina / maxStamina * 100);
+  const uiState = staminaUiState(player, percent);
+  return { percent, uiState, label: staminaUiLabel(uiState) };
+}
+
+function controllerCard(slotId: string): HTMLElement | null {
+  return controllerPanelEl.querySelector<HTMLElement>(`[data-controller-slot="${slotId}"]`);
+}
+
+function controllerTitle(label: string, player: PlayerSnapshot | null, stateLabel: string, staminaLabelText: string): string {
+  const playerLabel = player ? `${displayPlayerName(player.name)} · ${teamNameLabel(player.team)}` : stateLabel;
+  return `${label}: ${playerLabel} · ${staminaLabelText}`;
+}
+
+function updateControllerCard(
+  slotId: string,
+  label: string,
+  player: PlayerSnapshot | null,
+  options: { connected: boolean; joining?: boolean } = { connected: false }
+): void {
+  const card = controllerCard(slotId);
+  if (!card) return;
+  const state = renderedState ?? latestState;
+  const metrics = playerStaminaMetrics(player, state);
+  const active = Boolean(player);
+  const connectedState = active ? "active" : options.joining ? "joining" : options.connected ? "connected" : "inactive";
+  card.dataset.active = String(active);
+  card.dataset.controllerState = connectedState;
+  card.dataset.staminaState = metrics.uiState;
+  card.dataset.team = player?.team === 0 ? "blue" : player?.team === 1 ? "orange" : "none";
+  card.dataset.playerId = player?.id ?? "";
+  card.dataset.stamina = active ? String(metrics.percent) : "";
+  card.style.setProperty("--controller-stamina-pct", `${metrics.percent}%`);
+  const staminaText = card.querySelector<HTMLElement>(".controller-stamina b");
+  if (staminaText) staminaText.textContent = active ? `${metrics.percent}` : "--";
+  const stateLabel = connectedState === "active"
+    ? t("controller.active")
+    : connectedState === "joining"
+      ? t("controller.joining")
+      : connectedState === "connected"
+        ? t("controller.connected")
+        : t("controller.inactive");
+  const staminaLabelText = active ? t("controller.staminaValue", { value: metrics.percent, state: metrics.label }) : stateLabel;
+  card.setAttribute("aria-label", controllerTitle(label, player, stateLabel, staminaLabelText));
+  card.setAttribute("title", controllerTitle(label, player, stateLabel, staminaLabelText));
+}
+
+function updateControllerHud(state: ServerState | null | undefined): void {
+  const playersById = new Map((state?.players ?? []).map((player) => [player.id, player]));
+  const keyboardPlayer = findLocalPlayer(state);
+  updateControllerCard("keyboard", t("controller.keyboard"), keyboardPlayer, { connected });
+
+  const connectedPads = new Map(connectedLocalGamepads().map((gamepad) => [gamepad.index, gamepad]));
+  for (let index = 0; index < LOCAL_GAMEPAD_MAX_PLAYERS; index += 1) {
+    const slot = localGamepadSlots.get(index);
+    const player = slot?.clientId ? playersById.get(slot.clientId) ?? null : null;
+    updateControllerCard(`pad-${index + 1}`, t("controller.gamepad", { index: index + 1 }), player, {
+      connected: connectedPads.has(index),
+      joining: Boolean(slot?.joining)
+    });
+  }
+
+  const activeSlots = [...controllerPanelEl.querySelectorAll<HTMLElement>(".controller-card[data-active=\"true\"]")];
+  document.documentElement.dataset.controllerHudActiveSlots = activeSlots.map((card) => card.dataset.controllerSlot || "").filter(Boolean).join(",");
+  document.documentElement.dataset.controllerHudActiveCount = String(activeSlots.length);
 }
 
 function updateNetworkHud(now = performance.now()): void {
@@ -2193,10 +2779,12 @@ function syncMobileControlsUi(): void {
 
 function updateResolvedInput(): void {
   const activeCodes = mergedPressedCodes();
-  input = resolveMovementInput(settings.controls, activeCodes, localJoin?.team ?? null, input);
+  const mounted = localPlayerMounted();
+  input = resolveMovementInput(settings.controls, activeCodes, mounted ? null : (localJoin?.team ?? null), input);
   syncLeftKickChargeInput();
   syncRightKickChargeInput();
   syncInputTestPad(activeCodes);
+  document.documentElement.dataset.keyboardVehicleControls = mounted ? "direct" : "team-relative";
   document.documentElement.dataset.resolvedInputDirections = [
     input.up ? "up" : "",
     input.down ? "down" : "",
@@ -4109,7 +4697,7 @@ class PlayerVisual {
     this.emotionLabel.visible = Boolean(emotion);
     if (emotion) {
       const remaining = Math.max(0, emotion.expiresAt - Date.now());
-      this.emotionLabel.material.opacity = THREE.MathUtils.clamp(remaining / APPLIED_EMOTION_FALLBACK_MS, 0.28, 1);
+      this.emotionLabel.material.opacity = THREE.MathUtils.clamp(remaining / APPLIED_EMOTION_FALLBACK_MS, APPLIED_EMOTION_MIN_OPACITY, 1);
       if (snapshot.id === localJoin?.id) document.documentElement.dataset.localEmotion = emotion.id;
     } else if (snapshot.id === localJoin?.id) {
       document.documentElement.dataset.localEmotion = "none";
@@ -4156,19 +4744,26 @@ function makeLabelTexture(name: string): THREE.CanvasTexture {
 
 function makeEmotionTexture(emoji: string): THREE.CanvasTexture {
   const canvasLabel = document.createElement("canvas");
-  canvasLabel.width = 256;
-  canvasLabel.height = 256;
+  canvasLabel.width = 384;
+  canvasLabel.height = 384;
   const context = canvasLabel.getContext("2d");
   if (context) {
-    context.fillStyle = "rgba(4, 12, 11, 0.72)";
+    context.clearRect(0, 0, canvasLabel.width, canvasLabel.height);
+    context.fillStyle = "rgba(4, 12, 11, 0.9)";
     context.beginPath();
-    context.arc(128, 128, 108, 0, Math.PI * 2);
+    context.arc(192, 192, 158, 0, Math.PI * 2);
     context.fill();
+    context.lineWidth = 10;
+    context.strokeStyle = "rgba(255, 209, 102, 0.74)";
+    context.stroke();
+    context.shadowColor = "rgba(0, 0, 0, 0.55)";
+    context.shadowBlur = 18;
+    context.shadowOffsetY = 8;
     context.fillStyle = "#ffffff";
-    context.font = "116px sans-serif";
+    context.font = "210px sans-serif";
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.fillText(emoji || " ", 128, 132);
+    context.fillText(emoji || " ", 192, 200);
   }
   return new THREE.CanvasTexture(canvasLabel);
 }
@@ -4189,6 +4784,7 @@ function makeLabel(name: string) {
 
 function makeEmotionLabel(emoji: string) {
   const texture = makeEmotionTexture(emoji);
+  texture.colorSpace = THREE.SRGBColorSpace;
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
   const sprite = new THREE.Sprite(material);
   sprite.scale.set(APPLIED_EMOTION_LABEL_SCALE, APPLIED_EMOTION_LABEL_SCALE, 1);
@@ -4551,6 +5147,7 @@ function sendEmotion(emotionId: EmotionId): void {
 }
 
 function receiveState(state: ServerState) {
+  observeLocalGamepadDamage(state);
   latestState = state;
   latestSnapshotReceivedAt = performance.now();
   stateHistory.push({ state, receivedAt: latestSnapshotReceivedAt * 0.001 });
@@ -4796,15 +5393,32 @@ function lerpAngle(from: number, to: number, alpha: number) {
   return from + delta * alpha;
 }
 
+function formatMatchTime(ms: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 function updateHud(state: ServerState) {
   blueScoreEl.textContent = String(state.score.blue);
   orangeScoreEl.textContent = String(state.score.orange);
+  const matchTime = formatMatchTime(state.matchRemainingMs ?? state.matchDurationMs ?? 0);
+  matchTimerEl.textContent = matchTime;
+  matchTimerEl.title = t("match.timerTitle", { time: matchTime });
+  document.documentElement.dataset.matchDurationMs = String(Math.round(state.matchDurationMs ?? 0));
+  document.documentElement.dataset.matchRemainingMs = String(Math.max(0, Math.round(state.matchRemainingMs ?? 0)));
   updateWeatherHud(state.weather, state.dayTimeSeconds);
   updatePlayerChip(state);
   updateNetworkHud();
   document.documentElement.dataset.goalResetPhase = state.goalReset.phase;
   document.documentElement.dataset.goalResetRemainingMs = String(Math.round(state.goalReset.remainingMs));
   document.documentElement.dataset.goalResetReturnProgress = state.goalReset.returnProgress.toFixed(3);
+  const goalBannerVisible = state.goalReset.phase === "celebration";
+  goalBannerEl.hidden = !goalBannerVisible;
+  goalBannerEl.dataset.team = goalBannerVisible ? String(state.goalReset.scoringTeam ?? "") : "";
+  goalBannerEl.style.setProperty("--goal-remaining-ms", String(Math.max(0, Math.round(state.goalReset.remainingMs))));
+  document.documentElement.dataset.goalBannerVisible = String(goalBannerVisible);
   const countdown = state.countdown > 0 ? t("status.countdown", { seconds: (state.countdown / 1000).toFixed(1) }) : "";
   const goalResetText = state.goalReset.phase === "celebration"
     ? t("status.celebration", { seconds: (state.goalReset.remainingMs / 1000).toFixed(1) })
@@ -5311,8 +5925,9 @@ function updateLighting(elapsedSeconds: number) {
   const cycleSeconds = Math.max(1, runtimeSettings?.dayCycleSeconds ?? DAY_CYCLE_SECONDS);
   const startSeconds = runtimeSettings?.dayStartSeconds ?? DAY_START_SECONDS;
   const serverDayTime = lightingState?.dayTimeSeconds;
-  const fallbackCycleSeconds = qaDayCycleSeconds === null ? elapsedSeconds : qaDayCycleSeconds + elapsedSeconds;
-  const fallbackDayTime = startSeconds + fallbackCycleSeconds / cycleSeconds * 24 * 60 * 60;
+  const fallbackDayTime = qaDayCycleSeconds === null
+    ? startSeconds
+    : startSeconds + qaDayCycleSeconds / cycleSeconds * 24 * 60 * 60;
   const daySeconds = serverDayTime ?? fallbackDayTime;
   const dayTime = THREE.MathUtils.euclideanModulo(daySeconds, 24 * 60 * 60);
   const visual = runtimeSettings?.visual ?? DEFAULT_VISUAL_SETTINGS;
@@ -5335,7 +5950,7 @@ function updateLighting(elapsedSeconds: number) {
   });
   document.documentElement.dataset.dayCycleSeconds = THREE.MathUtils.euclideanModulo((lighting.solarCycle - 0.25) * cycleSeconds, cycleSeconds).toFixed(2);
   document.documentElement.dataset.dayTimeSeconds = dayTime.toFixed(1);
-  document.documentElement.dataset.dayCycleSource = serverDayTime === undefined ? "fallback-animated" : "server";
+  document.documentElement.dataset.dayCycleSource = serverDayTime === undefined ? "fixed-client-daylight" : "fixed-server-daylight";
   document.documentElement.dataset.dayCycleLengthSeconds = String(cycleSeconds);
   document.documentElement.dataset.darkHours = DARK_HOURS_LABEL;
   document.documentElement.dataset.twilightHours = TWILIGHT_HOURS_LABEL;
@@ -5676,6 +6291,15 @@ addEventListener("keydown", (event) => {
   }
   if (settingsOpen) return;
   const keyCodes = new Set([event.code]);
+  if (!event.repeat && event.code === "Tab") {
+    event.preventDefault();
+    input.switchTeam += 1;
+    document.documentElement.dataset.teamSwitchSource = "keyboard";
+    document.documentElement.dataset.teamSwitchCount = String(input.switchTeam);
+    pushEventFeed("Team switch requested");
+    sendInput(true);
+    return;
+  }
   if (
     !event.repeat
     && localPlayerMounted()
@@ -5941,12 +6565,25 @@ addEventListener("blur", () => {
 });
 addEventListener("pagehide", () => {
   const clientId = transportMode === "http" ? httpClientId : localJoin?.id;
-  if (!clientId) return;
-  const body = JSON.stringify({ clientId });
-  navigator.sendBeacon(`${serverApiBase()}/leave`, new Blob([body], { type: "application/json" }));
+  const clientIds = new Set<string>();
+  if (clientId) clientIds.add(clientId);
+  for (const slot of localGamepadSlots.values()) {
+    if (slot.clientId) clientIds.add(slot.clientId);
+  }
+  for (const id of clientIds) {
+    const body = JSON.stringify({ clientId: id });
+    navigator.sendBeacon(`${serverApiBase()}/leave`, new Blob([body], { type: "application/json" }));
+  }
+});
+addEventListener("gamepadconnected", () => {
+  updateLocalGamepads();
+});
+addEventListener("gamepaddisconnected", () => {
+  updateLocalGamepads();
 });
 resize();
 initializeProfileControls();
+syncLocalGamepadDataset();
 connect();
 
 function runFrame(time: number) {
@@ -5956,6 +6593,7 @@ function runFrame(time: number) {
   lastFrameSeconds = seconds;
   syncLeftKickChargeDataset(time);
   sendInput();
+  updateLocalGamepads(time);
   renderedState = selectRenderState(seconds);
   document.documentElement.dataset.interpolationBuffer = String(stateHistory.length);
   document.documentElement.dataset.interpolationDelayMs = String(Math.round(STATE_INTERPOLATION_DELAY_SECONDS * 1000));

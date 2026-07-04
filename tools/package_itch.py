@@ -32,6 +32,7 @@ TEXTURELESS_RUNTIME_ASSET_DIRS = (
     pathlib.Path("assets") / "characters",
     pathlib.Path("assets") / "environment",
     pathlib.Path("assets") / "balls",
+    pathlib.Path("assets") / "vehicles",
 )
 BLOCKED_TEXTURE_FILE_EXTENSIONS = {
     ".png",
@@ -126,7 +127,8 @@ def material_has_texture_reference(material: dict) -> bool:
 
 
 def glb_vertex_pbr_problems(gltf: dict, relative: str) -> list[str]:
-    requires_packed_pbr = "/assets/characters/" in f"/{relative}"
+    normalized = f"/{relative}"
+    requires_packed_pbr = "/assets/characters/" in normalized or "/assets/vehicles/" in normalized
     problems: set[str] = set()
     for mesh in gltf.get("meshes", []):
         for primitive in mesh.get("primitives", []):

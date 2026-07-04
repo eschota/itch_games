@@ -130,6 +130,9 @@ Use this file for deployment-reference work inside `/itch_games/ai_chat/deploy`.
   `/unsoccer/api/health` for the matching server version. `/api/deploy-health`
   must not report ready when source, dist HTML, weight label, and local API
   versions diverge.
+- `/api/deploy-health` must read enough of `unsoccer/client/dist/index.html`
+  and the public `/unsoccer/` HTML to include the bottom HUD `version-badge`;
+  keep this above the full index size so the weight marker is not truncated.
 - Before starting a new UnSoccer release, the qwertystock and Moscow deploys
   must stop `itch-games-unsoccer-server.service`, kill any residual
   `node .../unsoccer/server/dist/index.js` process for that host path, then

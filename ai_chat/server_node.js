@@ -1747,10 +1747,10 @@ function trackUnsoccerOutput(streamName, chunk) {
 
 async function deployHealthSnapshot() {
   const publicBaseUrl = publicSiteBaseUrl();
-  const distHtml = readTextFileSlice(["unsoccer", "client", "dist", "index.html"], 16000);
+  const distHtml = readTextFileSlice(["unsoccer", "client", "dist", "index.html"], 64000);
   const distAssets = unsoccerDistAssetReports(distHtml);
   const serverHealth = await localHttpJson(Number(process.env.UNSOCCER_PORT || 8787), "/api/health", 1800);
-  const publicGameHtml = await remoteHttpText(`${publicBaseUrl}/unsoccer/`, 2500, 16000);
+  const publicGameHtml = await remoteHttpText(`${publicBaseUrl}/unsoccer/`, 2500, 64000);
   const publicApiHealth = await remoteHttpJson(`${publicBaseUrl}/unsoccer/api/health`, 2500);
   const systemd = await execFileReport("systemctl", ["is-active", "itch-games-unsoccer-server.service"], 1800);
   const processList = await execFileReport("pgrep", ["-af", "unsoccer/server/dist/index.js"], 1800);
